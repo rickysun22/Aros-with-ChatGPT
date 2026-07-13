@@ -1,0 +1,1 @@
+"""AROS test suite."""

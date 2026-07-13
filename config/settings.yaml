@@ -1,0 +1,25 @@
+# AROS runtime configuration
+# Every runtime parameter is centralized here so the code stays config-driven
+# (project principle: 所有参数配置化). Environment variables may override
+# individual keys — see .env.example.
+
+app_name: AROS
+
+data:
+  source: akshare          # data provider (AKShare)
+  frequency: daily         # bar frequency
+  start_date: "2015-01-01" # inclusive data start
+  end_date: "2026-06-30"   # inclusive data end
+  # symbols: null          # null = all available A-share codes
+
+database:
+  url: sqlite:///data/aros.db
+
+paths:
+  data_dir: data
+  cache_dir: data/cache
+  report_dir: reports
+
+logging:
+  level: INFO
+  dir: logs
