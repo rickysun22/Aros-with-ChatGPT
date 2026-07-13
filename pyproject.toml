@@ -55,7 +55,8 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = false
+disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]
-module = ["yaml.*", "dotenv.*"]
+module = ["yaml.*", "dotenv.*", "akshare.*"]
 ignore_missing_imports = true

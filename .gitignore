@@ -217,10 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# AROS generated artifacts
-data/
-logs/
-reports/
+# AROS generated artifacts (anchored to repo root so src/data/ is NOT ignored)
+/data/
+/logs/
+/reports/
 *.db
 aros.db
 .aros/

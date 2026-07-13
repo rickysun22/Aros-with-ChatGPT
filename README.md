@@ -9,7 +9,8 @@ AROS is a modular A-share research platform for data ingestion, validation, indi
 | Sprint | Scope | Status |
 |--------|-------|--------|
 | **1.1** | Project Foundation (scaffold, config, logging, db, CLI, tests) | ✅ completed |
-| 1.2+ | Database Layer, AKShare Layer, DataManager, indicators, factors, strategies, backtest | ⏳ planned |
+| **1.2** | Data Layer: Database (ORM), AKShare provider, DataManager (single entry) | ✅ completed |
+| 1.3+ | Indicator Engine, Factor Engine, strategies, backtest, ranking, report | ⏳ planned |
 
 - Data range target: 2015-01-01 to 2026-06-30
 - Data source: AKShare
@@ -50,7 +51,7 @@ cp .env.example .env         # optional local overrides
 pytest            # run the test suite
 ruff check .      # lint
 black --check .   # format check
-mypy src tests    # static type check
+mypy src tests main.py    # static type check
 ```
 
 All four gates must pass before a sprint is considered done.
@@ -61,12 +62,17 @@ All four gates must pass before a sprint is considered done.
 python main.py --help
 python main.py version
 python main.py info
+
+# Data (Sprint 1.2) - all data access goes through DataManager
+python main.py sync --list                 # fetch & store the A-share stock list
+python main.py sync --code 600000          # fetch & store daily bars for one stock
+python main.py bars 600000 --start 2024-01-01 --end 2024-03-31
 ```
 
 ## Planned modules
 
 - `src/core` (done): config, logging, database, exceptions
-- `src/data`: ingestion, normalization, validation, management
+- `src/data` (done): `models` (ORM), `provider` (AKShare + normalization), `manager` (DataManager)
 - `src/indicators`: technical indicators
 - `src/factors`: research factors
 - `src/strategies`: strategy definitions

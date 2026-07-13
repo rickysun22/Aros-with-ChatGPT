@@ -26,6 +26,9 @@ class DataConfig(BaseModel):
 
     source: str = "akshare"
     frequency: str = "daily"
+    # Price adjustment for historical bars: "qfq" (forward), "hfq" (backward),
+    # or "" (raw). Forward-adjusted is the sensible default for research.
+    adjust: str = "qfq"
     start_date: str = "2015-01-01"
     end_date: str = "2026-06-30"
     symbols: list[str] | None = None
