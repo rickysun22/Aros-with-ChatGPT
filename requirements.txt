@@ -1,0 +1,12 @@
+akshare
+pandas
+numpy
+sqlalchemy>=2.0
+pydantic>=2.0
+pyyaml
+loguru
+typer
+pytest
+black
+ruff
+mypy
