@@ -27,10 +27,11 @@ from sqlalchemy.orm import Session
 
 from core.config import AppConfig, get_config
 from core.database import Base, get_engine, get_sessionmaker
-from core.exceptions import DataError
+from core.exceptions import ConfigError, DataError
 
 from .models import DailyBar, Stock, SyncState
 from .provider import AkShareProvider, DataProvider
+from .providers.astockdata import AStockDataProvider
 
 
 def _parse_date(value: str) -> date:
@@ -50,9 +51,23 @@ class DataManager:
         provider: DataProvider | None = None,
     ) -> None:
         self.config = config or get_config()
-        self.provider = provider or AkShareProvider(adjust=self.config.data.adjust)
-        self._sessionmaker = get_sessionmaker()
+        self.provider = provider or self._build_provider()
+        self._engine = get_engine(self.config.database.url)
+        self._sessionmaker = get_sessionmaker(self._engine)
         self._ensure_schema()
+
+    # ------------------------------------------------------------------ #
+    # Provider selection (single source of truth)
+    # ------------------------------------------------------------------ #
+    def _build_provider(self) -> DataProvider:
+        source = self.config.data.source
+        if source == "astockdata":
+            return AStockDataProvider()
+        if source == "akshare":
+            return AkShareProvider(adjust=self.config.data.adjust)
+        raise ConfigError(
+            f"Unsupported data.source: {source!r} (expected 'akshare' or 'astockdata')"
+        )
 
     # ------------------------------------------------------------------ #
     # Schema
@@ -60,7 +75,7 @@ class DataManager:
     def _ensure_schema(self) -> None:
         from . import models  # noqa: F401  (register models on Base.metadata)
 
-        Base.metadata.create_all(get_engine())
+        Base.metadata.create_all(self._engine)
 
     # ------------------------------------------------------------------ #
     # Writes (from provider) -- used by sync pipelines
@@ -118,9 +133,10 @@ class DataManager:
         excluded = stmt.excluded
         stmt = stmt.on_conflict_do_update(
             index_elements=["code", "date"],
-            set_={col: getattr(excluded, col) for col in (
-                "open", "high", "low", "close", "volume", "amount"
-            )},
+            set_={
+                col: getattr(excluded, col)
+                for col in ("open", "high", "low", "close", "volume", "amount")
+            },
         )
         session.execute(stmt)
 
@@ -131,9 +147,7 @@ class DataManager:
         """Return all stored stocks as a DataFrame with ``code``/``name``."""
         with self._sessionmaker() as session:
             stocks = session.execute(select(Stock)).scalars().all()
-            return pd.DataFrame(
-                [{"code": s.code, "name": s.name} for s in stocks]
-            )
+            return pd.DataFrame([{"code": s.code, "name": s.name} for s in stocks])
 
     def get_daily(
         self,
@@ -160,9 +174,7 @@ class DataManager:
                 .order_by(DailyBar.date)
             )
             bars = session.execute(stmt).scalars().all()
-            return pd.DataFrame(
-                [{c: getattr(b, c) for c in columns} for b in bars]
-            )
+            return pd.DataFrame([{c: getattr(b, c) for c in columns} for b in bars])
 
     def last_sync_date(self, code: str) -> date | None:
         """Return the most recent bar date stored for ``code``, if any."""

@@ -42,9 +42,7 @@ class DataProvider(Protocol):
         """Return all A-share instruments as a DataFrame with ``code``/``name``."""
         ...
 
-    def get_daily_bars(
-        self, code: str, start_date: date, end_date: date
-    ) -> pd.DataFrame:
+    def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
         """Return daily OHLCV for ``code`` in ``[start_date, end_date]``.
 
         The result must contain columns: ``code``, ``date``, ``open``, ``high``,
@@ -78,9 +76,7 @@ def normalize_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
     # Drop rows we cannot use (e.g. suspended days with no close print).
     out = out.dropna(subset=["open", "close"])
     out = out.sort_values("date").reset_index(drop=True)
-    return out[
-        ["code", "date", "open", "high", "low", "close", "volume", "amount"]
-    ]
+    return out[["code", "date", "open", "high", "low", "close", "volume", "amount"]]
 
 
 class AkShareProvider:
@@ -99,9 +95,7 @@ class AkShareProvider:
 
         return normalize_stock_list(ak.stock_info_a_code_name())
 
-    def get_daily_bars(
-        self, code: str, start_date: date, end_date: date
-    ) -> pd.DataFrame:
+    def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
         import akshare as ak
 
         raw = ak.stock_zh_a_hist(

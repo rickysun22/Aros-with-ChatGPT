@@ -22,7 +22,12 @@ DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "settings.yaml"
 
 
 class DataConfig(BaseModel):
-    """Data source and date-range configuration."""
+    """Data source and date-range configuration.
+
+    ``source`` selects the :class:`~data.provider.DataProvider`
+    implementation: ``"akshare"`` (default, forward-adjusted) or
+    ``"astockdata"`` (akshare-free, direct HTTP via Baidu/Eastmoney).
+    """
 
     source: str = "akshare"
     frequency: str = "daily"

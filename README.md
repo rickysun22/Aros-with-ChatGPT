@@ -69,6 +69,20 @@ python main.py sync --code 600000          # fetch & store daily bars for one st
 python main.py bars 600000 --start 2024-01-01 --end 2024-03-31
 ```
 
+## Data sources
+
+`DataManager` selects its backend via `config/settings.yaml` → `data.source`:
+
+| `data.source` | Backend | Notes |
+|---------------|---------|-------|
+| `akshare` (default) | AKShare | Forward-adjusted (`qfq`/`hfq` via `data.adjust`); best for research |
+| `astockdata` | [a-stock-data](https://github.com/simonlin1212/a-stock-data) | akshare-free, direct HTTP (Baidu K-line + Eastmoney list); raw prices |
+
+Switch by editing `data.source` in `config/settings.yaml` (or `AROS_DATA_SOURCE`
+is **not** yet env-overridable — set it in the YAML). Both implement the same
+`DataProvider` protocol, so `DataManager` and every downstream module are
+unchanged.
+
 ## Planned modules
 
 - `src/core` (done): config, logging, database, exceptions

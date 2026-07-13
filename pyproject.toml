@@ -18,6 +18,7 @@ dependencies = [
     "loguru",
     "typer",
     "python-dotenv",
+    "requests",
 ]
 
 [project.optional-dependencies]

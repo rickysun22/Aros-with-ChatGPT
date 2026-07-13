@@ -10,6 +10,7 @@ import pytest
 from core.exceptions import DataError
 from data.manager import DataManager
 from data.provider import normalize_daily, normalize_stock_list
+from data.providers.astockdata import AStockDataProvider, normalize_baidu_daily
 
 
 # --------------------------------------------------------------------------- #
@@ -151,3 +152,87 @@ def test_manager_passes_date_range_to_provider() -> None:
     dm.sync_daily("600000", start_date=date(2023, 1, 1), end_date=date(2023, 12, 31))
     # The fake provider records the exact (start, end) it received.
     assert ("bars", "600000", date(2023, 1, 1), date(2023, 12, 31)) in prov.calls
+
+
+# --------------------------------------------------------------------------- #
+# a-stock-data provider (akshare-free, direct HTTP)
+# --------------------------------------------------------------------------- #
+def _fake_baidu_response() -> dict:
+    return {
+        "keys": ["time", "open", "high", "low", "close", "volume", "amount"],
+        "rows": [
+            "2024-01-02,10.0,10.2,9.8,10.1,1000,10100",
+            "2024-01-03,10.5,10.6,10.4,10.55,1100,11500",
+            "2024-01-04,10.6,10.9,10.5,10.8,1200,12960",
+        ],
+    }
+
+
+def test_normalize_baidu_daily() -> None:
+    df = normalize_baidu_daily(_fake_baidu_response(), "600000")
+    assert list(df.columns) == [
+        "code",
+        "date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount",
+    ]
+    assert len(df) == 3
+    assert df.iloc[0]["date"] == date(2024, 1, 2)
+    assert df.iloc[0]["code"] == "600000"
+
+
+def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "data.providers.astockdata._baidu_kline",
+        lambda code, start_time="": _fake_baidu_response(),
+    )
+    df = AStockDataProvider().get_daily_bars("600000", date(2024, 1, 1), date(2024, 12, 31))
+    assert len(df) == 3
+
+
+def test_astockdata_provider_stock_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "data.providers.astockdata._eastmoney_stock_list",
+        lambda: pd.DataFrame(
+            [{"code": "600000", "name": "浦发银行"}, {"code": "000001", "name": "平安银行"}]
+        ),
+    )
+    df = AStockDataProvider().get_stock_list()
+    assert set(df["code"]) == {"600000", "000001"}
+
+
+def test_manager_selects_astockdata_source(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from core.config import AppConfig
+
+    monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path}/t.db")  # type: ignore[union-attr]
+    monkeypatch.setattr(
+        "data.providers.astockdata._baidu_kline",
+        lambda code, start_time="": _fake_baidu_response(),
+    )
+    monkeypatch.setattr(
+        "data.providers.astockdata._eastmoney_stock_list",
+        lambda: pd.DataFrame([{"code": "600000", "name": "浦发银行"}]),
+    )
+    cfg = AppConfig()
+    cfg.data.source = "astockdata"
+    dm = DataManager(config=cfg)
+    assert isinstance(dm.provider, AStockDataProvider)
+    dm.sync_stock_list()
+    dm.sync_daily("600000")
+    assert len(dm.get_daily("600000")) == 3
+
+
+def test_manager_rejects_unknown_source() -> None:
+    from core.config import AppConfig
+    from core.exceptions import ConfigError
+
+    cfg = AppConfig()
+    cfg.data.source = "magic"
+    with pytest.raises(ConfigError):
+        DataManager(config=cfg)

@@ -29,9 +29,7 @@ class DailyBar(Base):
     """A single day of OHLCV data for one stock (adjusted per config)."""
 
     __tablename__ = "daily_bars"
-    __table_args__ = (
-        UniqueConstraint("code", "date", name="uq_bar_code_date"),
-    )
+    __table_args__ = (UniqueConstraint("code", "date", name="uq_bar_code_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
@@ -51,6 +49,4 @@ class SyncState(Base):
 
     code: Mapped[str] = mapped_column(String(16), primary_key=True)
     last_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
