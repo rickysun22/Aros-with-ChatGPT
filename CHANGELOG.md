@@ -2,6 +2,25 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.6 — Backtest Engine (2026-07-15)
+
+### Added
+
+- `src/backtest/cost.py` — `CostModel`: A-share transaction cost model. Per-side commission (wan 2.5, min RMB 5), stamp tax (wan 5, sell-only), transfer fee (wan 0.1, both sides), and slippage (configurable, default 0). Pure, unit-testable `charge(notional, is_sell)`.
+- `src/backtest/metrics.py` — pure performance-metric functions: `total_return`, `cagr`, `max_drawdown`, `sharpe`, `sortino`, `win_rate`, `num_trades`, `turnover`, `benchmark_return`, plus a `compute_metrics` dispatcher that selects metrics from `BacktestConfig.metrics` and raises `ConfigError` on unknown names.
+- `src/backtest/engine.py` — `BacktestEngine`: composes `StrategyEngine` + `CostModel` + metrics. Reuses `Portfolio.positions` for target weights, then layers A-share costs on top of the no-cost mark-to-market primitive. Produces a cost-aware equity curve, a trade blotter, and a metrics dict. Supports single-code and per-code grouped (multi-code) backtests.
+- `src/backtest/__init__.py` — public exports.
+- `core/config.py` — `CostConfig` / `BacktestConfig` models, wired into `AppConfig.backtest` (strategy, initial_cash, max_position, risk_free, metrics list, benchmark flag, cost).
+- `config/settings.yaml` — `backtest` section with `weighted_momentum` as the default strategy and 2024 A-share default rates.
+- `main.py` — new `backtest` command: `backtest --list`, `backtest CODE [--strategy ...] [--start ...] [--end ...]`; prints metric summary + benchmark + last 10 equity rows.
+- `tests/test_backtest.py` — cost model, metric correctness, cost-aware <= no-cost, trade blotter, `max_position` clamp, no-look-ahead truncation invariant, missing-signal `DataError`, unknown-metric `ConfigError`, full-pipeline integration on synthetic data, and a CLI smoke test.
+
+### Notes
+
+- No look-ahead is preserved: the position held at bar t is decided at t-1 close and earns the t-1 to t return; rebalance costs are charged at t-1 close using only data known by then. A truncation test guards this.
+- Single instrument only (or per-code grouped); cross-instrument allocation is deferred to Sprint 1.7. Shorting (-1) is reserved and treated as FLAT with a warning.
+- The cost notional is the traded dollar amount (absolute delta weight times equity); the design note literal price times equity product was a typo and is not used.
+
 ## Sprint 1.5 — Strategy Engine (2026-07-14)
 
 ### Added

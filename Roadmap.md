@@ -20,7 +20,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **1.3** | Indicator Engine | ✅ completed | MA/EMA/RSI/MACD/KDJ/BOLL/VOL_MA; config-driven; no future leakage |
 | **1.4** | Factor Engine | ✅ completed | 8 factors on indicator columns; config-driven; no future leakage |
 | **1.5** | Strategy Engine | completed | weighted + rule strategies; StrategyEngine + Portfolio; config-driven; no future leakage |
-| 1.6 | Backtest Engine | ⏳ planned | event-driven backtest over synced daily bars |
+| **1.6** | Backtest Engine | completed | cost-aware A-share backtest over strategy signals; CostModel + metrics + BacktestEngine |
 | 1.7 | Ranking | ⏳ planned | score & rank candidates (Top 20) |
 | 1.8 | Daily Report | ⏳ planned | generate the daily research report |
 

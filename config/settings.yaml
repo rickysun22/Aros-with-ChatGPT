@@ -96,3 +96,27 @@ strategies:
           - { factor: ma_cross_5_20, op: ">",  value: 0 }
           - { factor: macd_cross,    op: ">",  value: 0 }
           - { factor: rsi_signal_14, op: "<",  value: 70 }
+
+# Backtest Engine (Sprint 1.6) - 把信号模拟成真实 A 股组合
+# 复用 indicators/factors/strategies 配置；费率全部可配，改这里即可无需改码。
+backtest:
+  strategy: weighted_momentum        # 回测哪个策略的 signal_<name>；缺省取第一个
+  initial_cash: 1000000.0
+  max_position: 1.0                  # 单标的仓位上限（1.0 = 满仓）
+  risk_free: 0.0                     # 无风险年化，用于 Sharpe/Sortino
+  metrics:
+    - total_return
+    - cagr
+    - max_drawdown
+    - sharpe
+    - sortino
+    - win_rate
+    - num_trades
+    - turnover
+  benchmark: true                    # 与同名标的买入持有对比
+  cost:
+    commission_rate: 0.00025          # 万 2.5
+    commission_min: 5.0              # 单笔最低佣金（按侧计）
+    stamp_tax_rate: 0.0005           # 万 5，仅卖出
+    transfer_fee_rate: 0.00001       # 万 0.1，双边
+    slippage: 0.0                    # 滑点，双边，简化为成本拖累

@@ -150,6 +150,39 @@ class StrategyConfig(BaseModel):
     enabled: list[StrategySpec] = Field(default_factory=list)
 
 
+class CostConfig(BaseModel):
+    """A-share transaction cost rates (2024 defaults)."""
+
+    commission_rate: float = 0.00025  # 万 2.5
+    commission_min: float = 5.0  # 单笔最低佣金（按侧计）
+    stamp_tax_rate: float = 0.0005  # 万 5，仅卖出
+    transfer_fee_rate: float = 0.00001  # 万 0.1，双边
+    slippage: float = 0.0  # 滑点，双边，简化为成本拖累
+
+
+class BacktestConfig(BaseModel):
+    """Backtest Engine (Sprint 1.6) configuration."""
+
+    strategy: str | None = None  # 回测哪个策略；None -> 第一个启用策略
+    initial_cash: float = 1_000_000.0
+    max_position: float = 1.0  # 单标的仓位上限（1.0 = 满仓）
+    risk_free: float = 0.0  # 无风险年化，用于 Sharpe/Sortino
+    metrics: list[str] = Field(
+        default_factory=lambda: [
+            "total_return",
+            "cagr",
+            "max_drawdown",
+            "sharpe",
+            "sortino",
+            "win_rate",
+            "num_trades",
+            "turnover",
+        ]
+    )
+    benchmark: bool = True  # 与同名标的买入持有对比
+    cost: CostConfig = Field(default_factory=CostConfig)
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -161,6 +194,7 @@ class AppConfig(BaseModel):
     indicators: IndicatorConfig = Field(default_factory=IndicatorConfig)
     factors: FactorConfig = Field(default_factory=FactorConfig)
     strategies: StrategyConfig = Field(default_factory=StrategyConfig)
+    backtest: BacktestConfig = Field(default_factory=BacktestConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

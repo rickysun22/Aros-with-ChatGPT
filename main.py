@@ -10,6 +10,7 @@ from datetime import date
 
 import typer
 
+from backtest.engine import BacktestEngine
 from core.config import (
     FactorConfig,
     IndicatorConfig,
@@ -217,6 +218,58 @@ def strategies(
         return
     signal_cols = [c for c in df.columns if c == "signal" or c.startswith("signal_")]
     typer.echo(df[["date", "close", *signal_cols]].tail(10).to_string(index=False))
+
+
+@app.command()
+def backtest(
+    code: str | None = typer.Argument(None, help="Stock code, e.g. 600000"),
+    list_all: bool = typer.Option(
+        False, "--list", help="List available strategy names for backtest"
+    ),
+    name: str | None = typer.Option(
+        None, "--strategy", help="Backtest this strategy signal_<name>"
+    ),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+) -> None:
+    """Backtest a configured strategy as a cost-aware A-share portfolio."""
+    setup_logging()
+    cfg = get_config()
+    specs = cfg.strategies.enabled
+    if list_all:
+        typer.echo("Available strategies: " + ", ".join(StrategyEngine.available()))
+        typer.echo(f"Configured ({len(specs)}): " + ", ".join(s.name for s in specs))
+        default_strategy = cfg.backtest.strategy or (specs[0].name if specs else "none")
+        typer.echo(f"Default backtest strategy: {default_strategy}")
+        return
+    if not code:
+        typer.echo("Specify a stock CODE or use --list", err=True)
+        raise typer.Exit(code=1)
+    engine = BacktestEngine.from_config(
+        IndicatorConfig(enabled=cfg.indicators.enabled),
+        FactorConfig(enabled=cfg.factors.enabled),
+        StrategyConfig(enabled=specs),
+        cfg.backtest,
+    )
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    signal_col = f"signal_{name}" if name else None
+    df, metrics = engine.run_code(code, dm, start_date, end_date, signal_col)
+    if isinstance(metrics, dict) and metrics == {}:
+        typer.echo(f"{code}: no data", err=True)
+        raise typer.Exit(code=1)
+    used = engine.config.strategy or (engine.names[0] if engine.names else "unknown")
+    typer.echo(f"{code}: {len(df)} rows, strategy={used}")
+    typer.echo("Metrics:")
+    for k, v in metrics.items():
+        if isinstance(v, float):
+            typer.echo(f"  {k:>14}: {v:>10.4f}")
+        else:
+            typer.echo(f"  {k:>14}: {v}")
+    typer.echo("Equity curve (last 10):")
+    cols = [c for c in ("date", "close", "position", "equity") if c in df.columns]
+    typer.echo(df[cols].tail(10).to_string(index=False))
 
 
 def main() -> None:
