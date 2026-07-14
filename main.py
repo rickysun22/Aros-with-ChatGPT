@@ -1,8 +1,7 @@
 """AROS command-line entry point (Typer).
 
-Run with ``python main.py --help``. The ``core`` package lives under ``src/``
-and is made importable via the editable install (``pip install -e .``) or the
-pytest ``pythonpath`` setting.
+Run with python main.py --help. The core package lives under src/ and is made
+importable via the editable install or the pytest pythonpath setting.
 """
 
 from __future__ import annotations
@@ -11,11 +10,17 @@ from datetime import date
 
 import typer
 
-from core.config import FactorConfig, IndicatorConfig, get_config
+from core.config import (
+    FactorConfig,
+    IndicatorConfig,
+    StrategyConfig,
+    get_config,
+)
 from core.logging import setup_logging
 from data.manager import DataManager
 from factors.engine import FactorEngine
 from indicators.engine import IndicatorEngine
+from strategies.engine import StrategyEngine
 
 app = typer.Typer(
     help="AROS - A-Share Research Operating System",
@@ -43,8 +48,8 @@ def info() -> None:
 
 @app.command()
 def sync(
-    code: str = typer.Option(None, "--code", help="Sync one stock's daily bars by code"),
-    list_stocks: bool = typer.Option(False, "--list", help="Sync the full A-share stock list"),
+    code: str = typer.Option(None, "--code", help="Sync one stock daily bars by code"),
+    list_stocks: bool = typer.Option(False, "--list", help="Sync the full A-share list"),
 ) -> None:
     """Sync market data from the provider into the database."""
     setup_logging()
@@ -129,7 +134,7 @@ def factors(
     start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
     end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
 ) -> None:
-    """Compute indicators then factors for a stock (read-only)."""
+    """Compute configured indicators then factors for a stock (read-only)."""
     setup_logging()
     cfg = get_config()
     specs = cfg.factors.enabled
@@ -167,6 +172,51 @@ def factors(
         if c not in ("date", "open", "high", "low", "close", "volume", "amount", "code")
     ]
     typer.echo(df[["date", "close", *factor_cols]].tail(10).to_string(index=False))
+
+
+@app.command()
+def strategies(
+    code: str | None = typer.Argument(None, help="Stock code, e.g. 600000"),
+    list_all: bool = typer.Option(False, "--list", help="List available strategy types"),
+    name: list[str] | None = typer.Option(None, "--name", help="Only these strategy name(s)"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+) -> None:
+    """Compute configured strategies (factors then signals) for a stock."""
+    setup_logging()
+    cfg = get_config()
+    specs = cfg.strategies.enabled
+    if name:
+        selected = [s for s in specs if s.name in name]
+        missing = set(name) - {s.name for s in selected}
+        if missing:
+            typer.echo(f"Unknown strategy(ies): {sorted(missing)}", err=True)
+            raise typer.Exit(code=2)
+        specs = selected
+
+    if list_all:
+        typer.echo("Available strategies: " + ", ".join(StrategyEngine.available()))
+        typer.echo(f"Configured ({len(specs)}): " + ", ".join(s.name for s in specs))
+        return
+
+    if not code:
+        typer.echo("Specify a stock CODE or use --list", err=True)
+        raise typer.Exit(code=1)
+
+    engine = StrategyEngine.from_config(
+        IndicatorConfig(enabled=cfg.indicators.enabled),
+        FactorConfig(enabled=cfg.factors.enabled),
+        StrategyConfig(enabled=specs),
+    )
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    df = engine.compute_code(code, dm, start_date, end_date)
+    typer.echo(f"{code}: {len(df)} rows")
+    if df.empty:
+        return
+    signal_cols = [c for c in df.columns if c == "signal" or c.startswith("signal_")]
+    typer.echo(df[["date", "close", *signal_cols]].tail(10).to_string(index=False))
 
 
 def main() -> None:

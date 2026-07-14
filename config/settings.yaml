@@ -68,3 +68,31 @@ factors:
       params: { window: 20 }
     - name: momentum
       params: { window: 5 }
+
+# Strategy Engine (Sprint 1.5) - 组合因子为可交易信号
+# 注意：每个 weight / condition 的 factor 引用的是「因子层输出的列名」
+# （如 ma_dist_20），其命名由 factors 段的窗口决定，两处必须保持一致。
+strategies:
+  enabled:
+    - name: weighted_momentum
+      type: weighted
+      params:
+        weights:
+          - { factor: ma_dist_20,    weight: 0.15, clip: [-0.15, 0.15] }
+          - { factor: ma_cross_5_20, weight: 0.20 }
+          - { factor: rsi_signal_14, weight: 0.15 }
+          - { factor: macd_cross,    weight: 0.20 }
+          - { factor: kdj_cross,     weight: 0.15 }
+          - { factor: vol_ratio_5,   weight: 0.05, clip: [0.5, 2.5] }
+          - { factor: boll_pos_20,   weight: 0.05 }
+          - { factor: mom_5,         weight: 0.05, clip: [-0.1, 0.1] }
+        buy_threshold: 0.30
+        sell_threshold: -0.30
+    - name: golden_cross_rule
+      type: rule
+      params:
+        combine: all
+        conditions:
+          - { factor: ma_cross_5_20, op: ">",  value: 0 }
+          - { factor: macd_cross,    op: ">",  value: 0 }
+          - { factor: rsi_signal_14, op: "<",  value: 70 }

@@ -2,6 +2,27 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.5 — Strategy Engine (2026-07-14)
+
+### Added
+
+- `src/strategies/signal.py` — `SignalType` enum (SHORT=-1 / FLAT=0 / LONG=1) plus `to_position` / `coerce` helpers mapping a signal to a target position weight. A-share first: long and flat are fully supported, short is reserved for future extension.
+- `src/strategies/base.py` — `BaseStrategy` base class + registry (`register`, `build`, `available`). Strategies read factor columns and emit a `signal_<name>` (and optional `score_<name>`) column; causal and future-leak free.
+- `src/strategies/impl.py` — two strategy types: `weighted` (normalise each factor to [-1,1], form a weighted composite score, map to a signal via buy/sell thresholds) and `rule` (boolean AND/OR of factor conditions -> long/flat). A missing factor column raises `DataError`; malformed params raise `ConfigError`.
+- `src/strategies/engine.py` — `StrategyEngine`: composes `FactorEngine` (indicators -> factors -> strategies), builds from `IndicatorConfig` + `FactorConfig` + `StrategyConfig`, computes per-stock, and reads bars through `DataManager` via `compute_code`.
+- `src/strategies/portfolio.py` — `Portfolio`: turns signals into positions and marks the book to market with close-to-close returns, using only data known at bar *t* (the position held at t-1 earns the t->t+1 return) — no look-ahead.
+- `src/strategies/__init__.py` — public exports.
+- `core/config.py` — `WeightSpec` / `WeightedParams` / `ConditionSpec` / `RuleParams` / `StrategySpec` / `StrategyConfig` models, wired into `AppConfig.strategies`.
+- `config/settings.yaml` — `strategies.enabled` default set: `weighted_momentum` (8-factor weighted composite) and `golden_cross_rule` (MA cross AND MACD cross AND RSI not overbought).
+- `main.py` — new `strategies` command: `strategies --list` and `strategies CODE [--name ...] [--start ...] [--end ...]`.
+- `tests/test_strategies.py` — strategy correctness, engine orchestration, missing-column `DataError`, malformed-param `ConfigError`, `Portfolio` position and equity behaviour, and a **no-future-leak** invariant test at the engine level (the signal at bar *t* computed on the full pipeline equals the value computed on bars `0..t`).
+
+### Notes
+
+- Strategies reference the factor **output columns** (for example `ma_dist_20`, `macd_cross`, `rsi_signal_14`) produced by the factor layer, not the factor registry names — keeping the factor/strategy wiring fully config-driven.
+- The whole indicators -> factors -> strategies pipeline inherits the *禁止未来函数* guarantee: a signal at bar *t* depends only on data at bars `<= t`.
+- `Portfolio` is the bridge to the backtest engine (Sprint 1.6): it derives positions from signals but does not yet apply costs, slippage, or sizing.
+
 ## Sprint 1.4 — Factor Engine (2025-07-14)
 
 ### Added
