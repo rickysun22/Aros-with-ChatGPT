@@ -11,7 +11,8 @@ AROS is a modular A-share research platform for data ingestion, validation, indi
 | **1.1** | Project Foundation (scaffold, config, logging, db, CLI, tests) | ✅ completed |
 | **1.2** | Data Layer: Database (ORM), AKShare provider, DataManager (single entry) | ✅ completed |
 | **1.3** | Indicator Engine: MA/EMA/RSI/MACD/KDJ/BOLL/VOL_MA, config-driven, no future leakage | ✅ completed |
-| 1.4+ | Factor Engine, Strategy Engine, backtest, ranking, report | ⏳ planned |
+| **1.4** | Factor Engine: 8 factors on indicators, config-driven, no future leakage | ✅ completed |
+| 1.5+ | Strategy Engine, backtest, ranking, report | ⏳ planned |
 
 - Data range target: 2015-01-01 to 2026-06-30
 - Data source: AKShare
@@ -73,6 +74,11 @@ python main.py bars 600000 --start 2024-01-01 --end 2024-03-31
 python main.py indicators --list                       # list available / configured
 python main.py indicators 600000                       # compute all configured indicators
 python main.py indicators 600000 --name ma --name rsi  # restrict to specific indicators
+
+# Factors (Sprint 1.4) - indicators then factors, no future leakage
+python main.py factors --list                          # list available / configured
+python main.py factors 600000                          # compute indicators + all configured factors
+python main.py factors 600000 --name ma_distance       # restrict to specific factors
 ```
 
 ## Data sources
@@ -94,7 +100,7 @@ unchanged.
 - `src/core` (done): config, logging, database, exceptions
 - `src/data` (done): `models` (ORM), `provider` (AKShare + normalization), `manager` (DataManager)
 - `src/indicators` (done): `base` (registry), `impl` (MA/EMA/RSI/MACD/KDJ/BOLL/VOL_MA), `engine` (IndicatorEngine)
-- `src/factors`: research factors
+- `src/factors` (done): `base` (registry), `impl` (8 factors), `engine` (FactorEngine, composes IndicatorEngine)
 - `src/strategies`: strategy definitions
 - `src/backtest`: backtesting engine
 - `src/ranking`: scoring and ranking

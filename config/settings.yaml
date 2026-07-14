@@ -45,3 +45,26 @@ indicators:
       params: { window: 20, num_std: 2.0 }
     - name: vol_ma
       params: { window: 5 }
+
+# Factor Engine (Sprint 1.4) - factors sit on top of indicator columns.
+# Each factor's params reference the indicator windows produced above, so the
+# two sections must stay consistent (e.g. ma_distance.window must match an
+# enabled ma with the same window).
+factors:
+  enabled:
+    - name: ma_distance
+      params: { window: 20 }
+    - name: ma_cross
+      params: { fast: 5, slow: 20 }
+    - name: rsi_signal
+      params: { window: 14, lower: 30, upper: 70 }
+    - name: macd_cross
+      params: {}
+    - name: kdj_cross
+      params: {}
+    - name: vol_ratio
+      params: { window: 5 }
+    - name: boll_position
+      params: { window: 20 }
+    - name: momentum
+      params: { window: 5 }

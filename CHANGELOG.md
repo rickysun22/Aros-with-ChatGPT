@@ -2,6 +2,25 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.4 — Factor Engine (2025-07-14)
+
+### Added
+
+- `src/factors/base.py` — `BaseFactor` base class + registry (`register`, `build`, `available`). Factors are pure, causal functions built on top of indicator columns.
+- `src/factors/impl.py` — eight factors, all config-driven and **future-leak free**: `ma_distance`, `ma_cross`, `rsi_signal`, `macd_cross`, `kdj_cross`, `vol_ratio`, `boll_position`, `momentum`.
+- `src/factors/engine.py` — `FactorEngine`: composes the `IndicatorEngine` (indicators first, then factors), builds from `IndicatorConfig` + `FactorConfig`, computes per-stock, and reads bars through `DataManager` via `compute_code`.
+- `src/factors/__init__.py` — public exports.
+- `core/config.py` — `FactorSpec` / `FactorConfig` models, wired into `AppConfig.factors`.
+- `config/settings.yaml` — `factors.enabled` default set (each factor references the indicator windows produced by the indicator layer).
+- `main.py` — new `factors` command: `factors --list` and `factors CODE [--name ...]`.
+- `tests/test_factors.py` — factor correctness, engine orchestration, missing-column `DataError`, and a **no-future-leak** invariant test (indicators + factor at bar *t* computed on the full series equals the value computed on bars `0..t`).
+
+### Notes
+
+- Factors only read columns already present in the frame (indicator outputs + raw `close`/`volume`), so the indicator + factor pipeline inherits the *禁止未来函数* guarantee.
+- A factor whose required indicator column is missing (misconfigured `factors` vs `indicators`) raises `DataError` immediately.
+- `Roadmap.md` added to track sprint status across the development workflow.
+
 ## Sprint 1.3 — Indicator Engine (2025-07-13)
 
 ### Added

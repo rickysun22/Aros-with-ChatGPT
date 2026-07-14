@@ -79,6 +79,25 @@ class IndicatorConfig(BaseModel):
     enabled: list[IndicatorSpec] = Field(default_factory=list)
 
 
+class FactorSpec(BaseModel):
+    """A single configured factor instance.
+
+    ``name`` must match a registered factor (see ``factors.base``). Factors are
+    built on top of computed indicators, so ``params`` typically reference the
+    same windows/columns produced by the indicator layer. Every parameter is
+    config-driven (project principle *所有参数配置化*).
+    """
+
+    name: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class FactorConfig(BaseModel):
+    """The set of factors AROS computes for each stock."""
+
+    enabled: list[FactorSpec] = Field(default_factory=list)
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -88,6 +107,7 @@ class AppConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     indicators: IndicatorConfig = Field(default_factory=IndicatorConfig)
+    factors: FactorConfig = Field(default_factory=FactorConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
