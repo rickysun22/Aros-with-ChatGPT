@@ -60,6 +60,25 @@ class LoggingConfig(BaseModel):
     dir: str = "logs"
 
 
+class IndicatorSpec(BaseModel):
+    """A single configured indicator instance.
+
+    ``name`` must match a registered indicator (see ``indicators.base``),
+    ``params`` are passed straight to that indicator's constructor so every
+    indicator parameter stays config-driven (project principle
+    *所有参数配置化*).
+    """
+
+    name: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class IndicatorConfig(BaseModel):
+    """The set of indicators AROS computes for each stock."""
+
+    enabled: list[IndicatorSpec] = Field(default_factory=list)
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -68,6 +87,7 @@ class AppConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    indicators: IndicatorConfig = Field(default_factory=IndicatorConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

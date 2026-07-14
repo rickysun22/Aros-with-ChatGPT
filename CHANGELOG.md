@@ -2,6 +2,24 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.3 — Indicator Engine (2025-07-13)
+
+### Added
+
+- `src/indicators/base.py` — `BaseIndicator` base class + registry (`register`, `build`, `available`). Indicators are pure, causal functions of historical bars.
+- `src/indicators/impl.py` — seven indicators, all config-driven and **future-leak free**: `ma`, `ema`, `rsi`, `macd`, `kdj`, `boll`, `vol_ma`.
+- `src/indicators/engine.py` — `IndicatorEngine`: builds from `IndicatorConfig`, computes per-stock (`compute`), and reads bars through the single data entry via `compute_code(data_manager, ...)`.
+- `src/indicators/__init__.py` — public exports.
+- `core/config.py` — `IndicatorSpec` / `IndicatorConfig` models, wired into `AppConfig.indicators`.
+- `config/settings.yaml` — `indicators.enabled` default set (multi-window `ma` demonstrates parameterization).
+- `main.py` — new `indicators` command: `indicators --list` and `indicators CODE [--name ...]`.
+- `tests/test_indicators.py` — indicator correctness, engine orchestration, and a **no-future-leak** invariant test (value at bar *t* computed on the full series equals the value computed on bars `0..t`).
+
+### Notes
+
+- Every indicator value at bar *t* depends only on data at bars `<= t` (rolling windows / EMA recursions / trailing min-max). The test-suite enforces this automatically.
+- Indicators obtain prices exclusively through `DataManager`, preserving the single-data-entry principle.
+
 ## Sprint 1.2 — Database Layer (2025-07-13)
 
 ### Added

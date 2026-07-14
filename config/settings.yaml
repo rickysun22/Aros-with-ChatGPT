@@ -23,3 +23,25 @@ paths:
 logging:
   level: INFO
   dir: logs
+
+# Indicator Engine (Sprint 1.3) - every parameter stays config-driven.
+# Same indicator name may appear multiple times with different params
+# (e.g. ma with window 5 and 20) to build multi-period features.
+indicators:
+  enabled:
+    - name: ma
+      params: { window: 5 }
+    - name: ma
+      params: { window: 20 }
+    - name: ema
+      params: { window: 12 }
+    - name: rsi
+      params: { window: 14 }
+    - name: macd
+      params: {}
+    - name: kdj
+      params: {}
+    - name: boll
+      params: { window: 20, num_std: 2.0 }
+    - name: vol_ma
+      params: { window: 5 }

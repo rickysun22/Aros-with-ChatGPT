@@ -11,9 +11,10 @@ from datetime import date
 
 import typer
 
-from core.config import get_config
+from core.config import IndicatorConfig, get_config
 from core.logging import setup_logging
 from data.manager import DataManager
+from indicators.engine import IndicatorEngine
 
 app = typer.Typer(
     help="AROS - A-Share Research Operating System",
@@ -72,6 +73,51 @@ def bars(
     typer.echo(f"{code}: {len(df)} bars")
     if not df.empty:
         typer.echo(df.head(10).to_string(index=False))
+
+
+@app.command()
+def indicators(
+    code: str | None = typer.Argument(None, help="Stock code, e.g. 600000"),
+    list_all: bool = typer.Option(False, "--list", help="List available indicator names"),
+    name: list[str] | None = typer.Option(None, "--name", help="Only these indicator name(s)"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+) -> None:
+    """Compute configured indicators for a stock (read-only)."""
+    setup_logging()
+    cfg = get_config()
+    specs = cfg.indicators.enabled
+    if name:
+        selected = [s for s in specs if s.name in name]
+        missing = set(name) - {s.name for s in selected}
+        if missing:
+            typer.echo(f"Unknown indicator(s): {sorted(missing)}", err=True)
+            raise typer.Exit(code=2)
+        specs = selected
+
+    if list_all:
+        typer.echo("Available indicators: " + ", ".join(IndicatorEngine.available()))
+        typer.echo(f"Configured ({len(specs)}): " + ", ".join(s.name for s in specs))
+        return
+
+    if not code:
+        typer.echo("Specify a stock CODE or use --list", err=True)
+        raise typer.Exit(code=1)
+
+    engine = IndicatorEngine.from_config(IndicatorConfig(enabled=specs))
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    df = engine.compute_code(code, dm, start_date, end_date)
+    typer.echo(f"{code}: {len(df)} rows")
+    if df.empty:
+        return
+    indicator_cols = [
+        c
+        for c in df.columns
+        if c not in ("date", "open", "high", "low", "close", "volume", "amount", "code")
+    ]
+    typer.echo(df[["date", "close", *indicator_cols]].tail(10).to_string(index=False))
 
 
 def main() -> None:
