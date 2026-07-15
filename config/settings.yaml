@@ -142,3 +142,8 @@ report:
   format: markdown                   # markdown | json
   freshness_days: 5                  # 数据比 as_of 滞后超过该天数则标"滞后"
   include_detail: true               # markdown 是否展开候选明细
+
+# Watchlist Tracker (Sprint 1.9) - 持久化关注池排名并派生日环比变动
+# 复用 ranking 截面与 core.database 共享库；关注池内自相对排名。
+watchlist:
+  alert_rank_jump: 5               # |排名变化| 达到该值，日报标记"显著变动"

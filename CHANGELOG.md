@@ -2,6 +2,26 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.9 — Watchlist Tracker (2026-07-15)
+
+### Added
+
+- `src/watchlist/models.py` — two ORM models on `core.database.Base`: `WatchlistItem` (membership, soft-delete via `removed_at`) and `RankingPoint` (daily snapshot: as_of, code, full cross-sectional rank, composite_score, scores_json; unique on (as_of, code)).
+- `src/watchlist/engine.py` — `WatchlistEngine` (add/remove/list_active/is_member, `snapshot` ranks the whole watchlist and persists every member including those that fall out of the Top-N, `history`, `deltas`) plus `WatchlistDigest` / `WatchlistMember` with `to_markdown()` / `to_json()`. `deltas` is a pure read of stored history (no network, no look-ahead).
+- `src/watchlist/__init__.py` — public exports.
+- `Sprint1.9-Watchlist-Design.md` — design doc.
+- `core/config.py` — `WatchlistConfig` (alert_rank_jump) wired into `AppConfig.watchlist`.
+- `config/settings.yaml` — `watchlist` section (alert_rank_jump=5).
+- `main.py` — new `watchlist` command: `add/remove/list/snapshot/history/digest`.
+- `tests/test_watchlist.py` — 12 tests (FakeSE + FakeDM + isolated temp SQLite): membership, full-rank snapshot incl. no-data codes, the six-state delta machine (new/dropped/up/down/steady/no_data), history ordering, as_of no-look-ahead, markdown/json rendering, real-config wiring, CLI smoke.
+
+### Notes
+
+- Reuses RankingEngine's full cross-section (`scored`) to compute a full cross-sectional rank so a watched code that drops out of the Top-N is still tracked; no new metric math is introduced.
+- No future functions: `snapshot` drives RankingEngine with the same `as_of` ceiling; `deltas` only reads already-stored history.
+- Rank relativity is internal to the watchlist (self-relative ranking), matching the "track my watched set" semantics.
+- A code with no data at the cross-section is intentionally left without a point, so the next `deltas` reports it as `dropped` (not a null `no_data` row). The `no_data` state is reserved for a present-but-unrankable point (e.g. NaN composite score).
+
 ## Sprint 1.8 — Daily Report Engine (2026-07-15)
 
 ### Added

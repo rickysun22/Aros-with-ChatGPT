@@ -218,6 +218,18 @@ class ReportConfig(BaseModel):
     include_detail: bool = True  # markdown 是否展开候选明细
 
 
+class WatchlistConfig(BaseModel):
+    """Watchlist Tracker (Sprint 1.9) configuration.
+
+    Persists the daily ranking of watched instruments into the shared database
+    and derives day-over-day deltas (new entries, drops, rank/score moves). It
+    is a tracking/aggregation layer built on top of RankingEngine + the shared
+    database (core.database.Base).
+    """
+
+    alert_rank_jump: int = 5  # |rank_change| >= this flags a notable move in the digest
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -232,6 +244,7 @@ class AppConfig(BaseModel):
     backtest: BacktestConfig = Field(default_factory=BacktestConfig)
     ranking: RankingConfig = Field(default_factory=RankingConfig)
     report: ReportConfig = Field(default_factory=ReportConfig)
+    watchlist: WatchlistConfig = Field(default_factory=WatchlistConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

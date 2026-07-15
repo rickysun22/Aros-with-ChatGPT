@@ -26,6 +26,7 @@ from indicators.engine import IndicatorEngine
 from ranking.engine import RankingEngine
 from report.engine import ReportEngine
 from strategies.engine import StrategyEngine
+from watchlist.engine import WatchlistEngine
 
 app = typer.Typer(
     help="AROS - A-Share Research Operating System",
@@ -382,6 +383,67 @@ def report(
         typer.echo(f"Report written to {out} ({len(daily.rows)} rows)")
     else:
         typer.echo(text)
+
+
+@app.command()
+def watchlist(
+    action: str = typer.Argument(..., help="add|remove|list|snapshot|history|digest"),
+    code: str = typer.Argument(None, help="CODE for add/remove/history"),
+    note: str | None = typer.Option(None, "--note", help="Note for add"),
+    limit: int = typer.Option(20, "--limit", help="History rows to show"),
+    as_of: str | None = typer.Option(None, "--as-of", help="Cross-section date YYYY-MM-DD"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    fmt: str = typer.Option("markdown", "--format", help="digest output: markdown|json"),
+) -> None:
+    """Track a watchlist: persist daily ranking + show day-over-day deltas."""
+
+    setup_logging()
+    cfg = get_config()
+    re = RankingEngine.from_config(cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking)
+    eng = WatchlistEngine(re, cfg.watchlist)
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+
+    if action == "add":
+        if not code:
+            typer.echo("add requires a CODE", err=True)
+            raise typer.Exit(code=1)
+        eng.add(code, note)
+        typer.echo(f"added {code} to watchlist")
+    elif action == "remove":
+        if not code:
+            typer.echo("remove requires a CODE", err=True)
+            raise typer.Exit(code=1)
+        eng.remove(code)
+        typer.echo(f"removed {code} from watchlist")
+    elif action == "list":
+        active = eng.list_active()
+        typer.echo(
+            "Watchlist (" + str(len(active)) + "): " + (", ".join(active) if active else "(empty)")
+        )
+    elif action == "snapshot":
+        digest = eng.snapshot(as_of, data_manager=dm, start_date=start_date, end_date=end_date)
+        text = (
+            digest.to_json() if fmt == "json" else digest.to_markdown(cfg.watchlist.alert_rank_jump)
+        )
+        typer.echo(text)
+    elif action == "history":
+        if not code:
+            typer.echo("history requires a CODE", err=True)
+            raise typer.Exit(code=1)
+        for pt in eng.history(code, limit):
+            typer.echo(f"{pt.as_of} rank={pt.rank} score={pt.composite_score}")
+    elif action == "digest":
+        digest = eng.deltas(as_of)
+        text = (
+            digest.to_json() if fmt == "json" else digest.to_markdown(cfg.watchlist.alert_rank_jump)
+        )
+        typer.echo(text)
+    else:
+        typer.echo(f"unknown action: {action}", err=True)
+        raise typer.Exit(code=1)
 
 
 def main() -> None:
