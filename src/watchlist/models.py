@@ -9,6 +9,10 @@ engine in ``core.database`` manages their schema alongside the existing
 * ``RankingPoint`` - one daily ranking snapshot per watched code, capturing the
   full cross-sectional rank (so a code that drops out of the Top-N is still
   tracked) plus its composite score and per-dimension scores.
+* ``BacktestPoint`` - one daily backtest snapshot per watched code, capturing the
+  historical backtest performance (under the configured strategy) so the
+  watchlist can show day-over-day changes in empirical performance, not just
+  ranking. Mirrors ``RankingPoint``'s as_of/code keying.
 """
 
 from __future__ import annotations
@@ -61,4 +65,28 @@ class RankingPoint(Base):
     composite_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Per-dimension scores, e.g. {"a": 0.6, "b": 0.4}; None when no data.
     scores_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class BacktestPoint(Base):
+    """One daily backtest snapshot for a single watched code.
+
+    Mirror of :class:`RankingPoint` for the backtest layer: a per-as_of, per-code
+    record of the historical backtest performance (under the configured
+    strategy) so the watchlist can surface day-over-day changes in empirical
+    performance, not just ranking. Codes with no data at as_of are intentionally
+    left without a point (consistent with RankingPoint / the "dropped" state).
+    """
+
+    __tablename__ = "backtest_points"
+    __table_args__ = (UniqueConstraint("as_of", "code", name="uq_bt_asof_code"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    as_of: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    # Compact decision-useful backtest metrics (fractions, not percentages).
+    total_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_drawdown: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sharpe: Mapped[float | None] = mapped_column(Float, nullable=True)
+    benchmark_return: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())

@@ -20,7 +20,7 @@ from core.config import RankingConfig, WatchlistConfig, get_config
 from core.database import Base
 from ranking.engine import RankingEngine
 from watchlist.engine import WatchlistEngine, _classify
-from watchlist.models import RankingPoint, WatchlistItem
+from watchlist.models import BacktestPoint, RankingPoint, WatchlistItem
 
 
 class FakeSE:
@@ -90,9 +90,26 @@ def cleanup(s, eng, path):
         pass
 
 
-def make_engine(session, wl=None):
+def make_engine(
+    session,
+    wl=None,
+    bt_fn=None,
+    bt_config=None,
+    ind=None,
+    fac=None,
+    st=None,
+):
     re = RankingEngine(FakeSE(), RankingConfig())
-    return WatchlistEngine(re, wl or WatchlistConfig(), session=session)
+    return WatchlistEngine(
+        re,
+        wl or WatchlistConfig(),
+        session=session,
+        backtest_fn=bt_fn,
+        backtest_config=bt_config,
+        indicators=ind,
+        factors=fac,
+        strategies=st,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -264,6 +281,121 @@ def test_classify_state_machine_direct():
     assert _classify(p(2, 0.5), p(2, 0.5))[0] == "steady"
     _, rc, _ = _classify(p(2, 0.5), p(5, 0.1))
     assert rc == 3
+
+
+# --------------------------------------------------------------------------- #
+# Backtest persistence (Sprint 1.11)
+# --------------------------------------------------------------------------- #
+def test_snapshot_backtest_disabled_by_default():
+    s, eng, path = make_session()
+    try:
+        e = make_engine(s)
+        e.add("A")
+        dm = FakeDM(make_frames({"A": ("2024-01-02", 0.9)}))
+        called = []
+        e._backtest_fn = lambda c, d, st, en: (called.append(en) or {"total_return": 0.1})
+        e.snapshot(data_manager=dm, as_of="2024-01-02")
+        # Backtest must NOT run when disabled, and nothing gets persisted.
+        assert called == []
+        assert s.query(BacktestPoint).count() == 0
+    finally:
+        cleanup(s, eng, path)
+
+
+def test_snapshot_backtest_stores_points():
+    s, eng, path = make_session()
+    try:
+        captured = {}
+
+        def fn(code, dm, start, end):
+            captured[code] = end
+            return {
+                "total_return": 0.12,
+                "max_drawdown": -0.07,
+                "sharpe": 1.5,
+                "benchmark_return": 0.04,
+            }
+
+        e = make_engine(s, WatchlistConfig(include_backtest=True), bt_fn=fn)
+        e.add("A")
+        e.add("B")
+        dm = FakeDM(make_frames({"A": ("2024-01-02", 0.9), "B": ("2024-01-02", 0.5)}))
+        e.snapshot(data_manager=dm, as_of="2024-01-02")
+        pts = {p.code: p for p in s.query(BacktestPoint).all()}
+        assert set(pts) == {"A", "B"}
+        assert abs(float(pts["A"].total_return) - 0.12) < 1e-9
+        assert abs(float(pts["A"].sharpe) - 1.5) < 1e-9
+        assert abs(float(pts["A"].benchmark_return) - 0.04) < 1e-9
+        # The backtest window end equals the ranking cross-section (no look-ahead).
+        assert str(captured["A"]) == "2024-01-02"
+    finally:
+        cleanup(s, eng, path)
+
+
+def test_snapshot_backtest_no_lookahead():
+    s, eng, path = make_session()
+    try:
+        captured = {}
+
+        def fn(code, dm, start, end):
+            captured[code] = end
+            return {
+                "total_return": 0.1,
+                "max_drawdown": -0.1,
+                "sharpe": 1.0,
+                "benchmark_return": 0.02,
+            }
+
+        e = make_engine(s, WatchlistConfig(include_backtest=True), bt_fn=fn)
+        e.add("A")
+        frames = {
+            "A": pd.DataFrame(
+                {
+                    "date": ["2024-01-01", "2024-01-02"],
+                    "close": [9.0, 1.0],
+                    "raw_a": [0.9, 0.1],
+                    "raw_b": [0.9, 0.1],
+                }
+            )
+        }
+        e.snapshot(data_manager=FakeDM(frames), as_of="2024-01-01")
+        # Even though the underlying data extends to 2024-01-02, the backtest
+        # window must stop at the as_of cross-section.
+        assert str(captured["A"]) == "2024-01-01"
+    finally:
+        cleanup(s, eng, path)
+
+
+def test_digest_backtest_ring_comparison():
+    s, eng, path = make_session()
+    try:
+        bt_state = {"A": 0.10}
+
+        def fn(code, dm, start, end):
+            return {
+                "total_return": bt_state.get(code, 0.0),
+                "max_drawdown": -0.05,
+                "sharpe": 1.2,
+                "benchmark_return": 0.03,
+            }
+
+        e = make_engine(s, WatchlistConfig(include_backtest=True), bt_fn=fn)
+        e.add("A")
+        e.snapshot(data_manager=FakeDM(make_frames({"A": ("2024-01-01", 0.9)})), as_of="2024-01-01")
+        bt_state["A"] = 0.25  # performance improved in the second snapshot
+        digest = e.snapshot(
+            data_manager=FakeDM(make_frames({"A": ("2024-01-02", 0.4)})), as_of="2024-01-02"
+        )
+        md = digest.to_markdown()
+        assert "回测表现" in md
+        assert digest.backtest_included is True
+        by = {m.code: m for m in digest.members}
+        assert by["A"].backtest.total_return == 0.25
+        assert by["A"].prev_backtest.total_return == 0.10
+        # Ring delta (0.25 - 0.10) rendered as +15.00%.
+        assert "+15.00" in md
+    finally:
+        cleanup(s, eng, path)
 
 
 # --------------------------------------------------------------------------- #

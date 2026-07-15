@@ -229,6 +229,7 @@ class WatchlistConfig(BaseModel):
     """
 
     alert_rank_jump: int = 5  # |rank_change| >= this flags a notable move in the digest
+    include_backtest: bool = False  # snapshot 时是否附上每只标的回测表现并落库 (用 backtest 配置)
 
 
 class AppConfig(BaseModel):

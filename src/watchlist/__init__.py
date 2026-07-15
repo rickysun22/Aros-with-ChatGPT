@@ -1,19 +1,22 @@
-"""Watchlist Tracker for AROS (Sprint 1.9).
+"""Watchlist Tracker for AROS (Sprint 1.9 + 1.11 backtest).
 
 Public surface:
-* WatchlistEngine - persist and track the daily ranking of watched stocks.
+* WatchlistEngine - persist and track the daily ranking (+ backtest) of watched stocks.
 * WatchlistDigest - day-over-day tracking report (markdown / json renderable).
 * WatchlistMember - one member's current standing vs the previous snapshot.
-* WatchlistItem / RankingPoint - ORM models (see watchlist.models).
+* BacktestSummary - compact backtest metrics for one member.
+* WatchlistItem / RankingPoint / BacktestPoint - ORM models (see watchlist.models).
 """
 
-from .engine import WatchlistDigest, WatchlistEngine, WatchlistMember
-from .models import RankingPoint, WatchlistItem
+from .engine import BacktestSummary, WatchlistDigest, WatchlistEngine, WatchlistMember
+from .models import BacktestPoint, RankingPoint, WatchlistItem
 
 __all__ = [
     "WatchlistEngine",
     "WatchlistDigest",
     "WatchlistMember",
+    "BacktestSummary",
     "WatchlistItem",
     "RankingPoint",
+    "BacktestPoint",
 ]

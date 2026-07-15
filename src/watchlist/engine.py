@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from typing import Any
@@ -19,10 +20,16 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from core.config import RankingConfig
+from core.config import (
+    BacktestConfig,
+    FactorConfig,
+    IndicatorConfig,
+    RankingConfig,
+    StrategyConfig,
+)
 from core.database import Base, get_engine, get_sessionmaker
 from ranking.engine import SCORE_PREFIX, RankingEngine
-from watchlist.models import RankingPoint, WatchlistItem
+from watchlist.models import BacktestPoint, RankingPoint, WatchlistItem
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +56,24 @@ class WatchlistMember:
     score_change: float | None
     status: str  # new | dropped | up | down | steady | no_data
     note: str | None = None
+    # Backtest enrichment (Sprint 1.11): historical performance of the member
+    # under the configured strategy, persisted as BacktestPoint. None when the
+    # backtest feature was never enabled (no rows stored) for this member.
+    backtest: BacktestSummary | None = None
+    prev_backtest: BacktestSummary | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class BacktestSummary:
+    """Compact historical backtest metrics for one watched code (fractions)."""
+
+    total_return: float | None = None
+    max_drawdown: float | None = None
+    sharpe: float | None = None
+    benchmark_return: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -63,6 +88,7 @@ class WatchlistDigest:
     generated_at: str
     members: list[WatchlistMember] = field(default_factory=list)
     summary: dict[str, int] = field(default_factory=dict)
+    backtest_included: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +96,7 @@ class WatchlistDigest:
             "prev_as_of": self.prev_as_of,
             "generated_at": self.generated_at,
             "summary": self.summary,
+            "backtest_included": self.backtest_included,
             "members": [m.to_dict() for m in self.members],
         }
 
@@ -122,6 +149,30 @@ class WatchlistDigest:
             ):
                 label += " (显著)"
             lines.append(f"| {m.code} | {rank} | {rc} | {score} | {sc} | {label} |")
+
+        if self.backtest_included:
+            lines.append("")
+            lines.append("## 回测表现 (落库快照，策略 signal)")
+            lines.append("")
+            header = ["代码", "收益%", "最大回撤%", "Sharpe", "基准%", "收益Δvs前次"]
+            lines.append("| " + " | ".join(header) + " |")
+            lines.append("|" + "|".join(["---"] * len(header)) + "|")
+            for m in self.members:
+                bt = m.backtest
+                if bt is None:
+                    continue
+                tr = f"{bt.total_return * 100:+.2f}" if bt.total_return is not None else "-"
+                mdd = f"{bt.max_drawdown * 100:+.2f}" if bt.max_drawdown is not None else "-"
+                sh = f"{bt.sharpe:.2f}" if bt.sharpe is not None else "-"
+                bm = f"{bt.benchmark_return * 100:+.2f}" if bt.benchmark_return is not None else "-"
+                delta = "-"
+                if (
+                    m.prev_backtest is not None
+                    and m.prev_backtest.total_return is not None
+                    and bt.total_return is not None
+                ):
+                    delta = f"{(bt.total_return - m.prev_backtest.total_return) * 100:+.2f}"
+                lines.append(f"| {m.code} | {tr} | {mdd} | {sh} | {bm} | {delta} |")
         return "\n".join(lines)
 
 
@@ -162,15 +213,103 @@ class WatchlistEngine:
         ranking_engine: RankingEngine,
         config: Any,
         session: Session | None = None,
+        backtest_config: BacktestConfig | None = None,
+        indicators: IndicatorConfig | None = None,
+        factors: FactorConfig | None = None,
+        strategies: StrategyConfig | None = None,
+        backtest_fn: Callable[..., dict | None] | None = None,
     ) -> None:
         self.ranking_engine = ranking_engine
         self.config = config
+        self.backtest_config = backtest_config
+        self._bt_ind = indicators
+        self._bt_fac = factors
+        self._bt_str = strategies
+        self._backtest_fn = backtest_fn
+        self._bt_engine: Any = None
         if session is None:
             engine = get_engine()
             Base.metadata.create_all(engine)
             self.session = get_sessionmaker(engine)()
         else:
             self.session = session
+
+    # ------------------------------------------------------------------ #
+    # Backtest helpers (Sprint 1.11)
+    # ------------------------------------------------------------------ #
+    def _get_bt_engine(self) -> Any:
+        """Lazily build a BacktestEngine from the stored configs."""
+        if self._bt_engine is None and self.backtest_config is not None:
+            ind, fac, st = self._bt_ind, self._bt_fac, self._bt_str
+            if ind is None or fac is None or st is None:
+                return None
+            from backtest.engine import BacktestEngine
+
+            self._bt_engine = BacktestEngine.from_config(ind, fac, st, self.backtest_config)
+        return self._bt_engine
+
+    def _backtest_snapshot(
+        self, code: str, data_manager: Any, start: Any, end: Any
+    ) -> dict[str, float] | None:
+        """Return the compact backtest metrics for a code, or None.
+
+        The backtest window is [start, end] where ``end`` is the as_of ceiling,
+        so the watchlist never consumes data after the cross-section (no
+        look-ahead). The default config limits the window through the caller.
+        """
+        if self._backtest_fn is not None:
+            return self._backtest_fn(code, data_manager, start, end)
+        engine = self._get_bt_engine()
+        if engine is None:
+            return None
+        _df, metrics = engine.run_code(code, data_manager, start, end)
+        if not metrics:
+            return None
+        return {
+            "total_return": metrics.get("total_return"),
+            "max_drawdown": metrics.get("max_drawdown"),
+            "sharpe": metrics.get("sharpe"),
+            "benchmark_return": metrics.get("benchmark_return"),
+        }
+
+    def _upsert_backtest_point(
+        self, as_of: date, code: str, metrics: dict[str, float] | None
+    ) -> None:
+        if not metrics:
+            return
+        existing = (
+            self.session.query(BacktestPoint)
+            .filter(BacktestPoint.as_of == as_of, BacktestPoint.code == code)
+            .one_or_none()
+        )
+        if existing is not None:
+            existing.total_return = metrics.get("total_return")
+            existing.max_drawdown = metrics.get("max_drawdown")
+            existing.sharpe = metrics.get("sharpe")
+            existing.benchmark_return = metrics.get("benchmark_return")
+        else:
+            self.session.add(
+                BacktestPoint(
+                    as_of=as_of,
+                    code=code,
+                    total_return=metrics.get("total_return"),
+                    max_drawdown=metrics.get("max_drawdown"),
+                    sharpe=metrics.get("sharpe"),
+                    benchmark_return=metrics.get("benchmark_return"),
+                )
+            )
+
+    def _backtest_point_map(self, as_of: date) -> dict[str, BacktestSummary]:
+        rows = self.session.query(BacktestPoint).filter(BacktestPoint.as_of == as_of).all()
+        out: dict[str, BacktestSummary] = {}
+        for p in rows:
+            out[p.code] = BacktestSummary(
+                total_return=p.total_return,
+                max_drawdown=p.max_drawdown,
+                sharpe=p.sharpe,
+                benchmark_return=p.benchmark_return,
+            )
+        return out
 
     # ------------------------------------------------------------------ #
     # Membership
@@ -308,6 +447,18 @@ class WatchlistEngine:
             # Codes with no data at as_of are intentionally left without a
             # point, so a later deltas() reports them as "dropped" vs the
             # previous snapshot (rather than a null "no_data" row).
+        # Backtest enrichment (Sprint 1.11): when enabled, persist each active
+        # member's historical backtest metrics over [start, as_of] (no look-ahead,
+        # since the window ceiling equals the ranking cross-section). Codes with
+        # no data are skipped, mirroring the ranking point behaviour.
+        if getattr(self.config, "include_backtest", False) and (
+            self._backtest_fn is not None or self.backtest_config is not None
+        ):
+            for code in codes:
+                if code not in by_code:
+                    continue
+                metrics = self._backtest_snapshot(code, data_manager, start_date, as_of_date)
+                self._upsert_backtest_point(as_of_date, code, metrics)
         self.session.commit()
         return self.deltas(as_of=str(as_of_date))
 
@@ -361,6 +512,9 @@ class WatchlistEngine:
         )
         note_by_code = {it.code: it.note for it in self.session.query(WatchlistItem).all()}
 
+        cur_bt = self._backtest_point_map(current)
+        prev_bt = self._backtest_point_map(prev) if prev is not None else {}
+
         members: list[WatchlistMember] = []
         for code in self.list_active():
             cur = cur_pts.get(code)
@@ -377,6 +531,8 @@ class WatchlistEngine:
                     score_change=score_change,
                     status=status,
                     note=note_by_code.get(code),
+                    backtest=cur_bt.get(code),
+                    prev_backtest=prev_bt.get(code),
                 )
             )
         # Order: active ranks first (None last), then by code.
@@ -392,10 +548,13 @@ class WatchlistEngine:
         for m in members:
             summary[m.status] = summary.get(m.status, 0) + 1
 
+        backtest_included = any(m.backtest is not None for m in members)
+
         return WatchlistDigest(
             as_of=str(current),
             prev_as_of=str(prev) if prev is not None else None,
             generated_at=datetime.now().isoformat(timespec="seconds"),
             members=members,
             summary=summary,
+            backtest_included=backtest_included,
         )

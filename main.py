@@ -401,13 +401,26 @@ def watchlist(
     start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
     end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
     fmt: str = typer.Option("markdown", "--format", help="digest output: markdown|json"),
+    backtest: bool = typer.Option(
+        False, "--backtest", help="snapshot 时附上每只标的回测表现并落库 (BacktestPoint)"
+    ),
 ) -> None:
     """Track a watchlist: persist daily ranking + show day-over-day deltas."""
 
     setup_logging()
     cfg = get_config()
     re = RankingEngine.from_config(cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking)
-    eng = WatchlistEngine(re, cfg.watchlist)
+    wl_cfg = cfg.watchlist
+    if backtest:
+        wl_cfg = wl_cfg.model_copy(update={"include_backtest": True})
+    eng = WatchlistEngine(
+        re,
+        wl_cfg,
+        backtest_config=cfg.backtest,
+        indicators=cfg.indicators,
+        factors=cfg.factors,
+        strategies=cfg.strategies,
+    )
     dm = DataManager()
     start_date = date.fromisoformat(start) if start else None
     end_date = date.fromisoformat(end) if end else None
@@ -429,6 +442,7 @@ def watchlist(
         typer.echo(
             "Watchlist (" + str(len(active)) + "): " + (", ".join(active) if active else "(empty)")
         )
+        typer.echo(f"Backtest in snapshot: {wl_cfg.include_backtest}")
     elif action == "snapshot":
         digest = eng.snapshot(as_of, data_manager=dm, start_date=start_date, end_date=end_date)
         text = (
