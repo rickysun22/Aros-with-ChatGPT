@@ -1,10 +1,12 @@
-# AROS Phase 2 — Quant Research Engine (Plan)
+# AROS Phase 2 — Quant Research Engine (Implementation Plan)
 
-> Status: **DRAFT for review** (aligned to code actually on `main` = Sprints 1.1–1.16).
-> Companion doc: `Phase2-Research-Engine-Revision.md` (reconciles GPT's original
-> Phase-2 idea, written against the 1.1–1.8 baseline, with the real 1.1–1.16 state).
-> This file is the concrete, sprint-by-sprint development plan to put in front of
-> ChatGPT for PASS before any code lands.
+> Status: **Implementation plan** (aligned to code on `main` = Sprints 1.1–1.16); direction accepted by ChatGPT.
+> **Primary reference**: `Phase2-Research-Engine-Revision.md` — single source of truth
+> reconciling GPT's original idea (1.1–1.8 baseline) with the real 1.1–1.16 state.
+> **Foundation contract**: `Sprint2.0-Technical-Design.md` — the framework (schemas /
+> interfaces / module boundaries) both sides freeze **before** any code lands.
+> This file is the sprint-by-sprint implementation roadmap (2.0–2.6). Each sprint still
+> requires ChatGPT PASS + CI green before the next begins.
 
 ## 1. Goal of Phase 2
 
@@ -48,6 +50,11 @@ so we don't fork the metric math:
 
 Two gaps must close before the research engine is meaningful. They are *data and
 persistence* work, not "research" per se, so they are a standalone foundation sprint.
+
+> **Sprint 2.0 has its own frozen contract** in `Sprint2.0-Technical-Design.md`
+> (ORM schemas, provider/manager interfaces, `research/` skeleton, config, test
+> contract, and 6 open decisions for sign-off). The summary below is the roadmap
+> view; the technical design is authoritative for implementation.
 
 ### 2.0a — Index / benchmark data in `DataManager` (1.2)
 - Add an index-data path: AKShare index daily (`ak.index_zh_a_hist` / `ak.stock_zh_index_daily`), wrapped behind the existing `DataProvider` protocol.
