@@ -75,9 +75,31 @@ def make_frames() -> dict[str, pd.DataFrame]:
     }
 
 
-def make_engine(report=None, ranking=None):
+def make_engine(report=None, ranking=None, backtest_fn=None, backtest_config=None):
     re = RankingEngine(FakeSE(), ranking or RankingConfig())
-    return ReportEngine(re, report or ReportConfig())
+    return ReportEngine(
+        re,
+        report or ReportConfig(),
+        backtest_config=backtest_config,
+        backtest_fn=backtest_fn,
+    )
+
+
+def fake_bt(metrics: dict | None):
+    """Return an injectable backtest fn yielding fixed metrics per code."""
+
+    def _fn(code, dm, start, end):  # noqa: ANN001
+        return metrics
+
+    return _fn
+
+
+BT_SAMPLE = {
+    "bt_total_return": 0.1234,
+    "bt_max_drawdown": -0.0567,
+    "bt_sharpe": 1.5,
+    "bt_benchmark_return": 0.0890,
+}
 
 
 def test_generate_sorted_and_scored():
@@ -177,10 +199,81 @@ def test_daily_report_dataclass_defaults():
 def test_real_config_wiring():
     cfg = get_config()
     eng = ReportEngine.from_config(
-        cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking, cfg.report
+        cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking, cfg.report, cfg.backtest
     )
     expected = [s.name for s in cfg.strategies.enabled]
     assert eng.ranking_engine.names == expected
+
+
+def test_backtest_disabled_by_default():
+    eng = make_engine()
+    rep = eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    assert rep.backtest_included is False
+    assert all(r.bt_sharpe is None for r in rep.rows)
+
+
+def test_backtest_enrichment_attached():
+    eng = make_engine(backtest_fn=fake_bt(BT_SAMPLE))
+    rep = eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    assert rep.backtest_included is True
+    by = {r.code: r for r in rep.rows}
+    assert abs(by["C"].bt_sharpe - 1.5) < 1e-9
+    assert abs(by["C"].bt_total_return - 0.1234) < 1e-9
+    assert abs(by["C"].bt_max_drawdown - (-0.0567)) < 1e-9
+    assert abs(by["C"].bt_benchmark_return - 0.0890) < 1e-9
+
+
+def test_backtest_no_lookahead_window():
+    captured = {}
+
+    def _fn(code, dm, start, end):  # noqa: ANN001
+        captured[code] = (start, end)
+        return BT_SAMPLE
+
+    eng = make_engine(report=ReportConfig(as_of="2024-01-01"), backtest_fn=_fn)
+    eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    # The backtest window end must equal the as_of ceiling (no future leakage).
+    for _code, (_start, end) in captured.items():
+        assert end == "2024-01-01" or str(end) == "2024-01-01"
+
+
+def test_backtest_null_metrics_yield_none_rows():
+    eng = make_engine(backtest_fn=fake_bt(None))
+    rep = eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    assert rep.backtest_included is True
+    assert all(r.bt_sharpe is None for r in rep.rows)
+
+
+def test_backtest_markdown_columns():
+    eng = make_engine(backtest_fn=fake_bt(BT_SAMPLE))
+    rep = eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    md = rep.to_markdown(include_detail=True)
+    assert "回测收益%" in md
+    assert "Sharpe" in md
+    assert "基准%" in md
+    assert "历史回测（策略 signal，区间 [start, as_of]）" in md
+
+
+def test_backtest_json_fields():
+    eng = make_engine(backtest_fn=fake_bt(BT_SAMPLE))
+    rep = eng.generate(["A", "B", "C"], FakeDM(make_frames()))
+    payload = json.loads(rep.to_json())
+    assert payload["backtest_included"] is True
+    row0 = payload["rows"][0]
+    assert "bt_sharpe" in row0
+    assert abs(row0["bt_sharpe"] - 1.5) < 1e-9
+
+
+def test_backtest_real_engine_empty_data_graceful():
+    # Exercises the real BacktestEngine lazy-build path (from actual configs)
+    # on empty data: run_code returns {} -> rows keep None backtest fields.
+    cfg = get_config()
+    eng = ReportEngine.from_config(
+        cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking, cfg.report, cfg.backtest
+    )
+    rep = eng.generate(["X", "Y"], FakeDM({}))
+    assert rep.backtest_included is True
+    assert all(r.bt_sharpe is None for r in rep.rows)
 
 
 def test_cli_report_list():

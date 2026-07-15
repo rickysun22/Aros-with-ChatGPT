@@ -216,6 +216,7 @@ class ReportConfig(BaseModel):
     format: Literal["markdown", "json"] = "markdown"
     freshness_days: int = 5  # 数据比 as_of 滞后超过该天数则标"滞后"
     include_detail: bool = True  # markdown 是否展开候选明细
+    include_backtest: bool = False  # 是否给每个候选附上历史回测指标（用 backtest 配置）
 
 
 class WatchlistConfig(BaseModel):

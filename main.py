@@ -338,6 +338,9 @@ def report(
     end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
     fmt: str | None = typer.Option(None, "--format", help="Output format: markdown|json"),
     out: str | None = typer.Option(None, "--out", help="Write report to FILE"),
+    backtest: bool = typer.Option(
+        False, "--backtest", help="Attach per-candidate backtest metrics"
+    ),
 ) -> None:
     """Generate the daily research report (ranking Top-N + price snapshots)."""
     setup_logging()
@@ -350,7 +353,7 @@ def report(
         typer.echo(
             f"Report: top_n={rp.top_n}, as_of={rp.as_of or 'latest'}, "
             f"format={rp.format}, freshness_days={rp.freshness_days}, "
-            f"include_detail={rp.include_detail}"
+            f"include_detail={rp.include_detail}, include_backtest={rp.include_backtest}"
         )
         return
     if not codes:
@@ -364,6 +367,8 @@ def report(
         updates["as_of"] = as_of
     if fmt is not None:
         updates["format"] = fmt
+    if backtest:
+        updates["include_backtest"] = True
     if updates:
         rp = rp.model_copy(update=updates)
     engine = ReportEngine.from_config(
@@ -372,6 +377,7 @@ def report(
         StrategyConfig(enabled=specs),
         cfg.ranking,
         rp,
+        backtest=cfg.backtest if rp.include_backtest else None,
     )
     dm = DataManager()
     start_date = date.fromisoformat(start) if start else None
