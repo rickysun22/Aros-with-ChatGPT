@@ -166,6 +166,154 @@ class DailyReport:
                 lines.append("")
         return "\n".join(lines)
 
+    def to_html(self, include_detail: bool = True) -> str:
+        """Render a self-contained HTML report (inline CSS + SVG bar chart).
+
+        No external JS/CSS dependencies, so it renders offline. Includes the same
+        columns as the markdown table plus a horizontal bar chart of the composite
+        scores; backtest columns are shown when ``backtest_included`` is True.
+        """
+
+        def esc(s: Any) -> str:
+            return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        # ---- SVG bar chart of composite scores ----
+        chart_rows: list[str] = []
+        if self.rows:
+            scores = [r.composite_score for r in self.rows]
+            lo, hi = min(scores), max(scores)
+            span = (hi - lo) or 1.0
+            chart_w = 560.0
+            row_h = 26
+            chart_h = row_h * len(self.rows)
+            for i, r in enumerate(self.rows):
+                y = i * row_h + 4
+                shifted = (r.composite_score - lo) / span  # 0..1
+                bw = max(2.0, shifted * chart_w)
+                label = esc(r.code)
+                val = f"{r.composite_score:.4f}"
+                chart_rows.append(
+                    f'<text x="0" y="{y + 16}" class="bl">{label}</text>'
+                    f'<rect x="70" y="{y + 4}" width="{bw:.1f}" height="16" rx="3" '
+                    f'class="bar"/>'
+                    f'<text x="{70 + bw + 6:.1f}" y="{y + 16}" class="bv">{val}</text>'
+                )
+            chart_svg = (
+                f'<svg width="{70 + chart_w + 80:.0f}" height="{chart_h + 8}" '
+                f'class="chart" role="img" aria-label="composite score ranking">'
+                + "".join(chart_rows)
+                + "</svg>"
+            )
+        else:
+            chart_svg = '<p class="muted">无候选标的（无数据或无打分）。</p>'
+
+        # ---- table ----
+        score_names = list(self.rows[0].scores.keys()) if self.rows else []
+        head = ["排名", "代码", "综合分"] + [f"score_{n}" for n in score_names]
+        head += ["最新价", "日涨跌%", "数据日期", "新鲜"]
+        if self.backtest_included:
+            head += ["回测收益%", "最大回撤%", "Sharpe", "基准%"]
+
+        def _bt(v: float | None, pct: bool) -> str:
+            if v is None:
+                return "-"
+            return f"{v * 100:+.2f}" if pct else f"{v:.2f}"
+
+        body_rows: list[str] = []
+        for r in self.rows:
+            chg = f"{r.daily_change_pct:+.2f}" if r.daily_change_pct is not None else "-"
+            fresh = "-" if r.stale is None else ("新鲜" if not r.stale else "滞后")
+            cells = [
+                str(r.rank),
+                esc(r.code),
+                f"{r.composite_score:.4f}",
+                *[f"{r.scores[n]:.4f}" for n in score_names],
+                f"{r.close:.2f}" if r.close is not None else "-",
+                chg,
+                r.as_of_date or "-",
+                fresh,
+            ]
+            if self.backtest_included:
+                cells += [
+                    _bt(r.bt_total_return, True),
+                    _bt(r.bt_max_drawdown, True),
+                    _bt(r.bt_sharpe, False),
+                    _bt(r.bt_benchmark_return, True),
+                ]
+            body_rows.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+
+        bt_banner = (
+            '<p class="muted">回测：已附每个候选的历史表现（策略 signal，区间 [start, as_of]）</p>'
+            if self.backtest_included
+            else ""
+        )
+
+        details: list[str] = []
+        if include_detail and self.rows:
+            for r in self.rows:
+                parts = [f"<li>综合分: {r.composite_score:.4f}</li>"]
+                parts += [f"<li>{n}: {r.scores[n]:.4f}</li>" for n in score_names]
+                if r.close is not None:
+                    chg = f"{r.daily_change_pct:+.2f}%" if r.daily_change_pct is not None else "n/a"
+                    parts.append(
+                        f"<li>最新价: {r.close:.2f}（{esc(r.as_of_date or '-')}），"
+                        f"日涨跌 {chg}</li>"
+                    )
+                    if r.stale is not None:
+                        parts.append(f"<li>数据新鲜度: {'新鲜' if not r.stale else '滞后'}</li>")
+                if self.backtest_included:
+                    parts.append(
+                        "<li>历史回测: 收益 "
+                        f"{_bt(r.bt_total_return, True)}% / "
+                        f"最大回撤 {_bt(r.bt_max_drawdown, True)}% / "
+                        f"Sharpe {_bt(r.bt_sharpe, False)} / "
+                        f"基准 {_bt(r.bt_benchmark_return, True)}%</li>"
+                    )
+                details.append(
+                    f'<div class="card"><h3>#{r.rank} {esc(r.code)}</h3><ul>'
+                    + "".join(parts)
+                    + "</ul></div>"
+                )
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AROS 每日研究日报</title>
+<style>
+ body{{font-family:-apple-system,Segoe UI,Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+   color:#1f2937;margin:0;padding:24px;background:#f7f8fa}}
+ h1{{font-size:20px;margin:0 0 4px}}
+ .meta{{color:#6b7280;font-size:13px;margin-bottom:16px}}
+ .muted{{color:#9ca3af;font-size:13px}}
+ .banner{{background:#eef2ff;border-left:3px solid #6366f1;padding:8px 12px;
+   border-radius:4px;font-size:13px;color:#4338ca;margin-bottom:16px}}
+ .chart{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;
+   padding:12px;margin-bottom:20px}}
+ .bl{{font-size:13px;fill:#374151}}
+ .bv{{font-size:12px;fill:#6b7280}}
+ .bar{{fill:#6366f1}}
+ table{{border-collapse:collapse;width:100%;background:#fff;font-size:13px;
+   border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}}
+ th,td{{padding:8px 10px;text-align:right;border-bottom:1px solid #f0f1f3}}
+ th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){{text-align:left}}
+ thead th{{background:#f3f4f6;color:#374151;font-weight:600}}
+ tbody tr:hover{{background:#fafafa}}
+ .cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:20px}}
+ .card{{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px}}
+ .card h3{{margin:0 0 6px;font-size:14px}}
+ .card ul{{margin:0;padding-left:18px;font-size:12px;color:#4b5563}}
+</style></head><body>
+<h1>AROS 每日研究日报</h1>
+<div class="meta">生成时间: {esc(self.generated_at)} ｜ 截面日期: {esc(self.as_of)} ｜
+候选池: {self.universe_size} 只 ｜ 数据来源: {esc(self.source)}</div>
+{bt_banner}
+<h2>一、Top 候选排序</h2>
+{chart_svg}
+<table><thead><tr>{"".join(f"<th>{esc(h)}</th>" for h in head)}</tr></thead>
+<tbody>{"".join(body_rows)}</tbody></table>
+{f'<h2>二、候选明细</h2><div class="cards">{"".join(details)}</div>' if details else ""}
+</body></html>"""
+
 
 class ReportEngine:
     """Build the daily report from the ranking layer + price snapshots (+ backtest)."""

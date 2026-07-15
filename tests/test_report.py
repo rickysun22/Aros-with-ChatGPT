@@ -276,6 +276,72 @@ def test_backtest_real_engine_empty_data_graceful():
     assert all(r.bt_sharpe is None for r in rep.rows)
 
 
+def test_to_html_renders_chart_and_table():
+    from report.engine import DailyReport, ReportRow
+
+    rep = DailyReport(
+        generated_at="2024-01-01T00:00:00",
+        as_of="2024-01-01",
+        universe_size=2,
+        source="akshare (qfq)",
+        rows=[
+            ReportRow(
+                rank=1,
+                code="A",
+                composite_score=0.9,
+                scores={"weighted_momentum": 0.9},
+                close=10.0,
+                as_of_date="2024-01-01",
+                daily_change_pct=1.2,
+                stale=False,
+            ),
+            ReportRow(
+                rank=2,
+                code="B",
+                composite_score=0.5,
+                scores={"weighted_momentum": 0.5},
+                close=20.0,
+                as_of_date="2024-01-01",
+                daily_change_pct=-0.5,
+                stale=False,
+            ),
+        ],
+    )
+    html = rep.to_html()
+    assert "<!DOCTYPE html>" in html
+    assert "<svg" in html and "bar" in html  # bar chart present
+    assert "A" in html and "B" in html
+    assert "综合分" in html
+    assert "候选明细" in html  # detail cards
+
+
+def test_to_html_backtest_columns():
+    from report.engine import DailyReport, ReportRow
+
+    rep = DailyReport(
+        generated_at="2024-01-01T00:00:00",
+        as_of="2024-01-01",
+        universe_size=1,
+        source="x",
+        backtest_included=True,
+        rows=[
+            ReportRow(
+                rank=1,
+                code="A",
+                composite_score=0.9,
+                scores={"weighted_momentum": 0.9},
+                bt_total_return=0.1,
+                bt_max_drawdown=-0.05,
+                bt_sharpe=1.5,
+                bt_benchmark_return=0.03,
+            ),
+        ],
+    )
+    html = rep.to_html()
+    assert "回测收益" in html
+    assert "Sharpe" in html
+
+
 def test_cli_report_list():
     from typer.testing import CliRunner
 

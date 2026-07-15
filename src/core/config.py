@@ -214,7 +214,7 @@ class ReportConfig(BaseModel):
 
     top_n: int = 20  # 日报展示的候选数量（可独立于 ranking.top_n）
     as_of: str | None = None  # "YYYY-MM-DD"; None => 每标的取最新一根
-    format: Literal["markdown", "json"] = "markdown"
+    format: Literal["markdown", "json", "html"] = "markdown"
     freshness_days: int = 5  # 数据比 as_of 滞后超过该天数则标"滞后"
     include_detail: bool = True  # markdown 是否展开候选明细
     include_backtest: bool = False  # 是否给每个候选附上历史回测指标（用 backtest 配置）

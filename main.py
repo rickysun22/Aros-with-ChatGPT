@@ -337,7 +337,7 @@ def report(
     as_of: str | None = typer.Option(None, "--as-of", help="Cross-section date YYYY-MM-DD"),
     start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
     end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
-    fmt: str | None = typer.Option(None, "--format", help="Output format: markdown|json"),
+    fmt: str | None = typer.Option(None, "--format", help="Output format: markdown|json|html"),
     out: str | None = typer.Option(None, "--out", help="Write report to FILE"),
     universe: str | None = typer.Option(
         None, "--universe", help="Resolve candidate codes from a named pool"
@@ -394,7 +394,12 @@ def report(
     start_date = date.fromisoformat(start) if start else None
     end_date = date.fromisoformat(end) if end else None
     daily = engine.generate(list(codes), dm, start_date, end_date)
-    text = daily.to_json() if rp.format == "json" else daily.to_markdown(rp.include_detail)
+    if rp.format == "json":
+        text = daily.to_json()
+    elif rp.format == "html":
+        text = daily.to_html(rp.include_detail)
+    else:
+        text = daily.to_markdown(rp.include_detail)
     if out:
         Path(out).write_text(text, encoding="utf-8")
         typer.echo(f"Report written to {out} ({len(daily.rows)} rows)")
