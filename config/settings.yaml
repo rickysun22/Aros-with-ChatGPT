@@ -120,3 +120,16 @@ backtest:
     stamp_tax_rate: 0.0005           # 万 5，仅卖出
     transfer_fee_rate: 0.00001       # 万 0.1，双边
     slippage: 0.0                    # 滑点，双边，简化为成本拖累
+
+# Ranking Engine (Sprint 1.7) - 跨标的截面复合打分排序，选 Top N
+# 复用 indicators/factors/strategies；排序依据是各策略的 score_<name> 连续分。
+ranking:
+  top_n: 20                          # 取前 N 名
+  as_of: null                        # null => 每个标的取最新一根 K 线
+  dimensions: null                   # null => 所有启用策略等权参与
+  # 显式配置示例（取消注释启用）：
+  # dimensions:
+  #   - strategy: weighted_momentum
+  #     weight: 1.0
+  #   - strategy: golden_cross_rule
+  #     weight: 0.5

@@ -21,6 +21,7 @@ from core.logging import setup_logging
 from data.manager import DataManager
 from factors.engine import FactorEngine
 from indicators.engine import IndicatorEngine
+from ranking.engine import RankingEngine
 from strategies.engine import StrategyEngine
 
 app = typer.Typer(
@@ -270,6 +271,57 @@ def backtest(
     typer.echo("Equity curve (last 10):")
     cols = [c for c in ("date", "close", "position", "equity") if c in df.columns]
     typer.echo(df[cols].tail(10).to_string(index=False))
+
+
+@app.command()
+def ranking(
+    codes: list[str] = typer.Argument(None, help="One or more stock codes, e.g. 600000 600519"),
+    list_all: bool = typer.Option(False, "--list", help="List strategies available for ranking"),
+    top_n: int | None = typer.Option(None, "--top-n", help="Override ranking.top_n"),
+    as_of: str | None = typer.Option(None, "--as-of", help="Cross-section date YYYY-MM-DD"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+) -> None:
+    """Rank candidate stocks by composite strategy score; print Top-N."""
+    setup_logging()
+    cfg = get_config()
+    specs = cfg.strategies.enabled
+    if list_all:
+        typer.echo("Available strategies: " + ", ".join(StrategyEngine.available()))
+        typer.echo(f"Configured ({len(specs)}): " + ", ".join(s.name for s in specs))
+        dims = (
+            ", ".join(f"{d.strategy}(w={d.weight})" for d in cfg.ranking.dimensions)
+            if cfg.ranking.dimensions is not None
+            else ", ".join(s.name for s in specs)
+        )
+        typer.echo(f"Ranking dimensions (equal weight if null): {dims}")
+        typer.echo(f"top_n: {cfg.ranking.top_n}, as_of: {cfg.ranking.as_of or 'latest'}")
+        return
+    if not codes:
+        typer.echo("Specify one or more stock CODES or use --list", err=True)
+        raise typer.Exit(code=1)
+    rc = cfg.ranking
+    if top_n is not None:
+        rc = rc.model_copy(update={"top_n": top_n})
+    if as_of is not None:
+        rc = rc.model_copy(update={"as_of": as_of})
+    engine = RankingEngine.from_config(
+        IndicatorConfig(enabled=cfg.indicators.enabled),
+        FactorConfig(enabled=cfg.factors.enabled),
+        StrategyConfig(enabled=specs),
+        rc,
+    )
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    table, _scored = engine.rank_universe(list(codes), dm, start_date, end_date)
+    if table.empty:
+        typer.echo("No ranking produced (no data or no scores).", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Ranking Top-{len(table)} of {len(codes)} candidates:")
+    cols = [c for c in ("rank", "code", "composite_score") if c in table.columns]
+    extra = [c for c in table.columns if c.startswith("score_")]
+    typer.echo(table[cols + extra].to_string(index=False))
 
 
 def main() -> None:

@@ -183,6 +183,26 @@ class BacktestConfig(BaseModel):
     cost: CostConfig = Field(default_factory=CostConfig)
 
 
+class DimensionSpec(BaseModel):
+    """One ranking dimension: a strategy's score_<name> column + its weight."""
+
+    strategy: str  # matches a StrategySpec.name
+    weight: float = 1.0  # may be negative to penalise
+
+
+class RankingConfig(BaseModel):
+    """Ranking Engine (Sprint 1.7) configuration.
+
+    Cross-sectional composite-score ranking over candidate stocks. The
+    composite is the weight-normalised sum of each strategy's score_<name> at
+    the chosen cross-section, sorted descending, Top-N kept.
+    """
+
+    top_n: int = 20
+    as_of: str | None = None  # "YYYY-MM-DD"; None => latest bar per code
+    dimensions: list[DimensionSpec] | None = None  # None => all enabled, equal weight
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -195,6 +215,7 @@ class AppConfig(BaseModel):
     factors: FactorConfig = Field(default_factory=FactorConfig)
     strategies: StrategyConfig = Field(default_factory=StrategyConfig)
     backtest: BacktestConfig = Field(default_factory=BacktestConfig)
+    ranking: RankingConfig = Field(default_factory=RankingConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

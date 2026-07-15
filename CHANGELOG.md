@@ -2,6 +2,24 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.7 — Ranking Engine (2026-07-15)
+
+### Added
+
+- `src/ranking/engine.py` — `RankingEngine`: cross-sectional composite-score ranking over candidate stocks. Reuses `StrategyEngine` to produce `score_<name>` columns, then combines them (configured weights, normalised by sum of absolute weights) into a composite score per stock at a chosen cross-section (latest bar, or `as_of`), sorts descending, and returns the Top-N watch-list plus the full scored cross-section.
+- `src/ranking/__init__.py` — public export `RankingEngine`.
+- `src/ranking` package + `Sprint1.7-Ranking-Design.md` (design doc).
+- `core/config.py` — `DimensionSpec` (strategy + weight, weight may be negative) and `RankingConfig` (top_n, as_of, dimensions), wired into `AppConfig.ranking`.
+- `config/settings.yaml` — `ranking` section (top_n=20, as_of=null, dimensions=null => all enabled strategies equal weight).
+- `main.py` — new `ranking` command: `ranking --list`, `ranking CODE [CODE ...] [--top-n N] [--as-of YYYY-MM-DD] [--start ...] [--end ...]`; prints a ranked Top-N table with composite + per-strategy score columns.
+- `tests/test_ranking.py` — composite score correctness (equal / explicit / negative weights), Top-N cutoff, `as_of` cross-section selection, no-look-ahead guard, missing `code` column `DataError`, missing score column `DataError`, real-config wiring, and a CLI smoke test.
+
+### Notes
+
+- Sorting semantics (user-confirmed): each candidate keeps its strategy `score_<name>` at the cross-section; those scores are combined into a composite and sorted descending. This is a thin layer over the strategy engine and inherits the no-look-ahead guarantee from Sprint 1.5.
+- `as_of` filters on the `date` column (get_daily returns an integer-indexed frame with a `date` column), so no future bar is ever visible at the cross-section.
+- Cross-instrument allocation beyond ranking is out of scope; this sprint produces a ranked candidate list, not a portfolio.
+
 ## Sprint 1.6 — Backtest Engine (2026-07-15)
 
 ### Added
