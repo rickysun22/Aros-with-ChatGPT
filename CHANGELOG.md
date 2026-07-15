@@ -2,6 +2,116 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.16 — Portfolio Backtest (2026-07-15)
+
+### Added
+
+- `src/backtest/portfolio.py` — `PortfolioBacktest` + `PortfolioResult`: selects Top-N candidates by composite score and builds an equal-weight rebalanced portfolio; reuses single-code equity curves from `BacktestEngine`; benchmark = buy & hold across the full candidate set. `rank_fn` / `equity_fn` are injectable for testing.
+- `src/backtest/__init__.py` — public exports `PortfolioBacktest`, `PortfolioResult`.
+- `main.py` — new `portfolio` command.
+- `tests/test_portfolio.py` — selection, equal-weight combination, benchmark, no-data zeros, injectable stubs.
+- `Sprint1.16-Portfolio-Backtest-Design.md` — design doc.
+
+### Notes
+
+- No future functions: the selection window and rebalance both converge on the per-candidate `as_of` ceiling.
+- This is the equal-weight Top-N baseline; richer weighting / risk-based rebalancing is deferred.
+
+## Sprint 1.15 — Scheduler + Notifier (2026-07-15)
+
+### Added
+
+- `src/scheduler/notify.py` — `Notifier` abstraction + three implementations: `ConsoleNotifier`, `FileNotifier`, `WebhookNotifier` (best-effort HTTP POST; no-op when URL is `None`); `build_notifier(SchedulerConfig)`.
+- `src/scheduler/engine.py` — `Scheduler` with `run_ntimes(task, interval, n)` and `run_loop(task, interval, stop_event)`; task exceptions are caught so the loop never dies.
+- `src/scheduler/__init__.py` — public exports.
+- `core/config.py` — `SchedulerConfig` (notifier_type / webhook_url / file_path), wired into `AppConfig.scheduler`.
+- `config/settings.yaml` — `scheduler` section.
+- `main.py` — new `schedule` command: `--report [CODES...] [--universe POOL] [--backtest]`, `--watchlist [--backtest]`, `--every N` (minutes) / `--once`.
+- `tests/test_scheduler.py` — offline tests (console/file, no-op webhook, interval ticking, error isolation).
+- `Sprint1.15-Scheduler-Design.md` — design doc.
+
+### Notes
+
+- Runs without any external credentials; the webhook is a no-op when `webhook_url` is unset.
+- Reuses existing report/watchlist generation; only repeats it on an interval, so the `as_of` window stays look-ahead free.
+
+## Sprint 1.14 — Report HTML (2026-07-15)
+
+### Added
+
+- `src/report/engine.py` — `DailyReport.to_html(include_detail=True)`: self-contained HTML with inline CSS and inline SVG horizontal bar charts (bars normalised on composite score), full table (incl. 1.10 backtest columns), and a detail card grid. Text is HTML-escaped.
+- `core/config.py` — `ReportConfig.format: Literal["markdown","json","html"]`.
+- `main.py` — `report ... --format html` (optionally `--out report.html`).
+- `tests/test_report.py` — HTML output assertions (doctype, svg, bars, codes, 综合分, backtest columns when enabled).
+- `Sprint1.14-Report-HTML-Design.md` — design doc.
+
+### Notes
+
+- Zero-dependency and offline-openable; the render layer introduces no new data or window, so no future functions are introduced.
+
+## Sprint 1.13 — Universe / Stock-pool (2026-07-15)
+
+### Added
+
+- `src/universe/models.py` — `UniversePool` ORM (`name` PK, `description`, `codes_json`, `created_at`, `updated_at`).
+- `src/universe/engine.py` — `UniverseEngine` (session-bound, shared DB): `add_codes` (dedupe + lexical sort), `remove_codes`, `get_codes`, `exists`, `list_pools`, `delete`.
+- `src/universe/__init__.py` — public exports.
+- `main.py` — new `universe` command (`add|remove|list|show|delete`) and `report --universe POOL` (mutually exclusive with positional codes).
+- `tests/test_universe.py` — 6 isolated in-memory SQLite tests.
+- `Sprint1.13-Universe-Design.md` — design doc.
+
+### Notes
+
+- `Universe` only answers "where do the codes come from"; it does not change ranking/backtest semantics. Watchlist keeps its own membership table and does not depend on universe.
+
+## Sprint 1.12 — Backtest Cache (2026-07-15)
+
+### Added
+
+- `src/backtest/cache.py` — `BacktestCache` ORM (`code`, `params_hash`, `start`, `end`, `signal_col`, `metrics_json`, `equity_json`, `created_at`; unique on `(code, params_hash)`) + `get_cached()` / `store()` (best-effort).
+- `src/backtest/engine.py` — `run_code` now does get-or-compute against the cache; `BacktestEngine.run_code(use_cache=True)`.
+- `core/config.py` — `BacktestConfig.cache_enabled` (default `True`).
+- `config/settings.yaml` — `backtest.cache_enabled`.
+- `tests/test_backtest.py` — cache hit skips recompute / distinct codes / hash determinism.
+- `Sprint1.12-Backtest-Cache-Design.md` — design doc.
+
+### Notes
+
+- `params_hash` folds every input that changes the simulation (signal column, cost, initial cash, max position, benchmark flag, start/end), so a new `as_of` naturally misses.
+- All cache access is best-effort: any DB error is caught and degrades to live computation, so caching never blocks a backtest.
+
+## Sprint 1.11 — Watchlist Backtest Persistence (2026-07-15)
+
+### Added
+
+- `src/watchlist/models.py` — `BacktestPoint` ORM (`as_of`, `code`, `total_return`, `max_drawdown`, `sharpe`, `benchmark_return`, `created_at`; unique on `(as_of, code)`; fields nullable so no-data codes do not get a point).
+- `src/watchlist/engine.py` — `BacktestSummary` dataclass; `WatchlistMember.backtest` / `prev_backtest`; `WatchlistDigest.backtest_included`; lazy `_get_bt_engine` + `_backtest_snapshot` / `_upsert_backtest_point` / `_backtest_point_map`; snapshot persists points and computes return deltas vs the previous point.
+- `src/watchlist/__init__.py` — export `BacktestPoint` / `BacktestSummary`.
+- `core/config.py` — `WatchlistConfig.include_backtest` (default `False`).
+- `main.py` — `watchlist snapshot --backtest`.
+- `tests/test_watchlist.py` — backtest coverage incl. `test_snapshot_backtest_no_lookahead`.
+- `Sprint1.11-Watchlist-Backtest-Design.md` — design doc.
+
+### Notes
+
+- No future functions: same `as_of` ceiling as 1.10; deltas are a pure read of stored history. Backtest result rendering appends a "## 回测表现" section with return deltas.
+
+## Sprint 1.10 — Report Backtest Enrichment (2026-07-15)
+
+### Added
+
+- `src/report/engine.py` — `ReportRow` gains `bt_total_return` / `bt_max_drawdown` / `bt_sharpe` / `bt_benchmark_return`; `DailyReport` gains `backtest_included`; `ReportEngine` gains a lazy `_get_bt_engine()` and `_backtest_snapshot`, and renders backtest columns in markdown/json.
+- `core/config.py` — `ReportConfig.include_backtest` (default `False`).
+- `config/settings.yaml` — `report.include_backtest`.
+- `main.py` — `report ... --backtest`.
+- `tests/test_report.py` — backtest coverage (injectable `backtest_fn` stub).
+- `Sprint1.10-Report-Backtest-Design.md` — design doc.
+
+### Notes
+
+- Per-candidate backtest (one backtest per Top-N candidate), not portfolio backtest (deferred to 1.16).
+- No future functions: backtest window `[start_date, as_of]` reuses the report's `as_of` ceiling. Only Top-N candidates are backtested to bound cost.
+
 ## Sprint 1.9 — Watchlist Tracker (2026-07-15)
 
 ### Added

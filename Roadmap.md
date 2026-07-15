@@ -9,7 +9,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 ## Pipeline
 
-`data → indicators → factors → strategies → backtest → ranking → report`
+`data → indicators → factors → strategies → backtest → ranking → report → watchlist → backtest-cache → universe → html-report → scheduler → portfolio-backtest`
 
 ## Sprints
 
@@ -24,6 +24,13 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **1.7** | Ranking Engine | completed | cross-sectional composite-score ranking over candidates; RankingEngine + RankingConfig + CLI |
 | **1.8** | Daily Report | completed | aggregate ranking Top-N into a markdown/json daily research report; ReportEngine + ReportConfig + CLI |
 | **1.9** | Watchlist Tracker | completed | persist daily ranking of watched stocks + day-over-day deltas (new/dropped/up/down/steady); WatchlistEngine + WatchlistConfig + CLI |
+| **1.10** | Report Backtest Enrichment | completed | per-candidate backtest metrics in daily report (total return / max drawdown / sharpe / benchmark); ReportConfig.include_backtest; `report --backtest` |
+| **1.11** | Watchlist Backtest Persistence | completed | `BacktestPoint` ORM + return deltas; WatchlistMember.backtest/prev_backtest; `watchlist snapshot --backtest`; WatchlistConfig.include_backtest |
+| **1.12** | Backtest Cache | completed | `BacktestCache` ORM + get-or-compute; results cached by params_hash; best-effort (DB errors degrade to live); BacktestConfig.cache_enabled |
+| **1.13** | Universe / Stock-pool | completed | `UniversePool` + `UniverseEngine` (add/remove/list/contains); `universe` CLI + `report --universe` |
+| **1.14** | Report HTML | completed | `DailyReport.to_html()` self-contained (inline CSS + SVG bars, backtest columns); ReportConfig.format=markdown/json/html; `report --format html` |
+| **1.15** | Scheduler + Notifier | completed | `Scheduler` (run_ntimes/run_loop) + `Notifier` (Console/File/Webhook no-op without URL); `schedule` CLI (--every/--once/--report/--watchlist) |
+| **1.16** | Portfolio Backtest | completed | `PortfolioBacktest` Top-N rebalanced equal-weight portfolio vs buy&hold benchmark; injectable rank_fn/equity_fn; `portfolio` CLI |
 
 ## Principles (non-negotiable)
 
@@ -35,6 +42,11 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 ## Next up
 
-Sprint 1.5 (Strategy Engine) turns the factor layer into concrete, testable
-short-term trading signals/strategies. It will reuse `FactorEngine` outputs and
-keep the same config-driven, no-future-leak, single-data-entry design.
+Sprints 1.1–1.16 are complete and on `main`; all four quality gates (ruff /
+black / mypy / pytest) are green locally. The next direction is **Phase 2 —
+Quant Research Engine** (experiment registry, benchmark comparison, walk-forward
+/ out-of-sample validation). GPT's initial Phase 2 plan was written against the
+1.1–1.8 baseline; the reconciled plan aligned to 1.16 is in
+`Phase2-Research-Engine-Revision.md` (the single source of truth for the next
+phase). Two prerequisites must land first: index-constituent data in
+`DataManager`, and experiment-result persistence on `core.database`.
