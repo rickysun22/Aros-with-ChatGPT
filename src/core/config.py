@@ -246,6 +246,37 @@ class SchedulerConfig(BaseModel):
     file_path: str | None = None  # target for the file notifier
 
 
+class BenchmarkConfig(BaseModel):
+    """Benchmark index configuration (Phase 2 / Sprint 2.0).
+
+    Maps human-friendly benchmark keys (used by ``ExperimentConfig.benchmark``)
+    to the raw index codes that :meth:`DataManager.get_index_daily` understands.
+    """
+
+    default: str = "csi300"
+    indices: dict[str, str] = Field(
+        default_factory=lambda: {
+            "csi300": "000300",
+            "csi500": "000905",
+            "csi1000": "000852",
+            "sh_composite": "000001",
+        }
+    )
+
+
+class ResearchConfig(BaseModel):
+    """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
+
+    Only the surface needed to freeze the 2.0 foundation is defined here; the
+    runner / walk-forward / report parameters land in their own sprints
+    (2.4-2.6). ``metrics=None`` means the research layer reuses
+    ``BacktestConfig.metrics`` rather than defining a parallel metric list.
+    """
+
+    experiment_id_prefix: str = "exp_"  # short-uuid prefix for ExperimentRun.id
+    metrics: list[str] | None = None  # None => reuse backtest.metrics (no parallel list)
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -262,6 +293,8 @@ class AppConfig(BaseModel):
     report: ReportConfig = Field(default_factory=ReportConfig)
     watchlist: WatchlistConfig = Field(default_factory=WatchlistConfig)
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
+    research: ResearchConfig = Field(default_factory=ResearchConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

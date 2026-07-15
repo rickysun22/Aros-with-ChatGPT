@@ -31,6 +31,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **1.14** | Report HTML | completed | `DailyReport.to_html()` self-contained (inline CSS + SVG bars, backtest columns); ReportConfig.format=markdown/json/html; `report --format html` |
 | **1.15** | Scheduler + Notifier | completed | `Scheduler` (run_ntimes/run_loop) + `Notifier` (Console/File/Webhook no-op without URL); `schedule` CLI (--every/--once/--report/--watchlist) |
 | **1.16** | Portfolio Backtest | completed | `PortfolioBacktest` Top-N rebalanced equal-weight portfolio vs buy&hold benchmark; injectable rank_fn/equity_fn; `portfolio` CLI |
+| **2.0** | Research Foundation | completed | Phase 2 foundation: `IndexBar` + `DataManager.sync_index/get_index_daily` (`index_zh_a_hist`, `as_of` safe); `BenchmarkConfig`/`ResearchConfig`; `src/research/` skeleton — `ExperimentRun`/`ExperimentMetric`/`ExperimentEquity` ORM, `ExperimentConfig` (frozen protocol), `ExperimentRegistry` CRUD; runner/walk-forward/benchmark/report are 2.x stubs |
 
 ## Principles (non-negotiable)
 
@@ -42,11 +43,13 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 ## Next up
 
-Sprints 1.1–1.16 are complete and on `main`; all four quality gates (ruff /
-black / mypy / pytest) are green locally. The next direction is **Phase 2 —
-Quant Research Engine** (experiment registry, benchmark comparison, walk-forward
-/ out-of-sample validation). GPT's initial Phase 2 plan was written against the
-1.1–1.8 baseline; the reconciled plan aligned to 1.16 is in
-`Phase2-Research-Engine-Revision.md` (the single source of truth for the next
-phase). Two prerequisites must land first: index-constituent data in
-`DataManager`, and experiment-result persistence on `core.database`.
+Sprints 1.1–1.16 **and Sprint 2.0** are complete and on `main`; all four quality
+gates (ruff / black / mypy / pytest) are green locally. Sprint 2.0 landed the
+**Phase 2 foundation** — index/benchmark data through `DataManager` and
+experiment-result persistence on `core.database` — per
+`Sprint2.0-Technical-Design.md` and the seven frozen decisions. The reconciled
+Phase 2 plan (aligned to 1.16) remains in `Phase2-Research-Engine-Revision.md`
+and `Phase2-Implementation-Plan.md` (single source of truth). Next up is
+**Sprint 2.1+**: benchmark alignment, experiment runner, and walk-forward /
+out-of-sample validation — currently `NotImplementedError` stubs in
+`src/research/`.

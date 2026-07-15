@@ -55,6 +55,25 @@ class FakeProvider:
         self.calls.append(("bars", code, start_date, end_date))
         return self.bars
 
+    def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        # Minimal index frame so this fake satisfies the DataProvider protocol
+        # (Sprint 2.0). Index-specific behaviour is exercised in test_research.
+        self.calls.append(("index", code, start_date, end_date))
+        return pd.DataFrame(
+            [
+                {
+                    "code": code,
+                    "date": date(2024, 1, 2),
+                    "open": 3000.0,
+                    "high": 3020.0,
+                    "low": 2990.0,
+                    "close": 3010.0,
+                    "volume": None,
+                    "amount": None,
+                }
+            ]
+        )
+
 
 # --------------------------------------------------------------------------- #
 # Normalization (pure functions)

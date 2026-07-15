@@ -154,3 +154,12 @@ class AStockDataProvider:
             return df
         mask = (df["date"] >= start_date) & (df["date"] <= end_date)
         return df[mask].reset_index(drop=True)
+
+    def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        # Frozen decision (Sprint 2.0 §7 Q6): index history via astockdata is
+        # deferred; AKShare is the default index source. Fail loudly (not
+        # silently) so ``data.source=astockdata`` surfaces the gap immediately.
+        raise NotImplementedError(
+            "astockdata does not provide index history yet; "
+            "set data.source=akshare for benchmark index data"
+        )

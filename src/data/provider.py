@@ -51,6 +51,15 @@ class DataProvider(Protocol):
         """
         ...
 
+    def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        """Return daily OHLCV for a benchmark index ``code`` (Sprint 2.0).
+
+        Same normalized columns as :meth:`get_daily_bars` (``volume``/``amount``
+        may be ``NaN`` for indices). Only historical data up to ``end_date`` is
+        returned -- no future leakage.
+        """
+        ...
+
 
 def normalize_stock_list(raw: pd.DataFrame) -> pd.DataFrame:
     """Normalize an AKShare stock-list DataFrame to canonical columns."""
@@ -74,6 +83,27 @@ def normalize_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
     for col in ("open", "high", "low", "close", "volume", "amount"):
         out[col] = pd.to_numeric(out[col], errors="coerce")
     # Drop rows we cannot use (e.g. suspended days with no close print).
+    out = out.dropna(subset=["open", "close"])
+    out = out.sort_values("date").reset_index(drop=True)
+    return out[["code", "date", "open", "high", "low", "close", "volume", "amount"]]
+
+
+def normalize_index_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
+    """Normalize an AKShare index-history DataFrame to the canonical AROS schema.
+
+    ``ak.index_zh_a_hist`` returns the same Chinese OHLCV headers as stock
+    history, so the same column map applies. Unlike stocks, an index bar may
+    legitimately lack volume/amount, so those are coerced but kept (as ``NaN``)
+    rather than used to drop rows -- only a missing open/close drops a row.
+    """
+    missing = [c for c in _DAILY_COLUMNS if c not in raw.columns]
+    if missing:
+        raise DataError(f"AKShare index bars missing columns: {missing}")
+    out = raw.rename(columns=_DAILY_COLUMNS)[list(_DAILY_COLUMNS.values())].copy()
+    out["code"] = code
+    out["date"] = pd.to_datetime(out["date"]).dt.date
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        out[col] = pd.to_numeric(out[col], errors="coerce")
     out = out.dropna(subset=["open", "close"])
     out = out.sort_values("date").reset_index(drop=True)
     return out[["code", "date", "open", "high", "low", "close", "volume", "amount"]]
@@ -106,3 +136,16 @@ class AkShareProvider:
             adjust=self.adjust,
         )
         return normalize_daily(raw, code)
+
+    def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        # Frozen decision (Sprint 2.0 §7 Q1): use index_zh_a_hist for native
+        # date-range support and integer-date alignment with get_daily_bars.
+        import akshare as ak
+
+        raw = ak.index_zh_a_hist(
+            symbol=code,
+            period="daily",
+            start_date=start_date.strftime("%Y%m%d"),
+            end_date=end_date.strftime("%Y%m%d"),
+        )
+        return normalize_index_daily(raw, code)

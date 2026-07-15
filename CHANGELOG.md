@@ -2,6 +2,40 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.0 — Research Foundation (2026-07-16)
+
+Phase 2 foundation: index/benchmark data + experiment persistence + `src/research/` skeleton. No forward-looking (2.1–2.6) logic — future modules are stubs that raise `NotImplementedError` with their target sprint.
+
+### Added
+
+- `src/data/models.py` — `IndexBar` ORM (separate table from `DailyBar`, `UniqueConstraint(code, date)`; nullable `volume`/`amount`).
+- `src/data/provider.py` — `DataProvider.get_index_daily` added to the Protocol; `normalize_index_daily`; `AkShareProvider.get_index_daily` via `ak.index_zh_a_hist` (daily).
+- `src/data/providers/astockdata.py` — `AStockDataProvider.get_index_daily` (deferred, raises `NotImplementedError`).
+- `src/data/manager.py` — `sync_index` + `get_index_daily(..., as_of=...)` through the single `DataManager` entry; missing benchmark raises `DataError` (never silent).
+- `src/core/config.py` — `BenchmarkConfig` (default `csi300`; csi300/csi500/csi1000/sh_composite index map) and `ResearchConfig` (experiment id prefix, metrics); wired into `AppConfig`.
+- `config/settings.yaml` — `benchmark` and `research` sections.
+- `src/research/models.py` — `ExperimentRun` (short-UUID string PK), `ExperimentMetric` (long-table form), `ExperimentEquity`.
+- `src/research/experiment.py` — `WalkForwardSpec`, `ExperimentConfig` (frozen Phase 2 protocol; `universe`/`codes` mutually exclusive), `ExperimentResult`.
+- `src/research/registry.py` — `ExperimentRegistry` CRUD (session-injected); no run logic.
+- `src/research/{benchmark,runner,walk_forward,report}.py` — stubs only (Sprint 2.x pointers).
+- `src/research/__init__.py` — public exports; explicit guard note: **no** `research/metrics.py` (metrics live in `src/backtest/metrics.py`).
+- `tests/test_research.py` — 12 tests: index normalize/roundtrip, `as_of` no-look-ahead, missing-benchmark `DataError`, registry CRUD, metric uniqueness, config validation, UUID PK uniqueness, config wiring, network-gated real-index smoke.
+
+### Frozen decisions
+
+- `IndexBar` is a separate table from `DailyBar`.
+- AKShare index interface: `index_zh_a_hist`.
+- Experiment primary key: UUID (short-uuid string).
+- `ExperimentMetric`: long-table design.
+- No `research/metrics.py`; reuse `src/backtest/metrics.py`.
+- `DataManager` remains the sole data entry point.
+- `ExperimentConfig` is the frozen Phase 2 experiment protocol.
+
+### Notes
+
+- No look-ahead: `get_index_daily` honours an `as_of` ceiling identical to the equity path.
+- Scope strictly limited to Sprint 2.0; walk-forward / runner / benchmark-alignment / report land in 2.1–2.6.
+
 ## Sprint 1.16 — Portfolio Backtest (2026-07-15)
 
 ### Added

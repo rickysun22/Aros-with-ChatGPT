@@ -157,3 +157,19 @@ scheduler:
   notifier_type: console
   webhook_url: null
   file_path: null
+
+# Benchmark indices (Phase 2 / Sprint 2.0) - maps friendly keys to index codes.
+# Consumed by DataManager.get_index_daily and ExperimentConfig.benchmark.
+benchmark:
+  default: csi300
+  indices:
+    csi300: "000300"
+    csi500: "000905"
+    csi1000: "000852"
+    sh_composite: "000001"
+
+# Research engine (Phase 2 / Sprint 2.0 foundation).
+# metrics: null => reuse backtest.metrics (no parallel metric list).
+research:
+  experiment_id_prefix: "exp_"
+  # metrics: null
