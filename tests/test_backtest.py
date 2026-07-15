@@ -240,3 +240,102 @@ def test_cli_backtest_list():
     assert result.exit_code == 0, result.output
     assert "Available strategies" in result.output
     assert "weighted_momentum" in result.output
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 1.12: backtest result cache
+# --------------------------------------------------------------------------- #
+from datetime import date  # noqa: E402
+
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from backtest.cache import (  # noqa: E402
+    BacktestCache,
+    compute_params_hash,
+    run_code_cached,
+)
+from core.database import Base  # noqa: E402
+
+
+def _isolated_session():
+    eng = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(eng)
+    Session = sessionmaker(bind=eng)
+    return Session()
+
+
+class _FakeBT:
+    def __init__(self) -> None:
+        self.config = BacktestConfig()
+        self.names = ["weighted_momentum"]
+        self._calls = 0
+
+    def run_code(self, code, dm, start=None, end=None, signal_col=None, use_cache=True):
+        self._calls += 1
+        df = dm.get_daily(code, start, end).copy()
+        df["equity"] = list(range(len(df)))
+        metrics = {
+            "total_return": 0.12,
+            "max_drawdown": -0.07,
+            "sharpe": 1.3,
+            "benchmark_return": 0.05,
+        }
+        return df, metrics
+
+
+class _FakeDM:
+    def __init__(self, df: pd.DataFrame) -> None:
+        self._df = df
+
+    def get_daily(self, code, start=None, end=None):
+        return self._df
+
+
+def _frame() -> pd.DataFrame:
+    n = 10
+    return pd.DataFrame(
+        {
+            "date": pd.date_range("2024-01-01", periods=n, freq="D"),
+            "open": [100] * n,
+            "high": [100] * n,
+            "low": [100] * n,
+            "close": list(range(100, 100 + n)),
+            "volume": [1000] * n,
+            "amount": [1000] * n,
+        }
+    )
+
+
+def test_backtest_cache_hit_avoids_recompute():
+    s = _isolated_session()
+    fake = _FakeBT()
+    dm = _FakeDM(_frame())
+    a, b = date(2024, 1, 1), date(2024, 1, 10)
+    run_code_cached(fake, "A", dm, a, b, None, session=s)
+    run_code_cached(fake, "A", dm, a, b, None, session=s)  # same window -> hit
+    assert fake._calls == 1
+    # different window -> recompute (miss)
+    run_code_cached(fake, "A", dm, a, date(2024, 1, 20), None, session=s)
+    assert fake._calls == 2
+    s.close()
+
+
+def test_backtest_cache_persists_rows():
+    s = _isolated_session()
+    fake = _FakeBT()
+    dm = _FakeDM(_frame())
+    run_code_cached(fake, "A", dm, date(2024, 1, 1), date(2024, 1, 10), None, session=s)
+    run_code_cached(fake, "B", dm, date(2024, 1, 1), date(2024, 1, 10), None, session=s)
+    rows = s.query(BacktestCache).all()
+    assert len(rows) == 2
+    s.close()
+
+
+def test_backtest_params_hash_deterministic():
+    cfg = BacktestConfig()
+    h1 = compute_params_hash(cfg, "signal_x", date(2024, 1, 1), date(2024, 1, 10))
+    h2 = compute_params_hash(cfg, "signal_x", date(2024, 1, 1), date(2024, 1, 10))
+    assert h1 == h2
+    h3 = compute_params_hash(cfg, "signal_x", date(2024, 1, 1), date(2024, 1, 11))
+    assert h3 != h1

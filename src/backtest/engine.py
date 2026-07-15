@@ -109,7 +109,15 @@ class BacktestEngine:
         start_date: date | None = None,
         end_date: date | None = None,
         signal_col: str | None = None,
+        use_cache: bool = True,
     ) -> tuple[pd.DataFrame, BacktestResult]:
+        if use_cache and self.config.cache_enabled:
+            try:
+                from .cache import run_code_cached
+
+                return run_code_cached(self, code, data_manager, start_date, end_date, signal_col)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("backtest cache unavailable, computing live: %s", exc)
         df = data_manager.get_daily(code, start_date, end_date)
         if df is None or df.empty:
             return (df if df is not None else pd.DataFrame()), {}

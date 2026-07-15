@@ -181,6 +181,7 @@ class BacktestConfig(BaseModel):
     )
     benchmark: bool = True  # 与同名标的买入持有对比
     cost: CostConfig = Field(default_factory=CostConfig)
+    cache_enabled: bool = True  # 回测结果落库缓存，相同窗口/参数命中即跳过仿真
 
 
 class DimensionSpec(BaseModel):

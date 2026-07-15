@@ -114,6 +114,7 @@ backtest:
     - num_trades
     - turnover
   benchmark: true                    # 与同名标的买入持有对比
+  cache_enabled: true                 # 回测结果落库缓存，相同窗口/参数跳过仿真（Sprint 1.12）
   cost:
     commission_rate: 0.00025          # 万 2.5
     commission_min: 5.0              # 单笔最低佣金（按侧计）
