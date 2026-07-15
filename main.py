@@ -13,6 +13,7 @@ from typing import Any
 import typer
 
 from backtest.engine import BacktestEngine
+from backtest.portfolio import PortfolioBacktest
 from core.config import (
     FactorConfig,
     IndicatorConfig,
@@ -591,6 +592,50 @@ def schedule(
     else:
         typer.echo(f"Scheduling every {every} min (Ctrl-C to stop)...")
         sched.run_loop(task, interval)
+
+
+@app.command()
+def portfolio(
+    codes: list[str] = typer.Argument(None, help="One or more stock codes"),
+    top_n: int = typer.Option(10, "--top-n", help="Hold the Top-N ranked codes"),
+    rebalance: str = typer.Option("ME", "--rebalance", help="pandas freq: ME|W|Q|..."),
+    universe: str | None = typer.Option(None, "--universe", help="Resolve codes from a pool"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+) -> None:
+    """Backtest a Top-N rebalancing portfolio over the candidate set."""
+    setup_logging()
+    cfg = get_config()
+    if universe is not None:
+        codes = UniverseEngine().get_codes(universe)
+    if not codes:
+        typer.echo("Specify one or more stock CODES, or use --universe NAME", err=True)
+        raise typer.Exit(code=1)
+    eng = PortfolioBacktest.from_config(
+        cfg.indicators,
+        cfg.factors,
+        cfg.strategies,
+        cfg.ranking,
+        cfg.backtest,
+        top_n=top_n,
+        rebalance_freq=rebalance,
+    )
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    res = eng.run(list(codes), dm, start_date, end_date)
+    if res.equity.empty:
+        typer.echo("无数据/无候选，无法回测组合", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"组合回测 top_n={top_n} rebalance={rebalance}: "
+        f"{len(codes)} 候选, {len(res.selections)} 次再平衡"
+    )
+    for k, v in res.metrics.items():
+        typer.echo(f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}")
+    typer.echo("再平衡持仓（前 5 次）:")
+    for d, sel in res.selections[:5]:
+        typer.echo(f"  {d.date()}: {sel}")
 
 
 def main() -> None:

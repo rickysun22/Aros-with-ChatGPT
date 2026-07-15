@@ -11,10 +11,13 @@ from .cache import BacktestCache
 from .cost import CostModel
 from .engine import BacktestEngine
 from .metrics import compute_metrics
+from .portfolio import PortfolioBacktest, PortfolioResult
 
 __all__ = [
     "BacktestEngine",
     "CostModel",
     "compute_metrics",
     "BacktestCache",
+    "PortfolioBacktest",
+    "PortfolioResult",
 ]
