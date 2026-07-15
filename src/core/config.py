@@ -203,6 +203,21 @@ class RankingConfig(BaseModel):
     dimensions: list[DimensionSpec] | None = None  # None => all enabled, equal weight
 
 
+class ReportConfig(BaseModel):
+    """Daily Report Engine (Sprint 1.8) configuration.
+
+    A presentation/aggregation layer over the ranking output. It selects the
+    Top-N candidates, enriches each with a latest price snapshot, and renders a
+    markdown/json daily research report. No new metric math is introduced.
+    """
+
+    top_n: int = 20  # 日报展示的候选数量（可独立于 ranking.top_n）
+    as_of: str | None = None  # "YYYY-MM-DD"; None => 每标的取最新一根
+    format: Literal["markdown", "json"] = "markdown"
+    freshness_days: int = 5  # 数据比 as_of 滞后超过该天数则标"滞后"
+    include_detail: bool = True  # markdown 是否展开候选明细
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -216,6 +231,7 @@ class AppConfig(BaseModel):
     strategies: StrategyConfig = Field(default_factory=StrategyConfig)
     backtest: BacktestConfig = Field(default_factory=BacktestConfig)
     ranking: RankingConfig = Field(default_factory=RankingConfig)
+    report: ReportConfig = Field(default_factory=ReportConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

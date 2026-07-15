@@ -2,6 +2,24 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 1.8 — Daily Report Engine (2026-07-15)
+
+### Added
+
+- `src/report/engine.py` — `ReportEngine` + `DailyReport` + `ReportRow`: a presentation/aggregation layer over the ranking output. It drives `RankingEngine` with its own `top_n`/`as_of`, takes the Top-N candidates, and enriches each with a latest price snapshot (close, daily change %, trade date, data-freshness flag) fetched from the `DataManager`. Renders to markdown (`to_markdown`) or json (`to_json`). No new metric math is introduced.
+- `src/report/__init__.py` — public exports `ReportEngine`, `DailyReport`, `ReportRow`.
+- `src/report` package + `Sprint1.8-Daily-Report-Design.md` (design doc).
+- `core/config.py` — `ReportConfig` (top_n, as_of, format, freshness_days, include_detail), wired into `AppConfig.report`.
+- `config/settings.yaml` — `report` section (top_n=20, as_of=null, format=markdown, freshness_days=5, include_detail=true).
+- `main.py` — new `report` command: `report --list`, `report CODE [CODE ...] [--top-n N] [--as-of YYYY-MM-DD] [--start ...] [--end ...] [--format markdown|json] [--out FILE]`; prints (or writes) the daily research report.
+- `tests/test_report.py` — sorted/scored output, price snapshot + daily change, Top-N cutoff, `as_of` cross-section with no-look-ahead snapshot, data-freshness (stale) flag, empty result, markdown table/detail toggles, json round-trip, dataclass helpers, real-config wiring, and a CLI smoke test.
+
+### Notes
+
+- No look-ahead is preserved end-to-end: the price snapshot ceiling follows the same `as_of` the ranking layer uses, so a candidate's close / daily change never sees a bar dated after the cross-section. A dedicated test asserts the snapshot uses only bars at/before `as_of`.
+- The report is an aggregation/rendering layer only; it reuses the ranking composite score and adds no factor/indicator/metric computation.
+- Daily change is computed only when at least two bars are visible; with a single visible bar it is reported as `None` rather than fabricated.
+
 ## Sprint 1.7 — Ranking Engine (2026-07-15)
 
 ### Added

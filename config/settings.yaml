@@ -133,3 +133,12 @@ ranking:
   #     weight: 1.0
   #   - strategy: golden_cross_rule
   #     weight: 0.5
+
+# Daily Report Engine (Sprint 1.8) - 聚合排序层 Top-N，生成每日研究日报
+# 复用 ranking 的截面复合打分，并用 DataManager 补最新价/日涨跌/数据新鲜度。
+report:
+  top_n: 20                          # 日报展示的候选数量
+  as_of: null                        # null => 每标的取最新一根 K 线
+  format: markdown                   # markdown | json
+  freshness_days: 5                  # 数据比 as_of 滞后超过该天数则标"滞后"
+  include_detail: true               # markdown 是否展开候选明细

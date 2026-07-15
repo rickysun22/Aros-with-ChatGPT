@@ -22,7 +22,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **1.5** | Strategy Engine | completed | weighted + rule strategies; StrategyEngine + Portfolio; config-driven; no future leakage |
 | **1.6** | Backtest Engine | completed | cost-aware A-share backtest over strategy signals; CostModel + metrics + BacktestEngine |
 | **1.7** | Ranking Engine | completed | cross-sectional composite-score ranking over candidates; RankingEngine + RankingConfig + CLI |
-| 1.8 | Daily Report | ⏳ planned | generate the daily research report |
+| **1.8** | Daily Report | completed | aggregate ranking Top-N into a markdown/json daily research report; ReportEngine + ReportConfig + CLI |
 
 ## Principles (non-negotiable)
 

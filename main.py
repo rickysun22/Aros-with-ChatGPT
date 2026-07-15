@@ -7,6 +7,8 @@ importable via the editable install or the pytest pythonpath setting.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -22,6 +24,7 @@ from data.manager import DataManager
 from factors.engine import FactorEngine
 from indicators.engine import IndicatorEngine
 from ranking.engine import RankingEngine
+from report.engine import ReportEngine
 from strategies.engine import StrategyEngine
 
 app = typer.Typer(
@@ -322,6 +325,63 @@ def ranking(
     cols = [c for c in ("rank", "code", "composite_score") if c in table.columns]
     extra = [c for c in table.columns if c.startswith("score_")]
     typer.echo(table[cols + extra].to_string(index=False))
+
+
+@app.command()
+def report(
+    codes: list[str] = typer.Argument(None, help="One or more stock codes"),
+    list_all: bool = typer.Option(False, "--list", help="List strategies + report config"),
+    top_n: int | None = typer.Option(None, "--top-n", help="Override report.top_n"),
+    as_of: str | None = typer.Option(None, "--as-of", help="Cross-section date YYYY-MM-DD"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    fmt: str | None = typer.Option(None, "--format", help="Output format: markdown|json"),
+    out: str | None = typer.Option(None, "--out", help="Write report to FILE"),
+) -> None:
+    """Generate the daily research report (ranking Top-N + price snapshots)."""
+    setup_logging()
+    cfg = get_config()
+    specs = cfg.strategies.enabled
+    if list_all:
+        typer.echo("Available strategies: " + ", ".join(StrategyEngine.available()))
+        typer.echo(f"Configured ({len(specs)}): " + ", ".join(s.name for s in specs))
+        rp = cfg.report
+        typer.echo(
+            f"Report: top_n={rp.top_n}, as_of={rp.as_of or 'latest'}, "
+            f"format={rp.format}, freshness_days={rp.freshness_days}, "
+            f"include_detail={rp.include_detail}"
+        )
+        return
+    if not codes:
+        typer.echo("Specify one or more stock CODES or use --list", err=True)
+        raise typer.Exit(code=1)
+    rp = cfg.report
+    updates: dict[str, Any] = {}
+    if top_n is not None:
+        updates["top_n"] = top_n
+    if as_of is not None:
+        updates["as_of"] = as_of
+    if fmt is not None:
+        updates["format"] = fmt
+    if updates:
+        rp = rp.model_copy(update=updates)
+    engine = ReportEngine.from_config(
+        IndicatorConfig(enabled=cfg.indicators.enabled),
+        FactorConfig(enabled=cfg.factors.enabled),
+        StrategyConfig(enabled=specs),
+        cfg.ranking,
+        rp,
+    )
+    dm = DataManager()
+    start_date = date.fromisoformat(start) if start else None
+    end_date = date.fromisoformat(end) if end else None
+    daily = engine.generate(list(codes), dm, start_date, end_date)
+    text = daily.to_json() if rp.format == "json" else daily.to_markdown(rp.include_detail)
+    if out:
+        Path(out).write_text(text, encoding="utf-8")
+        typer.echo(f"Report written to {out} ({len(daily.rows)} rows)")
+    else:
+        typer.echo(text)
 
 
 def main() -> None:
