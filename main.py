@@ -26,6 +26,7 @@ from indicators.engine import IndicatorEngine
 from ranking.engine import RankingEngine
 from report.engine import ReportEngine
 from strategies.engine import StrategyEngine
+from universe.engine import UniverseEngine
 from watchlist.engine import WatchlistEngine
 
 app = typer.Typer(
@@ -338,6 +339,9 @@ def report(
     end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
     fmt: str | None = typer.Option(None, "--format", help="Output format: markdown|json"),
     out: str | None = typer.Option(None, "--out", help="Write report to FILE"),
+    universe: str | None = typer.Option(
+        None, "--universe", help="Resolve candidate codes from a named pool"
+    ),
     backtest: bool = typer.Option(
         False, "--backtest", help="Attach per-candidate backtest metrics"
     ),
@@ -356,8 +360,15 @@ def report(
             f"include_detail={rp.include_detail}, include_backtest={rp.include_backtest}"
         )
         return
+    if universe is not None:
+        ue = UniverseEngine()
+        codes = ue.get_codes(universe)
+        if not codes:
+            typer.echo(f"Universe {universe!r} is empty or unknown", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Resolved {len(codes)} codes from universe {universe!r}")
     if not codes:
-        typer.echo("Specify one or more stock CODES or use --list", err=True)
+        typer.echo("Specify one or more stock CODES, or use --universe NAME", err=True)
         raise typer.Exit(code=1)
     rp = cfg.report
     updates: dict[str, Any] = {}
@@ -461,6 +472,46 @@ def watchlist(
             digest.to_json() if fmt == "json" else digest.to_markdown(cfg.watchlist.alert_rank_jump)
         )
         typer.echo(text)
+    else:
+        typer.echo(f"unknown action: {action}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def universe(
+    action: str = typer.Argument(..., help="add|remove|list|show|delete"),
+    name: str = typer.Argument(None, help="Pool name (add/remove/show/delete)"),
+    codes: list[str] = typer.Argument(None, help="Codes for add/remove"),
+) -> None:
+    """Manage named stock pools (candidate universes) for the report command."""
+    setup_logging()
+    eng = UniverseEngine()
+    if action == "add":
+        if not name:
+            typer.echo("add requires a pool NAME", err=True)
+            raise typer.Exit(code=1)
+        eng.add_codes(name, list(codes or []))
+        typer.echo(f"Pool {name!r}: {eng.get_codes(name)}")
+    elif action == "remove":
+        if not name:
+            typer.echo("remove requires a pool NAME", err=True)
+            raise typer.Exit(code=1)
+        eng.remove_codes(name, list(codes or []))
+        typer.echo(f"Pool {name!r}: {eng.get_codes(name)}")
+    elif action == "list":
+        pools = eng.list_pools()
+        typer.echo(f"Universe pools ({len(pools)}): " + (", ".join(pools) if pools else "(none)"))
+    elif action == "show":
+        if not name:
+            typer.echo("show requires a pool NAME", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"{name!r}: {eng.get_codes(name)}")
+    elif action == "delete":
+        if not name:
+            typer.echo("delete requires a pool NAME", err=True)
+            raise typer.Exit(code=1)
+        ok = eng.delete(name)
+        typer.echo(f"deleted {name!r}" if ok else f"pool {name!r} not found")
     else:
         typer.echo(f"unknown action: {action}", err=True)
         raise typer.Exit(code=1)
