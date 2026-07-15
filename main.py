@@ -25,6 +25,7 @@ from factors.engine import FactorEngine
 from indicators.engine import IndicatorEngine
 from ranking.engine import RankingEngine
 from report.engine import ReportEngine
+from scheduler import Scheduler, build_notifier
 from strategies.engine import StrategyEngine
 from universe.engine import UniverseEngine
 from watchlist.engine import WatchlistEngine
@@ -520,6 +521,76 @@ def universe(
     else:
         typer.echo(f"unknown action: {action}", err=True)
         raise typer.Exit(code=1)
+
+
+@app.command()
+def schedule(
+    every: int = typer.Option(30, "--every", help="Interval in minutes between runs"),
+    once: bool = typer.Option(False, "--once", help="Run a single cycle then exit"),
+    report: bool = typer.Option(False, "--report", help="Scheduled task: daily report"),
+    watchlist: bool = typer.Option(False, "--watchlist", help="Scheduled task: watchlist digest"),
+    codes: list[str] = typer.Argument(None, help="Codes for report (or use --universe)"),
+    universe: str | None = typer.Option(
+        None, "--universe", help="Resolve report codes from a pool"
+    ),
+    backtest: bool = typer.Option(False, "--backtest", help="Attach backtest metrics"),
+) -> None:
+    """Run a report/digest on an interval and push it via the configured notifier."""
+    setup_logging()
+    cfg = get_config()
+    sched = Scheduler(build_notifier(cfg.scheduler))
+    if report:
+
+        def task() -> str:
+            rp = cfg.report
+            if backtest:
+                rp = rp.model_copy(update={"include_backtest": True})
+            resolved = list(codes or [])
+            if universe is not None:
+                resolved = UniverseEngine().get_codes(universe)
+            if not resolved:
+                return "(no codes: pass CODEs or --universe)"
+            eng = ReportEngine.from_config(
+                IndicatorConfig(enabled=cfg.indicators.enabled),
+                FactorConfig(enabled=cfg.factors.enabled),
+                StrategyConfig(enabled=cfg.strategies.enabled),
+                cfg.ranking,
+                rp,
+                backtest=cfg.backtest if rp.include_backtest else None,
+            )
+            dm = DataManager()
+            daily = eng.generate(resolved, dm, None, None)
+            return daily.to_markdown(rp.include_detail)
+
+        interval = every * 60
+    elif watchlist:
+
+        def task() -> str:
+            re = RankingEngine.from_config(cfg.indicators, cfg.factors, cfg.strategies, cfg.ranking)
+            wl_cfg = cfg.watchlist
+            if backtest:
+                wl_cfg = wl_cfg.model_copy(update={"include_backtest": True})
+            eng = WatchlistEngine(
+                re,
+                wl_cfg,
+                backtest_config=cfg.backtest,
+                indicators=cfg.indicators,
+                factors=cfg.factors,
+                strategies=cfg.strategies,
+            )
+            digest = eng.deltas(None)
+            return digest.to_markdown(cfg.watchlist.alert_rank_jump)
+
+        interval = every * 60
+    else:
+        typer.echo("specify --report or --watchlist", err=True)
+        raise typer.Exit(code=1)
+
+    if once:
+        sched.run_ntimes(task, 0, 1)
+    else:
+        typer.echo(f"Scheduling every {every} min (Ctrl-C to stop)...")
+        sched.run_loop(task, interval)
 
 
 def main() -> None:

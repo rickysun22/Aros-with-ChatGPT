@@ -233,6 +233,19 @@ class WatchlistConfig(BaseModel):
     include_backtest: bool = False  # snapshot 时是否附上每只标的回测表现并落库 (用 backtest 配置)
 
 
+class SchedulerConfig(BaseModel):
+    """Scheduled generation + push (Sprint 1.15).
+
+    The scheduler runs a task (report / watchlist digest) on an interval and
+    delivers it through a notifier. No external credentials are required: the
+    webhook notifier is a no-op when ``webhook_url`` is absent.
+    """
+
+    notifier_type: Literal["console", "file", "webhook"] = "console"
+    webhook_url: str | None = None  # IM webhook (DingTalk/WeCom); None => skip webhook
+    file_path: str | None = None  # target for the file notifier
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -248,6 +261,7 @@ class AppConfig(BaseModel):
     ranking: RankingConfig = Field(default_factory=RankingConfig)
     report: ReportConfig = Field(default_factory=ReportConfig)
     watchlist: WatchlistConfig = Field(default_factory=WatchlistConfig)
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

@@ -149,3 +149,11 @@ report:
 # 复用 ranking 截面与 core.database 共享库；关注池内自相对排名。
 watchlist:
   alert_rank_jump: 5               # |排名变化| 达到该值，日报标记"显著变动"
+
+# Scheduler (Sprint 1.15) - 定时生成报告/自选股并推送
+# notifier_type: console(打印) | file(追加到文件) | webhook(HTTP POST 到 IM)
+# webhook_url 为空时 webhook 通知自动跳过，无需任何外部凭据即可运行。
+scheduler:
+  notifier_type: console
+  webhook_url: null
+  file_path: null
