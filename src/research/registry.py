@@ -13,7 +13,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from core.database import Base, get_engine, get_sessionmaker
-from research.models import ExperimentRun
+from research.models import ExperimentEquity, ExperimentMetric, ExperimentRun
 
 
 def _new_run_id(prefix: str = "exp_") -> str:
@@ -62,10 +62,17 @@ class ExperimentRegistry:
         )
 
     def delete(self, run_id: str) -> bool:
-        """Delete run ``run_id``. Returns True if it existed."""
+        """Delete run ``run_id`` and its child rows. Returns True if it existed.
+
+        The child FKs are plain ``ForeignKey(...)`` with no ``ondelete="CASCADE"``
+        and SQLite ships FK enforcement off by default, so we purge the children
+        explicitly before deleting the parent. The ORM schema is unchanged.
+        """
         run = self.session.get(ExperimentRun, run_id)
         if run is None:
             return False
+        self.session.query(ExperimentMetric).filter_by(run_id=run_id).delete()
+        self.session.query(ExperimentEquity).filter_by(run_id=run_id).delete()
         self.session.delete(run)
         self.session.commit()
         return True

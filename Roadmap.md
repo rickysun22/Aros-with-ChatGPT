@@ -32,6 +32,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **1.15** | Scheduler + Notifier | completed | `Scheduler` (run_ntimes/run_loop) + `Notifier` (Console/File/Webhook no-op without URL); `schedule` CLI (--every/--once/--report/--watchlist) |
 | **1.16** | Portfolio Backtest | completed | `PortfolioBacktest` Top-N rebalanced equal-weight portfolio vs buy&hold benchmark; injectable rank_fn/equity_fn; `portfolio` CLI |
 | **2.0** | Research Foundation | completed | Phase 2 foundation: `IndexBar` + `DataManager.sync_index/get_index_daily` (`index_zh_a_hist`, `as_of` safe); `BenchmarkConfig`/`ResearchConfig`; `src/research/` skeleton — `ExperimentRun`/`ExperimentMetric`/`ExperimentEquity` ORM, `ExperimentConfig` (frozen protocol), `ExperimentRegistry` CRUD; runner/walk-forward/benchmark/report are 2.x stubs |
+| **2.1** | Research CLI Surface | completed | `research` Typer sub-app (`init|list|show|delete`); `init` via flags or `--config` (JSON/YAML) with `--dry-run`; `--universe` XOR `--codes`, universe resolved via `UniverseEngine`; `--strategy` validated; `delete` cascades to metrics/equity; 7 new CLI + cascade tests |
 
 ## Principles (non-negotiable)
 
@@ -43,13 +44,13 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 ## Next up
 
-Sprints 1.1–1.16 **and Sprint 2.0** are complete and on `main`; all four quality
-gates (ruff / black / mypy / pytest) are green locally. Sprint 2.0 landed the
-**Phase 2 foundation** — index/benchmark data through `DataManager` and
-experiment-result persistence on `core.database` — per
-`Sprint2.0-Technical-Design.md` and the seven frozen decisions. The reconciled
-Phase 2 plan (aligned to 1.16) remains in `Phase2-Research-Engine-Revision.md`
-and `Phase2-Implementation-Plan.md` (single source of truth). Next up is
-**Sprint 2.1+**: benchmark alignment, experiment runner, and walk-forward /
-out-of-sample validation — currently `NotImplementedError` stubs in
-`src/research/`.
+Sprints 1.1–1.16 **and Sprints 2.0–2.1** are complete and on `main`; all four
+quality gates (ruff / black / mypy / pytest) are green locally. Sprint 2.0 landed
+the **Phase 2 foundation** — index/benchmark data through `DataManager` and
+experiment-result persistence on `core.database` — and Sprint 2.1 added the
+`research` CLI surface (`init|list|show|delete`) per `Sprint2.0-Technical-Design.md`
+and the seven frozen decisions. The reconciled Phase 2 plan (aligned to 1.16)
+remains in `Phase2-Research-Engine-Revision.md` and `Phase2-Implementation-Plan.md`
+(single source of truth). Next up is **Sprint 2.2+**: benchmark alignment,
+experiment runner, and walk-forward / out-of-sample validation — currently
+`NotImplementedError` stubs in `src/research/`.

@@ -2,6 +2,40 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.1 — Research CLI Surface (2026-07-16)
+
+Sprint 2.0 shipped the `ExperimentConfig` / `ExperimentRun` / `ExperimentRegistry`
+classes and config wiring. Sprint 2.1 adds the command-line surface that the
+Phase 2 plan owed under "2.1 — Registry & Config": a `research` Typer sub-app
+(`init | list | show | delete`) plus a complete delete cascade that also clears
+an experiment's `ExperimentMetric` / `ExperimentEquity` child rows.
+
+### Added
+
+- `main.py` — `research` Typer sub-app mounted on the root app (`app.add_typer(research_app, name="research")`).
+  - `research init` — accepts either CLI flags (`--name --strategy --start --end --universe|--codes --benchmark --metrics --walk-forward --seed --notes`) **or** `--config <file.json|yaml>`; conflicts resolved with `--dry-run` (prints config, persists nothing). `--codes` and `--metrics` take comma-separated values. `--universe` and `--codes` are mutually exclusive; `--universe` is resolved against `UniverseEngine` and rejected (exit 1) if empty/unknown; `--strategy` is validated against `cfg.strategies.enabled` (exit 2 if absent).
+  - `research list` — newest-first table of `RUN_ID | NAME | STATUS | CREATED_AT`.
+  - `research show <run_id>` — full run metadata + validated `ExperimentConfig` JSON.
+  - `research delete <run_id>` — cascades to `ExperimentMetric` / `ExperimentEquity`, then removes the run.
+- `src/research/registry.py` — `delete` now deletes child `ExperimentMetric` / `ExperimentEquity` rows before the `ExperimentRun` (explicit cascade; no FK `ondelete`, per frozen decision D4).
+- `tests/test_research.py` — 7 new CLI + cascade tests: init via flags / config file / both-sources reject / unknown-universe reject / dry-run / list-show-delete lifecycle / registry delete cascade.
+
+### Frozen decisions (carried from 2.0 design, §10)
+
+- D1 Typer sub-app `research init|list|show|delete`.
+- D2 `universe` column stores the pool **name** only; code resolution deferred to the runner (2.4).
+- D3 `--config` accepts both JSON and YAML.
+- D4 Delete uses an explicit child-row cascade (no FK `ondelete`).
+- D5 `WalkForwardSpec` is persisted now via `--walk-forward TRAIN TEST STEP`.
+- D6 `init` includes `--dry-run`.
+- D7 `init` validates `--strategy` against enabled strategies.
+
+### Notes
+
+- `ExperimentRegistry` still carries no run logic; the CLI only persists the
+  frozen `ExperimentConfig`. Execution (runner) lands in Sprint 2.x.
+- All four gates green: ruff / black / mypy (68 files) / pytest 191 passed, 1 skipped.
+
 ## Sprint 2.0 — Research Foundation (2026-07-16)
 
 Phase 2 foundation: index/benchmark data + experiment persistence + `src/research/` skeleton. No forward-looking (2.1–2.6) logic — future modules are stubs that raise `NotImplementedError` with their target sprint.

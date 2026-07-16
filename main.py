@@ -6,11 +6,13 @@ importable via the editable install or the pytest pythonpath setting.
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import typer
+import yaml
 
 from backtest.engine import BacktestEngine
 from backtest.portfolio import PortfolioBacktest
@@ -26,6 +28,8 @@ from factors.engine import FactorEngine
 from indicators.engine import IndicatorEngine
 from ranking.engine import RankingEngine
 from report.engine import ReportEngine
+from research.experiment import ExperimentConfig, WalkForwardSpec
+from research.registry import ExperimentRegistry
 from scheduler import Scheduler, build_notifier
 from strategies.engine import StrategyEngine
 from universe.engine import UniverseEngine
@@ -636,6 +640,192 @@ def portfolio(
     typer.echo("再平衡持仓（前 5 次）:")
     for d, sel in res.selections[:5]:
         typer.echo(f"  {d.date()}: {sel}")
+
+
+def _build_experiment_config(
+    *,
+    name: str,
+    strategy: str,
+    start: str,
+    end: str,
+    universe: str | None,
+    codes: list[str] | None,
+    benchmark: str,
+    metrics: list[str] | None,
+    walk_forward: tuple[int, int, int] | None,
+    seed: int | None,
+) -> ExperimentConfig:
+    """Map CLI flags to a validated :class:`ExperimentConfig`."""
+    wf = None
+    if walk_forward is not None:
+        wf = WalkForwardSpec(
+            train_years=walk_forward[0],
+            test_years=walk_forward[1],
+            step_years=walk_forward[2],
+        )
+    return ExperimentConfig(
+        name=name,
+        strategy=strategy,
+        start=start,
+        end=end,
+        universe=universe,
+        codes=codes,
+        benchmark=benchmark,
+        metrics=metrics,
+        walk_forward=wf,
+        seed=seed,
+    )
+
+
+def _load_config_file(path: Path) -> dict[str, Any]:
+    """Read a JSON or YAML config file into a dict.
+
+    JSON first; fall back to YAML so a ``.yaml`` experiment spec works too.
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    if path.suffix.lower() in (".yaml", ".yml"):
+        data: dict[str, Any] = yaml.safe_load(text)
+        return data
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        data = yaml.safe_load(text)
+    return data
+
+
+research_app = typer.Typer(help="Phase 2 research experiments (Sprint 2.1)")
+
+
+@research_app.command("init")
+def research_init(
+    name: str | None = typer.Option(None, "--name", help="Experiment name"),
+    strategy: str | None = typer.Option(
+        None, "--strategy", help="Strategy name (default: configured)"
+    ),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    universe: str | None = typer.Option(
+        None, "--universe", help="Universe pool name (XOR --codes)"
+    ),
+    codes: str | None = typer.Option(
+        None, "--codes", help="Comma-separated codes (XOR --universe)"
+    ),
+    benchmark: str | None = typer.Option(
+        None, "--benchmark", help="Benchmark key (default: configured)"
+    ),
+    metrics: str | None = typer.Option(None, "--metrics", help="Comma-separated metric names"),
+    walk_forward: tuple[int, int, int] | None = typer.Option(
+        None, "--walk-forward", help="Walk-forward TRAIN TEST STEP (years)"
+    ),
+    seed: int | None = typer.Option(None, "--seed", help="Random seed"),
+    notes: str | None = typer.Option(None, "--notes", help="Run note"),
+    config: Path | None = typer.Option(None, "--config", help="Config file (JSON/YAML)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print config, do not persist"),
+) -> None:
+    """Create a research experiment from flags or a --config file."""
+    setup_logging()
+    cfg = get_config()
+
+    if config is not None:
+        exp_cfg = ExperimentConfig.model_validate(_load_config_file(config))
+    else:
+        if name is None or start is None or end is None:
+            typer.echo(
+                "init requires --name/--start/--end (or use --config)", err=True
+            )
+            raise typer.Exit(code=2)
+        if strategy is None:
+            strategy = cfg.backtest.strategy or (
+                cfg.strategies.enabled[0].name if cfg.strategies.enabled else None
+            )
+        if strategy is None:
+            typer.echo("no strategy available; pass --strategy", err=True)
+            raise typer.Exit(code=2)
+        enabled = {s.name for s in cfg.strategies.enabled}
+        if strategy not in enabled:
+            typer.echo(f"unknown strategy: {strategy}", err=True)
+            raise typer.Exit(code=2)
+        if universe is not None and codes is not None:
+            typer.echo("set either --universe or --codes, not both", err=True)
+            raise typer.Exit(code=2)
+        if universe is not None:
+            resolved = UniverseEngine().get_codes(universe)
+            if not resolved:
+                typer.echo(f"universe {universe!r} is empty or unknown", err=True)
+                raise typer.Exit(code=1)
+        resolved_benchmark = benchmark or cfg.benchmark.default
+        codes_list = [c.strip() for c in codes.split(",") if c.strip()] if codes else None
+        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()] if metrics else None
+        exp_cfg = _build_experiment_config(
+            name=name,
+            strategy=strategy,
+            start=start,
+            end=end,
+            universe=universe,
+            codes=codes_list,
+            benchmark=resolved_benchmark,
+            metrics=metrics_list,
+            walk_forward=walk_forward,
+            seed=seed,
+        )
+
+    if dry_run:
+        typer.echo(exp_cfg.model_dump_json(indent=2))
+        typer.echo("(not persisted)")
+        return
+
+    reg = ExperimentRegistry()
+    run_id = reg.create(name=exp_cfg.name, config_json=exp_cfg.model_dump_json(), notes=notes)
+    typer.echo(f"Created experiment {run_id} (name={exp_cfg.name!r})")
+
+
+@research_app.command("list")
+def research_list() -> None:
+    """List experiments, newest first."""
+    setup_logging()
+    runs = ExperimentRegistry().list()
+    if not runs:
+        typer.echo("No experiments yet.")
+        return
+    typer.echo("RUN_ID | NAME | STATUS | CREATED_AT")
+    for r in runs:
+        created = r.created_at.isoformat(sep=" ") if r.created_at else "-"
+        typer.echo(f"{r.id} | {r.name} | {r.status} | {created}")
+
+
+@research_app.command("show")
+def research_show(run_id: str) -> None:
+    """Show one experiment (config + lifecycle)."""
+    setup_logging()
+    run = ExperimentRegistry().get(run_id)
+    if run is None:
+        typer.echo(f"run {run_id} not found", err=True)
+        raise typer.Exit(code=1)
+    exp_cfg = ExperimentConfig.model_validate_json(run.config_json)
+    created = run.created_at.isoformat(sep=" ") if run.created_at else "-"
+    finished = run.finished_at.isoformat(sep=" ") if run.finished_at else "-"
+    typer.echo(f"Run:      {run.id}")
+    typer.echo(f"Name:     {run.name}")
+    typer.echo(f"Status:   {run.status}")
+    typer.echo(f"Created:  {created}")
+    typer.echo(f"Finished: {finished}")
+    typer.echo(f"Notes:    {run.notes or '-'}")
+    typer.echo("Config:")
+    typer.echo(exp_cfg.model_dump_json(indent=2))
+
+
+@research_app.command("delete")
+def research_delete(run_id: str) -> None:
+    """Delete an experiment (cascades to its metrics/equity)."""
+    setup_logging()
+    ok = ExperimentRegistry().delete(run_id)
+    if not ok:
+        typer.echo(f"run {run_id} not found", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"deleted {run_id}")
+
+
+app.add_typer(research_app, name="research")
 
 
 def main() -> None:
