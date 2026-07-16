@@ -13,7 +13,7 @@ import json
 import math
 import uuid
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -136,5 +136,5 @@ class ExperimentRegistry:
         if run is None:
             return
         run.status = status
-        run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        run.finished_at = datetime.now(UTC).replace(tzinfo=None)
         self.session.commit()
