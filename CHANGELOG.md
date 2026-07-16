@@ -2,6 +2,29 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Maintenance — CI gate hardening (2026-07-16)
+
+The GitHub Actions CI ran `ruff` / `black` / `mypy` / `pytest` against
+**unpinned** dev dependencies. Every time a new black/ruff/mypy release shipped,
+the floating install diverged from the local venv and the `black --check .` gate
+failed on otherwise-correct code (the 2.1 run #24 failure was this exact case).
+
+### Changed
+
+- `requirements.txt` — pin the gate toolchain to the versions already used in the
+  local venv so CI reproduces local results:
+  - `black==26.5.1`
+  - `ruff==0.15.21`
+  - `mypy==2.3.0`
+  - `pytest==9.1.1`
+- No source changes; `black .` is a no-op at the pinned version (68 files unchanged).
+
+### Notes
+
+- This also unblocks the three Sprint 2.0/2.1/2.2 commits that were authored
+  locally but never pushed — remote `main` was still pre-2.0, so CI kept running
+  against stale code. Pushing them together with the pin makes the gate stable.
+
 ## Sprint 2.2 — Metrics Extension (2026-07-16)
 
 Sprint 2.2 adds the five performance metrics GPT's Phase 2 plan wanted — but
