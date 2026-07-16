@@ -26,11 +26,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
+from core.config import get_config
 from core.database import Base
-from core.exceptions import DataError
+from core.exceptions import ConfigError, DataError
 from data.manager import DataManager
 from data.models import IndexBar
 from data.provider import normalize_index_daily
+from research.benchmark import BenchmarkEngine
 from research.experiment import ExperimentConfig
 from research.models import ExperimentMetric
 from research.registry import ExperimentRegistry
@@ -293,6 +295,153 @@ def test_smoke_real_index(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:  #
         ).model_dump_json(),
     )
     assert reg.get(run_id) is not None
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 2.3 -- BenchmarkEngine.compare
+# --------------------------------------------------------------------------- #
+_DATES = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4), date(2024, 1, 5)]
+
+
+class FakeDataManager:
+    """Injectable stand-in for :class:`DataManager` serving one benchmark frame.
+
+    Honours the ``as_of`` / ``[start, end]`` window exactly like the real
+    :meth:`DataManager.get_index_daily`, and raises :class:`DataError` when the
+    resulting window is empty so a missing benchmark is never silently ignored.
+    """
+
+    def __init__(self, bench: pd.DataFrame | None) -> None:
+        self.config = get_config()
+        self._bench = bench
+
+    def get_index_daily(
+        self,
+        code: str,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        as_of: date | None = None,
+    ) -> pd.DataFrame:
+        if self._bench is None or self._bench.empty:
+            raise DataError(f"No index data for benchmark {code!r}")
+        df = self._bench.copy()
+        if start_date is not None:
+            df = df[df["date"] >= start_date]
+        if end_date is not None:
+            df = df[df["date"] <= end_date]
+        if as_of is not None:
+            df = df[df["date"] <= as_of]
+        if df.empty:
+            raise DataError(f"No index data for benchmark {code!r} in window")
+        return df.reset_index(drop=True)
+
+
+def _bench_frame(closes: list[float], dates: list[date] | None = None) -> pd.DataFrame:
+    dts = dates or _DATES[: len(closes)]
+    return pd.DataFrame({"date": dts, "close": [float(c) for c in closes]})
+
+
+def _pe(closes: list[float], dates: list[date] | None = None) -> pd.Series:
+    dts = dates or _DATES[: len(closes)]
+    return pd.Series([float(c) for c in closes], index=pd.DatetimeIndex(dts))
+
+
+def _ref_metrics(
+    pe_close: list[float], be_close: list[float], rf: float = 0.0
+) -> tuple[float, float, float, float, float]:
+    """Independent parallel computation of the five benchmark metrics."""
+    import numpy as np
+
+    pe = np.asarray(pe_close, dtype=float)
+    be = np.asarray(be_close, dtype=float)
+
+    def dr(x: np.ndarray) -> np.ndarray:
+        r = np.zeros_like(x)
+        r[1:] = x[1:] / x[:-1] - 1.0
+        return r
+
+    r_p, r_b = dr(pe), dr(be)
+    rf_d = (1.0 + rf) ** (1.0 / 252) - 1.0
+    excess_return = (pe[-1] / pe[0] - 1.0) - (be[-1] / be[0] - 1.0)
+    var_b = float(np.var(r_b, ddof=1))
+    beta = 0.0 if var_b == 0.0 else float(np.cov(r_p, r_b, ddof=1)[0, 1] / var_b)
+    alpha = float(((r_p - rf_d).mean() - beta * (r_b - rf_d).mean()) * 252)
+    active = r_p - r_b
+    te = float(active.std(ddof=1) * np.sqrt(252))
+    ir = 0.0 if te == 0.0 else float(active.mean() * 252 / te)
+    return excess_return, alpha, beta, te, ir
+
+
+def test_benchmark_equal() -> None:
+    closes = [100.0, 101.0, 103.0, 102.0]
+    eng = BenchmarkEngine(FakeDataManager(_bench_frame(closes)))
+    res = eng.compare(_pe(closes), "csi300", ("2024-01-01", "2024-01-31"), risk_free=0.0)
+    assert res.n_points == 4
+    assert res.beta == pytest.approx(1.0, abs=1e-9)
+    assert res.excess_return == pytest.approx(0.0, abs=1e-9)
+    assert res.alpha == pytest.approx(0.0, abs=1e-9)
+    assert res.tracking_error == pytest.approx(0.0, abs=1e-9)
+    assert res.information_ratio == pytest.approx(0.0, abs=1e-9)
+
+
+def test_benchmark_beta_zero() -> None:
+    # Flat portfolio (constant equity) vs a moving benchmark => beta == 0.
+    flat = [100.0, 100.0, 100.0, 100.0]
+    bench = [100.0, 101.0, 103.0, 102.0]
+    eng = BenchmarkEngine(FakeDataManager(_bench_frame(bench)))
+    res = eng.compare(_pe(flat), "csi300", ("2024-01-01", "2024-01-31"), risk_free=0.0)
+    assert res.beta == pytest.approx(0.0, abs=1e-9)
+    assert res.tracking_error > 0.0
+    assert res.information_ratio == res.information_ratio  # finite (not NaN)
+
+
+def test_benchmark_hand_values() -> None:
+    pe_close = [100.0, 102.0, 101.0, 104.0]
+    be_close = [100.0, 101.0, 102.0, 101.0]
+    eng = BenchmarkEngine(FakeDataManager(_bench_frame(be_close)))
+    res = eng.compare(_pe(pe_close), "csi300", ("2024-01-01", "2024-01-31"), risk_free=0.0)
+    exp_er, exp_alpha, exp_beta, exp_te, exp_ir = _ref_metrics(pe_close, be_close, 0.0)
+    assert res.excess_return == pytest.approx(exp_er, abs=1e-9)
+    assert res.alpha == pytest.approx(exp_alpha, abs=1e-9)
+    assert res.beta == pytest.approx(exp_beta, abs=1e-9)
+    assert res.tracking_error == pytest.approx(exp_te, abs=1e-9)
+    assert res.information_ratio == pytest.approx(exp_ir, abs=1e-9)
+    # to_dict drops the label and keeps numeric metrics only.
+    d = res.to_dict()
+    assert "benchmark_code" not in d
+    assert d["beta"] == pytest.approx(exp_beta, abs=1e-9)
+
+
+def test_benchmark_no_lookahead() -> None:
+    pe_close = [100.0, 102.0, 101.0, 104.0]  # portfolio ends 2024-01-05
+    # Benchmark has an extra later bar (2024-01-08) the portfolio never saw.
+    bench_dates = [*_DATES, date(2024, 1, 8)]
+    bench = _bench_frame([100.0, 101.0, 102.0, 101.0, 150.0], bench_dates)
+    eng = BenchmarkEngine(FakeDataManager(bench))
+
+    # Default as_of caps at the portfolio's last date => the 01-08 bar is hidden.
+    res_default = eng.compare(_pe(pe_close), "csi300", ("2024-01-01", "2024-01-31"), risk_free=0.0)
+    assert res_default.n_points == 4
+
+    # Explicit as_of before the portfolio end => only the non-leaking window.
+    res_trunc = eng.compare(
+        _pe(pe_close), "csi300", ("2024-01-01", "2024-01-31"), risk_free=0.0, as_of="2024-01-04"
+    )
+    assert res_trunc.n_points == 3
+    exp_er, *_ = _ref_metrics(pe_close[:3], [100.0, 101.0, 102.0], 0.0)
+    assert res_trunc.excess_return == pytest.approx(exp_er, abs=1e-9)
+
+
+def test_benchmark_missing_data() -> None:
+    eng = BenchmarkEngine(FakeDataManager(None))
+    with pytest.raises(DataError):
+        eng.compare(_pe([100.0, 101.0]), "csi300", ("2024-01-01", "2024-01-31"))
+
+
+def test_benchmark_unknown_key() -> None:
+    eng = BenchmarkEngine(FakeDataManager(_bench_frame([100.0, 101.0])))
+    with pytest.raises(ConfigError):
+        eng.compare(_pe([100.0, 101.0]), "does_not_exist", ("2024-01-01", "2024-01-31"))
 
 
 # --------------------------------------------------------------------------- #

@@ -39,13 +39,20 @@ def max_drawdown(equity: pd.Series) -> float:
     return float(dd.min())
 
 
-def _daily_returns(equity: pd.Series) -> pd.Series:
+def daily_returns(equity: pd.Series) -> pd.Series:
+    """Simple day-over-day percentage returns of an equity/price series.
+
+    The first observation has no prior bar, so its return is filled with 0.0.
+    Promoted to a public helper in Sprint 2.3 so benchmark comparison
+    (``src/research/benchmark.py``) reuses the exact same return math — return
+    computation lives in exactly one place.
+    """
     return equity.pct_change().fillna(0.0)
 
 
 def sharpe(equity: pd.Series, risk_free: float = 0.0) -> float:
     """Annualised Sharpe ratio of daily returns."""
-    r = _daily_returns(equity)
+    r = daily_returns(equity)
     rf_daily = (1.0 + risk_free) ** (1.0 / TRADING_DAYS) - 1.0
     excess = r - rf_daily
     std = r.std(ddof=1)
@@ -56,7 +63,7 @@ def sharpe(equity: pd.Series, risk_free: float = 0.0) -> float:
 
 def sortino(equity: pd.Series, risk_free: float = 0.0) -> float:
     """Annualised Sortino ratio (downside-deviation denominator)."""
-    r = _daily_returns(equity)
+    r = daily_returns(equity)
     rf_daily = (1.0 + risk_free) ** (1.0 / TRADING_DAYS) - 1.0
     excess = r - rf_daily
     downside = r[r < rf_daily]
@@ -70,7 +77,7 @@ def sortino(equity: pd.Series, risk_free: float = 0.0) -> float:
 
 def win_rate(equity: pd.Series) -> float:
     """Fraction of bars with a positive period return."""
-    r = _daily_returns(equity)
+    r = daily_returns(equity)
     if len(r) == 0:
         return 0.0
     return float((r > 0).mean())
@@ -101,7 +108,7 @@ def profit_factor(equity: pd.Series) -> float:
     The trade blotter carries no per-trade realised PnL, so this is computed
     from daily returns (the standard return-based profit factor).
     """
-    r = _daily_returns(equity)
+    r = daily_returns(equity)
     gross_profit = float(r[r > 0].sum())
     gross_loss = float(-r[r < 0].sum())
     if gross_loss == 0:
@@ -130,7 +137,7 @@ def avg_holding_days(trades: pd.DataFrame) -> float:
 
 def max_consecutive_losses(equity: pd.Series) -> float:
     """Length of the longest run of consecutive down days."""
-    r = _daily_returns(equity)
+    r = daily_returns(equity)
     best = 0
     run = 0
     for v in r.to_numpy():

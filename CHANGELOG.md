@@ -2,6 +2,38 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.3 — Benchmark Comparison (2026-07-16)
+
+Sprint 2.3 fills the `src/research/benchmark.py` stub with a real
+`BenchmarkEngine` that compares an experiment's equity curve against a benchmark
+index pulled through `DataManager.get_index_daily` (the single data entry point,
+with a no-look-ahead `as_of` ceiling). No new metric math leaves
+`src/backtest/metrics.py`; the benchmark-relative maths (alpha/beta/TE/IR) lives
+in `benchmark.py` and reuses the promoted `daily_returns` helper. No ORM/CLI
+change — `BenchmarkConfig` (2.0), `ExperimentConfig.benchmark` (2.0) and the
+`research init --benchmark` flag (2.1) already exist; the engine is consumed by
+the 2.4 runner.
+
+### Added
+
+- `src/research/benchmark.py` — `BenchmarkEngine.compare(portfolio_equity, benchmark_code, range, risk_free=None, as_of=None)` returning a typed `BenchmarkComparison` dataclass (`+ to_dict()`), with five metrics computed on the inner-joined date window:
+  - `excess_return` — portfolio period return minus benchmark period return (scale-invariant).
+  - `beta` — `Cov(r_p, r_b) / Var(r_b)`; flat benchmark (`Var==0`) ⇒ `0.0`.
+  - `alpha` — annualised CAPM alpha `(mean(excess_p) − beta·mean(excess_b)) × 252`.
+  - `tracking_error` — annualised std of active returns `std(r_p − r_b) × √252`.
+  - `information_ratio` — `mean(r_p − r_b) × 252 / tracking_error`; `TE==0` ⇒ `0.0`.
+- `IndexDataSource` Protocol (mirrors `DataProvider`) so the data dependency is structurally injectable/testable.
+- `research/__init__.py` — export `BenchmarkEngine` + `BenchmarkComparison`.
+- `tests/test_research.py` — six cases: β=1 (equal), β=0 (flat portfolio), hand-checked five-metric values, no-look-ahead (default cap + explicit `as_of`), missing benchmark ⇒ `DataError`, unknown key ⇒ `ConfigError`.
+
+### Changed
+
+- `src/backtest/metrics.py` — promote private `_daily_returns` → public `daily_returns` (visibility-only; `compute_metrics` signature unchanged) so return math lives in one place and `benchmark.py` reuses it.
+
+### No-look-ahead
+
+- `as_of` defaults to `max(portfolio_equity.index)` and is passed straight to `get_index_daily`, so the benchmark fetch can never include data the portfolio could not have seen; an invariant test enforces this.
+
 ## Maintenance — CI gate hardening (2026-07-16)
 
 The GitHub Actions CI ran `ruff` / `black` / `mypy` / `pytest` against
