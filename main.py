@@ -730,9 +730,7 @@ def research_init(
         exp_cfg = ExperimentConfig.model_validate(_load_config_file(config))
     else:
         if name is None or start is None or end is None:
-            typer.echo(
-                "init requires --name/--start/--end (or use --config)", err=True
-            )
+            typer.echo("init requires --name/--start/--end (or use --config)", err=True)
             raise typer.Exit(code=2)
         if strategy is None:
             strategy = cfg.backtest.strategy or (

@@ -95,6 +95,72 @@ def benchmark_return(close: pd.Series) -> float:
     return float(close.iloc[-1] / close.iloc[0] - 1.0)
 
 
+def profit_factor(equity: pd.Series) -> float:
+    """Gross profit / gross loss over daily equity returns.
+
+    The trade blotter carries no per-trade realised PnL, so this is computed
+    from daily returns (the standard return-based profit factor).
+    """
+    r = _daily_returns(equity)
+    gross_profit = float(r[r > 0].sum())
+    gross_loss = float(-r[r < 0].sum())
+    if gross_loss == 0:
+        return float("inf") if gross_profit > 0 else 0.0
+    return gross_profit / gross_loss
+
+
+def calmar(equity: pd.Series) -> float:
+    """CAGR divided by the absolute maximum drawdown."""
+    mdd = max_drawdown(equity)
+    if mdd == 0:
+        return 0.0
+    return cagr(equity) / abs(mdd)
+
+
+def avg_holding_days(trades: pd.DataFrame) -> float:
+    """Mean calendar-day gap between consecutive rebalance events."""
+    if trades is None or len(trades) < 2 or "date" not in trades.columns:
+        return 0.0
+    dates = pd.to_datetime(trades["date"]).sort_values()
+    gaps = dates.diff().dropna().dt.days
+    if len(gaps) == 0:
+        return 0.0
+    return float(gaps.mean())
+
+
+def max_consecutive_losses(equity: pd.Series) -> float:
+    """Length of the longest run of consecutive down days."""
+    r = _daily_returns(equity)
+    best = 0
+    run = 0
+    for v in r.to_numpy():
+        if v < 0:
+            run += 1
+            best = max(best, run)
+        else:
+            run = 0
+    return float(best)
+
+
+def exposure(equity: pd.Series, trades: pd.DataFrame) -> float:
+    """Fraction of bars holding a non-zero weight.
+
+    ``compute_metrics`` does not receive a position series, only trade events,
+    so the held weight is reconstructed from cumulative ``weight_change`` over
+    the equity index; the result is the share of bars with non-zero weight.
+    """
+    if trades is None or len(trades) == 0:
+        return 0.0
+    pos = pd.Series(0.0, index=equity.index)
+    for _, t in trades.iterrows():
+        try:
+            i = equity.index.get_loc(t["date"])
+        except KeyError:
+            continue
+        pos.iloc[i:] = pos.iloc[i:] + float(t["weight_change"])
+    return float((pos != 0).mean())
+
+
 def compute_metrics(
     equity: pd.Series,
     trades: pd.DataFrame,
@@ -112,6 +178,11 @@ def compute_metrics(
         "num_trades": float(num_trades(trades)),
         "turnover": turnover(trades),
         "benchmark_return": benchmark_return(close),
+        "profit_factor": profit_factor(equity),
+        "calmar": calmar(equity),
+        "avg_holding_days": avg_holding_days(trades),
+        "max_consecutive_losses": max_consecutive_losses(equity),
+        "exposure": exposure(equity, trades),
     }
     result: dict[str, float] = {}
     for name in config.metrics:

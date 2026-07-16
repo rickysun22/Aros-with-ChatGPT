@@ -2,6 +2,36 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.2 — Metrics Extension (2026-07-16)
+
+Sprint 2.2 adds the five performance metrics GPT's Phase 2 plan wanted — but
+**into the existing `src/backtest/metrics.py` dispatcher**, not a new
+`research/metrics.py` (forbidden by the 2.0 frozen decision). Pure functions
+only; no signature change to `compute_metrics`, no ORM/CLI change, no network.
+
+### Added
+
+- `src/backtest/metrics.py` — five new scalar metrics:
+  - `profit_factor` — gross profit / gross loss over daily equity returns (blotter carries no per-trade PnL); `inf` when no losing day, `0.0` when flat.
+  - `calmar` — `cagr / abs(max_drawdown)`; `0.0` when `max_drawdown == 0`.
+  - `avg_holding_days` — mean calendar-day gap between consecutive rebalances (from `trades["date"]`); `0.0` when `< 2` trades.
+  - `max_consecutive_losses` — longest run of consecutive down days.
+  - `exposure` — fraction of bars holding a non-zero weight, reconstructed from cumulative `weight_change` over the equity index.
+  - All five registered in `compute_metrics`'s `available` dict (now selectable via `BacktestConfig.metrics`).
+- `tests/test_backtest.py` — 10 hand-checked unit tests (each metric + edge cases: flat equity, no-drawdown, `< 2` trades, no trades).
+
+### Frozen decisions (carried from 2.2 design, §6)
+
+- D1 The five metrics are **not** added to the default `BacktestConfig.metrics` list — registered only in the dispatcher, so they are selectable without changing existing backtest outputs / snapshots.
+- D2 `profit_factor` uses daily-return gross profit / gross loss (not per-trade PnL).
+- D3 `exposure` reconstructs the held weight from cumulative `weight_change` over `equity.index`.
+- D4 Edge values: `profit_factor` `inf` (no loss) / `0.0` (flat); `calmar` `0.0` (mdd==0); `avg_holding_days` `0.0` (`< 2` trades); `max_consecutive_losses` `0` (none).
+
+### Notes
+
+- Fully backward compatible: `compute_metrics` signature unchanged; the 2.1 `research` CLI and all existing callers unaffected. These metrics become the vocabulary for benchmark (2.3) / runner (2.4) / walk-forward (2.5) / report (2.6).
+- All four gates green: ruff / black / mypy (68 files) / pytest 201 passed, 1 skipped.
+
 ## Sprint 2.1 — Research CLI Surface (2026-07-16)
 
 Sprint 2.0 shipped the `ExperimentConfig` / `ExperimentRun` / `ExperimentRegistry`

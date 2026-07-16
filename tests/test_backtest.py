@@ -7,6 +7,8 @@ truncation test, and a CLI smoke test.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -112,6 +114,99 @@ def test_unknown_metric_raises():
         compute_metrics(
             eq, pd.DataFrame(columns=["weight_change"]), close, BacktestConfig(metrics=["bogus"])
         )
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 2.2 — extended metrics (hand-checked)
+# --------------------------------------------------------------------------- #
+def test_metric_profit_factor():
+    # 100->110 (+.10), 110->100 (-1/11), 100->110 (+.10): pf = .20 / (1/11) = 2.2
+    eq = pd.Series([100.0, 110.0, 100.0, 110.0])
+    close = pd.Series([100.0, 110.0, 100.0, 110.0])
+    cfg = BacktestConfig(metrics=["profit_factor"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert abs(m["profit_factor"] - 2.2) < 1e-9
+
+
+def test_metric_profit_factor_no_loss_is_inf():
+    eq = pd.Series([100.0, 110.0, 110.0, 121.0])
+    close = pd.Series([100.0, 110.0, 110.0, 121.0])
+    cfg = BacktestConfig(metrics=["profit_factor"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert math.isinf(m["profit_factor"])
+
+
+def test_metric_profit_factor_flat_is_zero():
+    eq = pd.Series([100.0, 100.0, 100.0])
+    close = pd.Series([100.0, 100.0, 100.0])
+    cfg = BacktestConfig(metrics=["profit_factor"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert m["profit_factor"] == 0.0
+
+
+def test_metric_calmar():
+    # 252 bars: 100 -> dip 90 -> steady 120. cagr=0.20, mdd=-0.10 => calmar=2.0
+    eq = pd.Series([100.0, 90.0] + [120.0] * 250)
+    close = eq
+    cfg = BacktestConfig(metrics=["calmar"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert abs(m["calmar"] - 2.0) < 1e-9
+
+
+def test_metric_calmar_no_drawdown_is_zero():
+    eq = pd.Series([100.0, 110.0, 121.0])  # monotonic up -> mdd = 0
+    close = eq
+    cfg = BacktestConfig(metrics=["calmar"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert m["calmar"] == 0.0
+
+
+def test_metric_avg_holding_days():
+    trades = pd.DataFrame(
+        {
+            "date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-01-06")],
+            "weight_change": [1.0, -1.0],
+        }
+    )
+    eq = pd.Series([100.0, 100.0])
+    cfg = BacktestConfig(metrics=["avg_holding_days"])
+    m = compute_metrics(eq, trades, eq, cfg)
+    assert abs(m["avg_holding_days"] - 5.0) < 1e-9
+
+
+def test_metric_avg_holding_days_few_trades_is_zero():
+    trades = pd.DataFrame({"date": [pd.Timestamp("2024-01-01")], "weight_change": [1.0]})
+    eq = pd.Series([100.0])
+    cfg = BacktestConfig(metrics=["avg_holding_days"])
+    m = compute_metrics(eq, trades, eq, cfg)
+    assert m["avg_holding_days"] == 0.0
+
+
+def test_metric_max_consecutive_losses():
+    # down run of 3 (bars 1,2,3)
+    eq = pd.Series([100.0, 99.0, 98.0, 97.0, 100.0])
+    close = eq
+    cfg = BacktestConfig(metrics=["max_consecutive_losses"])
+    m = compute_metrics(eq, pd.DataFrame(columns=["weight_change"]), close, cfg)
+    assert m["max_consecutive_losses"] == 3.0
+
+
+def test_metric_exposure():
+    idx = pd.date_range("2024-01-01", periods=10, freq="D")
+    equity = pd.Series([100.0] * 10, index=idx)
+    trades = pd.DataFrame({"date": [idx[0], idx[5]], "weight_change": [1.0, -1.0]})
+    cfg = BacktestConfig(metrics=["exposure"])
+    m = compute_metrics(equity, trades, equity, cfg)
+    # bars 0-4 invested (5), bars 5-9 flat (5) => exposure 0.5
+    assert abs(m["exposure"] - 0.5) < 1e-9
+
+
+def test_metric_exposure_no_trades_is_zero():
+    idx = pd.date_range("2024-01-01", periods=5, freq="D")
+    equity = pd.Series([100.0] * 5, index=idx)
+    cfg = BacktestConfig(metrics=["exposure"])
+    m = compute_metrics(equity, pd.DataFrame(columns=["weight_change"]), equity, cfg)
+    assert m["exposure"] == 0.0
 
 
 # --------------------------------------------------------------------------- #
