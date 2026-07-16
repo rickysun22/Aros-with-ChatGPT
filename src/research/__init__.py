@@ -1,11 +1,11 @@
 """AROS Phase 2 research engine (Sprint 2.0 foundation).
 
-Sprint 2.0 lays only the rails: experiment-persistence ORM models, the frozen
+Sprint 2.0 lays the rails: experiment-persistence ORM models, the frozen
 :class:`ExperimentConfig` protocol, and a CRUD :class:`ExperimentRegistry`.
-Sprint 2.3 adds :class:`BenchmarkEngine` (benchmark comparison). The remaining
-research logic -- runner orchestration, walk-forward/OOS, and report rendering
--- lands in Sprints 2.4-2.6 and is still only *stubbed* here (see ``runner.py``
-/ ``walk_forward.py`` / ``report.py``).
+Sprint 2.3 adds :class:`BenchmarkEngine` (benchmark comparison). Sprint 2.4
+adds :class:`ResearchRunner`, the orchestration + persistence layer that chains
+the engines and records results. Walk-forward/OOS (2.5) and report rendering
+(2.6) still land later.
 
 NOTE: there is intentionally **no** ``research/metrics.py``. All metric math
 lives in ``src/backtest/metrics.py`` and is *extended there* in Sprint 2.2 --
@@ -17,6 +17,7 @@ from .benchmark import BenchmarkComparison, BenchmarkEngine
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
 from .registry import ExperimentRegistry
+from .runner import ResearchRunner
 
 __all__ = [
     "ExperimentConfig",
@@ -28,4 +29,5 @@ __all__ = [
     "ExperimentRegistry",
     "BenchmarkEngine",
     "BenchmarkComparison",
+    "ResearchRunner",
 ]

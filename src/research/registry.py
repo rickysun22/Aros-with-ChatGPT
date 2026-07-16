@@ -1,14 +1,19 @@
-"""Experiment registry (Sprint 2.0) -- CRUD only, no run logic.
+"""Experiment registry (Sprint 2.0) -- CRUD + result persistence.
 
-Persists / retrieves :class:`ExperimentRun` rows. It deliberately contains *no*
-execution logic in 2.0: the runner that fills metrics/equity lands in Sprint
-2.4. Session handling mirrors :class:`~universe.engine.UniverseEngine` so tests
-can inject an in-memory session.
+Persists / retrieves :class:`ExperimentRun` rows and records the metrics /
+equity produced by the runner (Sprint 2.4). Session handling mirrors
+:class:`~universe.engine.UniverseEngine` so tests can inject an in-memory
+session. All ORM writes live here -- the runner calls these helpers rather than
+touching the models directly (2.1 owns the schema).
 """
 
 from __future__ import annotations
 
+import json
+import math
 import uuid
+from collections.abc import Mapping
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -76,3 +81,60 @@ class ExperimentRegistry:
         self.session.delete(run)
         self.session.commit()
         return True
+
+    # ------------------------------------------------------------------ #
+    # Result persistence (Sprint 2.4) -- all ORM writes stay in the registry
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _coerce_value(value: float | None) -> float | None:
+        """Coerce non-finite metric values to ``None`` (sqlite-safe, nullable)."""
+        if value is None:
+            return None
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+        return value
+
+    def record_metrics(
+        self,
+        run_id: str,
+        metrics: Mapping[str, float | None],
+        window: str = "full",
+        is_oos: bool = False,
+    ) -> None:
+        """Append long-form metric rows for ``run_id`` (non-finite -> ``None``)."""
+        rows = [
+            ExperimentMetric(
+                run_id=run_id,
+                metric_name=name,
+                value=self._coerce_value(value),
+                is_oos=is_oos,
+                window=window,
+            )
+            for name, value in metrics.items()
+        ]
+        if rows:
+            self.session.add_all(rows)
+            self.session.commit()
+
+    def record_equity(
+        self,
+        run_id: str,
+        equity: dict[str, float],
+        window: str = "full",
+        is_oos: bool = False,
+    ) -> None:
+        """Persist an equity curve as a JSON blob (``{iso_date: value}``)."""
+        blob = json.dumps({str(k): float(v) for k, v in equity.items()})
+        self.session.add(
+            ExperimentEquity(run_id=run_id, window=window, is_oos=is_oos, equity_json=blob)
+        )
+        self.session.commit()
+
+    def mark_done(self, run_id: str, status: str = "done") -> None:
+        """Mark ``run_id`` finished (sets status + ``finished_at``)."""
+        run = self.session.get(ExperimentRun, run_id)
+        if run is None:
+            return
+        run.status = status
+        run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        self.session.commit()

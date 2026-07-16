@@ -642,6 +642,67 @@ def portfolio(
         typer.echo(f"  {d.date()}: {sel}")
 
 
+def _resolve_cli_experiment_config(
+    cfg: Any,
+    *,
+    name: str | None,
+    strategy: str | None,
+    start: str | None,
+    end: str | None,
+    universe: str | None,
+    codes: str | None,
+    benchmark: str | None,
+    metrics: str | None,
+    walk_forward: tuple[int, int, int] | None,
+    seed: int | None,
+) -> ExperimentConfig:
+    """Build a validated :class:`ExperimentConfig` from CLI flags.
+
+    Shared by ``research init`` and ``research run`` so both keep the same
+    validation / resolution rules. Raises ``typer.Exit`` on bad input.
+    """
+    if name is None or start is None or end is None:
+        typer.echo("experiment requires --name/--start/--end (or use --config)", err=True)
+        raise typer.Exit(code=2)
+    if strategy is None:
+        strategy = cfg.backtest.strategy or (
+            cfg.strategies.enabled[0].name if cfg.strategies.enabled else None
+        )
+    if strategy is None:
+        typer.echo("no strategy available; pass --strategy", err=True)
+        raise typer.Exit(code=2)
+    enabled = {s.name for s in cfg.strategies.enabled}
+    if strategy not in enabled:
+        typer.echo(f"unknown strategy: {strategy}", err=True)
+        raise typer.Exit(code=2)
+    if universe is not None and codes is not None:
+        typer.echo("set either --universe or --codes, not both", err=True)
+        raise typer.Exit(code=2)
+    if universe is not None:
+        try:
+            resolved = UniverseEngine().get_codes(universe)
+        except Exception:  # noqa: BLE001 - surface any DB issue as a clean error
+            resolved = []
+        if not resolved:
+            typer.echo(f"universe {universe!r} is empty or unknown", err=True)
+            raise typer.Exit(code=1)
+    resolved_benchmark = benchmark or cfg.benchmark.default
+    codes_list = [c.strip() for c in codes.split(",") if c.strip()] if codes else None
+    metrics_list = [m.strip() for m in metrics.split(",") if m.strip()] if metrics else None
+    return _build_experiment_config(
+        name=name,
+        strategy=strategy,
+        start=start,
+        end=end,
+        universe=universe,
+        codes=codes_list,
+        benchmark=resolved_benchmark,
+        metrics=metrics_list,
+        walk_forward=walk_forward,
+        seed=seed,
+    )
+
+
 def _build_experiment_config(
     *,
     name: str,
@@ -729,40 +790,16 @@ def research_init(
     if config is not None:
         exp_cfg = ExperimentConfig.model_validate(_load_config_file(config))
     else:
-        if name is None or start is None or end is None:
-            typer.echo("init requires --name/--start/--end (or use --config)", err=True)
-            raise typer.Exit(code=2)
-        if strategy is None:
-            strategy = cfg.backtest.strategy or (
-                cfg.strategies.enabled[0].name if cfg.strategies.enabled else None
-            )
-        if strategy is None:
-            typer.echo("no strategy available; pass --strategy", err=True)
-            raise typer.Exit(code=2)
-        enabled = {s.name for s in cfg.strategies.enabled}
-        if strategy not in enabled:
-            typer.echo(f"unknown strategy: {strategy}", err=True)
-            raise typer.Exit(code=2)
-        if universe is not None and codes is not None:
-            typer.echo("set either --universe or --codes, not both", err=True)
-            raise typer.Exit(code=2)
-        if universe is not None:
-            resolved = UniverseEngine().get_codes(universe)
-            if not resolved:
-                typer.echo(f"universe {universe!r} is empty or unknown", err=True)
-                raise typer.Exit(code=1)
-        resolved_benchmark = benchmark or cfg.benchmark.default
-        codes_list = [c.strip() for c in codes.split(",") if c.strip()] if codes else None
-        metrics_list = [m.strip() for m in metrics.split(",") if m.strip()] if metrics else None
-        exp_cfg = _build_experiment_config(
+        exp_cfg = _resolve_cli_experiment_config(
+            cfg,
             name=name,
             strategy=strategy,
             start=start,
             end=end,
             universe=universe,
-            codes=codes_list,
-            benchmark=resolved_benchmark,
-            metrics=metrics_list,
+            codes=codes,
+            benchmark=benchmark,
+            metrics=metrics,
             walk_forward=walk_forward,
             seed=seed,
         )
@@ -775,6 +812,69 @@ def research_init(
     reg = ExperimentRegistry()
     run_id = reg.create(name=exp_cfg.name, config_json=exp_cfg.model_dump_json(), notes=notes)
     typer.echo(f"Created experiment {run_id} (name={exp_cfg.name!r})")
+
+
+@research_app.command("run")
+def research_run(
+    name: str | None = typer.Option(None, "--name", help="Experiment name"),
+    strategy: str | None = typer.Option(
+        None, "--strategy", help="Strategy name (default: configured)"
+    ),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    universe: str | None = typer.Option(
+        None, "--universe", help="Universe pool name (XOR --codes)"
+    ),
+    codes: str | None = typer.Option(
+        None, "--codes", help="Comma-separated codes (XOR --universe)"
+    ),
+    benchmark: str | None = typer.Option(
+        None, "--benchmark", help="Benchmark key (default: configured)"
+    ),
+    metrics: str | None = typer.Option(None, "--metrics", help="Comma-separated metric names"),
+    walk_forward: tuple[int, int, int] | None = typer.Option(
+        None, "--walk-forward", help="Walk-forward TRAIN TEST STEP (years)"
+    ),
+    seed: int | None = typer.Option(None, "--seed", help="Random seed"),
+    notes: str | None = typer.Option(None, "--notes", help="Run note"),
+    config: Path | None = typer.Option(None, "--config", help="Config file (JSON/YAML)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print config, do not run"),
+) -> None:
+    """Run a research experiment end to end and persist its results."""
+    setup_logging()
+    cfg = get_config()
+
+    if config is not None:
+        exp_cfg = ExperimentConfig.model_validate(_load_config_file(config))
+    else:
+        exp_cfg = _resolve_cli_experiment_config(
+            cfg,
+            name=name,
+            strategy=strategy,
+            start=start,
+            end=end,
+            universe=universe,
+            codes=codes,
+            benchmark=benchmark,
+            metrics=metrics,
+            walk_forward=walk_forward,
+            seed=seed,
+        )
+
+    if dry_run:
+        typer.echo(exp_cfg.model_dump_json(indent=2))
+        typer.echo("(not executed)")
+        return
+
+    from research.runner import ResearchRunner
+
+    result = ResearchRunner().run(exp_cfg, notes=notes)
+    m = result.metrics.get("full", {})
+    typer.echo(f"Run {result.run_id} complete (name={exp_cfg.name!r})")
+    typer.echo(f"  total_return      : {m.get('total_return')}")
+    typer.echo(f"  sharpe            : {m.get('sharpe')}")
+    typer.echo(f"  bench_excess_return: {m.get('bench_excess_return')}")
+    typer.echo(f"  bench_beta        : {m.get('bench_beta')}")
 
 
 @research_app.command("list")

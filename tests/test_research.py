@@ -19,6 +19,7 @@ import json
 import os
 import re
 from datetime import date
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -26,6 +27,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
+from backtest.portfolio import PortfolioResult
 from core.config import get_config
 from core.database import Base
 from core.exceptions import ConfigError, DataError
@@ -34,8 +36,9 @@ from data.models import IndexBar
 from data.provider import normalize_index_daily
 from research.benchmark import BenchmarkEngine
 from research.experiment import ExperimentConfig
-from research.models import ExperimentMetric
+from research.models import ExperimentEquity, ExperimentMetric
 from research.registry import ExperimentRegistry
+from research.runner import ResearchRunner
 
 
 # --------------------------------------------------------------------------- #
@@ -632,3 +635,186 @@ def test_registry_delete_cascades(tmp_path, monkeypatch: pytest.MonkeyPatch) -> 
     assert reg.delete(rid) is True
     assert reg.session.query(ExperimentMetric).filter_by(run_id=rid).count() == 0
     assert reg.get(rid) is None
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 2.4 -- ResearchRunner end-to-end orchestration + persistence
+# --------------------------------------------------------------------------- #
+def _fake_portfolio_fn(equity_close: list[float], dates: list[date] | None = None):
+    """Return a ``portfolio_fn`` seam yielding a canned :class:`PortfolioResult`."""
+
+    def _fn(codes: list[str], dm: Any, start: date, end: date) -> PortfolioResult:
+        return PortfolioResult(
+            equity=_pe(equity_close, dates),
+            metrics={},
+            selections=[],
+            trades=pd.DataFrame(),  # empty blotter is safe for compute_metrics
+        )
+
+    return _fn
+
+
+def _runner_for(
+    bench_closes: list[float],
+    bench_dates: list[date] | None = None,
+    pf_closes: list[float] | None = None,
+    config: ExperimentConfig | None = None,
+) -> tuple[ResearchRunner, ExperimentConfig]:
+    """Wire a :class:`ResearchRunner` with injected fakes (no network / no real IO)."""
+    bench = _bench_frame(bench_closes, bench_dates)
+    dm = FakeDataManager(bench)
+    runner = ResearchRunner(
+        data_manager=dm,
+        portfolio_fn=_fake_portfolio_fn(pf_closes if pf_closes is not None else bench_closes),
+        benchmark_engine=BenchmarkEngine(dm),
+        config=get_config(),
+    )
+    cfg = config or ExperimentConfig(
+        name="r1",
+        strategy="weighted_momentum",
+        start="2024-01-01",
+        end="2024-01-31",
+        codes=["600000"],
+        benchmark="csi300",
+        metrics=["total_return", "sharpe", "max_drawdown", "sortino", "benchmark_return"],
+    )
+    return runner, cfg
+
+
+def test_runner_end_to_end_persists() -> None:
+    session = _mem_session()
+    runner, cfg = _runner_for([100.0, 101.0, 102.0, 101.0], pf_closes=[100.0, 102.0, 101.0, 104.0])
+    result = runner.run(cfg, session=session, notes="t")
+    assert result.run_id.startswith("exp_")
+    assert result.windows == ["full"]
+
+    combined = result.metrics["full"]
+    assert "total_return" in combined
+    assert "bench_beta" in combined
+    assert "bench_excess_return" in combined
+
+    # Benchmark metrics match the independent reference, capped at the portfolio end.
+    exp_er, exp_alpha, exp_beta, exp_te, exp_ir = _ref_metrics(
+        [100.0, 102.0, 101.0, 104.0], [100.0, 101.0, 102.0, 101.0], 0.0
+    )
+    assert combined["bench_excess_return"] == pytest.approx(exp_er, abs=1e-9)
+    assert combined["bench_beta"] == pytest.approx(exp_beta, abs=1e-9)
+    assert combined["bench_alpha"] == pytest.approx(exp_alpha, abs=1e-9)
+    assert combined["bench_tracking_error"] == pytest.approx(exp_te, abs=1e-9)
+    assert combined["bench_information_ratio"] == pytest.approx(exp_ir, abs=1e-9)
+
+    # Persistence: run marked done, metric + equity rows recorded.
+    reg = ExperimentRegistry(session=session)
+    run = reg.get(result.run_id)
+    assert run is not None
+    assert run.status == "done"
+    assert run.notes == "t"
+    names = {
+        r.metric_name for r in session.query(ExperimentMetric).filter_by(run_id=result.run_id).all()
+    }
+    assert "bench_beta" in names and "total_return" in names
+    eq_rows = session.query(ExperimentEquity).filter_by(run_id=result.run_id).all()
+    assert len(eq_rows) == 1
+    assert len(json.loads(eq_rows[0].equity_json)) == 4
+
+
+def test_runner_no_lookahead() -> None:
+    # Benchmark carries an extra later bar (2024-01-08) the portfolio never saw.
+    bench_dates = [*_DATES, date(2024, 1, 8)]
+    bench_closes = [100.0, 101.0, 102.0, 101.0, 150.0]
+    session = _mem_session()
+    runner, cfg = _runner_for(
+        bench_closes, bench_dates=bench_dates, pf_closes=[100.0, 102.0, 101.0, 104.0]
+    )
+    result = runner.run(cfg, session=session)
+    # The 01-08 bar must NOT leak: metrics match the 4-point (in-window) reference.
+    exp_er, exp_alpha, exp_beta, exp_te, exp_ir = _ref_metrics(
+        [100.0, 102.0, 101.0, 104.0], [100.0, 101.0, 102.0, 101.0], 0.0
+    )
+    assert result.metrics["full"]["bench_beta"] == pytest.approx(exp_beta, abs=1e-9)
+    assert result.metrics["full"]["bench_excess_return"] == pytest.approx(exp_er, abs=1e-9)
+    assert result.metrics["full"]["bench_tracking_error"] == pytest.approx(exp_te, abs=1e-9)
+    assert result.metrics["full"]["bench_information_ratio"] == pytest.approx(exp_ir, abs=1e-9)
+
+
+def test_runner_missing_benchmark_raises() -> None:
+    runner, cfg = _runner_for(
+        [],
+        pf_closes=[100.0, 102.0, 101.0, 104.0],
+        config=ExperimentConfig(
+            name="r",
+            strategy="weighted_momentum",
+            start="2024-01-01",
+            end="2024-01-31",
+            codes=["600000"],
+            benchmark="csi300",
+            metrics=["total_return", "benchmark_return"],
+        ),
+    )
+    # Force the data manager to have no benchmark data.
+    runner._dm = FakeDataManager(None)
+    runner._benchmark_engine = BenchmarkEngine(runner._dm)
+    with pytest.raises(DataError):
+        runner.run(cfg, session=_mem_session())
+
+
+def test_runner_unknown_benchmark_key_raises() -> None:
+    runner, cfg = _runner_for(
+        [100.0, 101.0, 102.0, 101.0],
+        pf_closes=[100.0, 102.0, 101.0, 104.0],
+        config=ExperimentConfig(
+            name="r",
+            strategy="weighted_momentum",
+            start="2024-01-01",
+            end="2024-01-31",
+            codes=["600000"],
+            benchmark="nope",
+            metrics=["total_return", "benchmark_return"],
+        ),
+    )
+    with pytest.raises(ConfigError):
+        runner.run(cfg, session=_mem_session())
+
+
+def test_runner_empty_candidates_raises() -> None:
+    runner, cfg = _runner_for(
+        [100.0, 101.0, 102.0, 101.0],
+        config=ExperimentConfig(
+            name="r",
+            strategy="weighted_momentum",
+            start="2024-01-01",
+            end="2024-01-31",
+            codes=[],
+            benchmark="csi300",
+            metrics=["total_return", "benchmark_return"],
+        ),
+    )
+    with pytest.raises(DataError):
+        runner.run(cfg, session=_mem_session())
+
+
+def test_cli_research_run_dry_run(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path / 'run.db'}")
+    result = _invoke(
+        [
+            "research",
+            "run",
+            "--name",
+            "dryrun",
+            "--strategy",
+            "weighted_momentum",
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-03-01",
+            "--codes",
+            "600000",
+            "--dry-run",
+        ]
+    )
+    assert result.exit_code == 0, result.output
+    assert "(not executed)" in result.output
+    assert '"name": "dryrun"' in result.output
+    # Nothing persisted: dry-run never calls the runner.
+    lst = _invoke(["research", "list"])
+    assert "No experiments yet." in lst.output

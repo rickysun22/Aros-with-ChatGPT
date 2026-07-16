@@ -11,6 +11,7 @@ it is intentionally minimal in 2.0 (rails, not logic).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, model_validator
@@ -65,6 +66,6 @@ class ExperimentResult:
     """
 
     run_id: str
-    metrics: dict[str, dict[str, float | None]] = field(default_factory=dict)
+    metrics: dict[str, Mapping[str, float | None]] = field(default_factory=dict)
     equity: dict[str, dict[str, float]] = field(default_factory=dict)
     windows: list[str] = field(default_factory=list)

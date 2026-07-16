@@ -2,6 +2,33 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.4 — Research Runner (2026-07-17)
+
+Sprint 2.4 fills the `src/research/runner.py` stub with `ResearchRunner`, the
+orchestration + persistence layer that chains the engines shipped in 1.16 / 2.2 /
+2.3 into one runnable, persistable experiment — and adds the `research run` CLI
+that drives it. No new metric math: it reuses `PortfolioBacktest.from_config`,
+`compute_metrics`, `BenchmarkEngine.compare`, and `ExperimentRegistry` exactly as
+they are.
+
+### Added
+
+- `src/research/runner.py` — `ResearchRunner(data_manager=None, portfolio_fn=None, benchmark_engine=None, config=None).run(config, session=None, notes=None) -> ExperimentResult`. Pipeline: resolve candidates (universe XOR codes via `UniverseEngine`) → portfolio backtest (injected `portfolio_fn` seam, default `PortfolioBacktest.from_config`) → `compute_metrics` → `BenchmarkEngine.compare` → persist → return `ExperimentResult` keyed by window `"full"`.
+- `src/research/registry.py` — three persistence helpers (`record_metrics` / `record_equity` / `mark_done`); all ORM writes stay in the registry. `record_metrics` coerces non-finite values (`inf`/`nan`) to `None` (sqlite-safe); `record_equity` serialises the curve as `{iso_date: value}` JSON; `mark_done` sets `status="done"` + `finished_at` (tz-aware UTC, naive column).
+- `research run` CLI — `research run --name/--universe/--codes/--strategy/--start/--end/--benchmark/--metrics [--config] [--dry-run]`; reuses the 2.1 `_resolve_cli_experiment_config` helper. Dry-run prints the resolved config and never calls the runner.
+- `research/__init__.py` — export `ResearchRunner`.
+- `tests/test_research.py` — six new cases: end-to-end run persists metrics + equity and matches the independent benchmark reference; no-look-ahead (extra later benchmark bar never leaks); missing benchmark ⇒ `DataError`; unknown benchmark key ⇒ `ConfigError`; empty candidate set ⇒ `DataError`; `research run --dry-run` persists nothing.
+
+### Changed
+
+- Benchmark-relative metrics are stored under a `bench_` prefix (`bench_excess_return` / `bench_alpha` / `bench_beta` / `bench_tracking_error` / `bench_information_ratio`) alongside the portfolio metrics in `ExperimentMetric`.
+- No-look-ahead ceiling is the **portfolio's own last date** (not the calendar experiment end), so a later benchmark bar cannot leak into `benchmark_return` during the metrics step.
+
+### Scope / non-goals
+
+- Single full-range window (`"full"`); walk-forward / OOS (2.5) and report rendering (2.6) are untouched.
+- No ORM schema change, no new metric functions — only wiring + persistence.
+
 ## Sprint 2.3 — Benchmark Comparison (2026-07-16)
 
 Sprint 2.3 fills the `src/research/benchmark.py` stub with a real
