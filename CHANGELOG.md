@@ -2,6 +2,33 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.6 — Research Report (2026-07-17)
+
+Sprint 2.6 fills the `src/research/report.py` stub with `ResearchReport`, which
+aggregates an experiment's metrics + benchmark comparison + walk-forward IS/OOS
+into a shareable report (markdown / json / html). Rendering reuses the 1.8 / 1.14
+`DailyReport` style — inline CSS and inline SVG bars — so the HTML is fully
+self-contained and renders offline (no external JS/CSS). No new metric math: the
+report only *presents* data the runner (2.4) and walk-forward runner (2.5) already
+produced and persisted. A new `ExperimentRegistry.load_result(run_id)` reconstructs
+an `ExperimentResult` from the DB (`ExperimentMetric` + `ExperimentEquity` rows,
+windows ordered, IS/OOS flag derived) so a report can be rendered from a persisted run.
+
+### Added
+
+- `src/research/report.py`
+  - `ResearchReport` dataclass with builders `from_run(run, result)` (DB row + reconstructed result; carries name / strategy / start / end / benchmark / status) and `from_result(result)` (stub fallback when only an in-memory result exists).
+  - `to_dict` / `to_json` (UTF-8, indented) / `to_markdown` / `to_html`. Markdown shows each metric as `中文标签 \`raw_key\`` (raw key + Chinese label, machine-referenceable). HTML is self-contained: metadata header, IS-vs-OOS diverging-bar SVG (walk-forward runs only; single-run reports have no chart), and per-window detail tables — no `http(s)://` references.
+  - `render_experiment_report(result)` stub entry point delegates to `ResearchReport.from_result(result).to_markdown()`.
+- `src/research/registry.py` — `load_result(run_id) -> ExperimentResult | None` reads `ExperimentMetric` + `ExperimentEquity` grouped by window; returns `None` when the run is missing.
+- `src/research/__init__.py` — export `ResearchReport` / `render_experiment_report`.
+- `main.py` — `research report <id> [--format markdown|json|html]` (default markdown) loads the run + result via the registry and prints the report; the `research show` command is unchanged.
+- `tests/test_research.py` — eight new 2.6 cases: markdown carries id + OOS flag + raw/bench keys; `render_experiment_report` stub; json round-trip; html self-contained + offline (no `<svg>` for single run); walk-forward report has IS/OOS section + SVG + IS-OOS decay; `load_result` DB round-trip (in-memory DB) feeding `from_run`; CLI `research report` for markdown / json / html (tmp DB).
+
+### Scope / non-goals
+
+- No ORM schema change, no new metric functions — only presentation + DB reconstruction.
+
 ## Sprint 2.5 — Walk-Forward / Out-of-Sample (2026-07-17)
 
 Sprint 2.5 fills the `src/research/walk_forward.py` stub with `WalkForwardSplitter`

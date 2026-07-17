@@ -30,6 +30,7 @@ from ranking.engine import RankingEngine
 from report.engine import ReportEngine
 from research.experiment import ExperimentConfig, WalkForwardSpec
 from research.registry import ExperimentRegistry
+from research.report import ResearchReport
 from scheduler import Scheduler, build_notifier
 from strategies.engine import StrategyEngine
 from universe.engine import UniverseEngine
@@ -924,6 +925,33 @@ def research_show(run_id: str) -> None:
     typer.echo(f"Notes:    {run.notes or '-'}")
     typer.echo("Config:")
     typer.echo(exp_cfg.model_dump_json(indent=2))
+
+
+@research_app.command("report")
+def research_report(
+    run_id: str,
+    format: str = typer.Option("markdown", "--format", help="markdown | json | html"),
+) -> None:
+    """Render a shareable report for an experiment (metrics + benchmark + OOS)."""
+    setup_logging()
+    reg = ExperimentRegistry()
+    run = reg.get(run_id)
+    if run is None:
+        typer.echo(f"run {run_id} not found", err=True)
+        raise typer.Exit(code=1)
+    result = reg.load_result(run_id)
+    if result is None:
+        typer.echo(f"run {run_id} has no results yet", err=True)
+        raise typer.Exit(code=1)
+
+    report = ResearchReport.from_run(run, result)
+    fmt = (format or "markdown").lower()
+    if fmt == "json":
+        typer.echo(report.to_json())
+    elif fmt == "html":
+        typer.echo(report.to_html())
+    else:
+        typer.echo(report.to_markdown())
 
 
 @research_app.command("delete")

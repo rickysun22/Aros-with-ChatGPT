@@ -39,6 +39,7 @@ from research.benchmark import BenchmarkEngine
 from research.experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from research.models import ExperimentEquity, ExperimentMetric
 from research.registry import ExperimentRegistry
+from research.report import ResearchReport, render_experiment_report
 from research.runner import ResearchRunner
 from research.walk_forward import WalkForwardFold, WalkForwardRunner, WalkForwardSplitter
 
@@ -1063,3 +1064,161 @@ def test_cli_research_run_walk_forward_dispatch(
     assert result.exit_code == 0, result.output
     assert calls.get("called") is True
     assert isinstance(calls.get("wf"), WalkForwardSpec)
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 2.6 -- research report (markdown / json / html) + load round-trip
+# --------------------------------------------------------------------------- #
+def _single_result(run_id: str = "exp_rpt") -> ExperimentResult:
+    return ExperimentResult(
+        run_id=run_id,
+        metrics={
+            "full": {
+                "total_return": 0.25,
+                "sharpe": 1.4,
+                "max_drawdown": -0.12,
+                "bench_excess_return": 0.05,
+                "bench_beta": 0.9,
+                "bench_alpha": 0.03,
+                "bench_tracking_error": 0.08,
+                "bench_information_ratio": 0.6,
+            }
+        },
+        equity={"full": {"2024-01-02": 100.0, "2024-01-03": 105.0}},
+        windows=["full"],
+    )
+
+
+def test_report_markdown_has_id_oos_flag_and_bench_columns() -> None:
+    rpt = ResearchReport.from_result(_single_result())
+    md = rpt.to_markdown()
+    assert "exp_rpt" in md
+    assert "样本外(OOS): 否" in md
+    # benchmark columns present (raw key + Chinese label)
+    assert "bench_excess_return" in md
+    assert "超额收益" in md
+    assert "bench_beta" in md
+    assert "bench_information_ratio" in md
+
+
+def test_render_experiment_report_stub_returns_markdown() -> None:
+    # The 2.0 stub entry point must still produce a valid markdown report.
+    md = render_experiment_report(_single_result())
+    assert "exp_rpt" in md
+    assert "样本外(OOS): 否" in md
+
+
+def test_report_json_roundtrip() -> None:
+    rpt = ResearchReport.from_result(_single_result())
+    d = json.loads(rpt.to_json())
+    assert d["run_id"] == "exp_rpt"
+    assert d["is_oos"] is False
+    assert d["metrics"]["full"]["bench_beta"] == pytest.approx(0.9)
+    assert d["metrics"]["full"]["total_return"] == pytest.approx(0.25)
+
+
+def test_report_html_self_contained_single_run() -> None:
+    rpt = ResearchReport.from_result(_single_result())
+    html = rpt.to_html()
+    # offline / self-contained: no external resource references
+    assert "http://" not in html and "https://" not in html
+    assert "exp_rpt" in html
+    # single-range run has no IS/OOS chart
+    assert "<svg" not in html
+
+
+def test_report_walk_forward_has_is_oos_section_and_svg() -> None:
+    result = ExperimentResult(
+        run_id="exp_wf_rpt",
+        metrics={
+            "is_agg": {"total_return": 0.20, "sharpe": 1.1, "bench_beta": 0.9},
+            "oos_agg": {"total_return": 0.10, "sharpe": 0.6, "bench_beta": 0.85},
+            "is_0": {"total_return": 0.20},
+            "oos_0": {"total_return": 0.10},
+        },
+        equity={},
+        windows=["is_0", "oos_0", "is_agg", "oos_agg"],
+    )
+    rpt = ResearchReport.from_result(result)
+    assert rpt.is_oos is True
+    md = rpt.to_markdown()
+    assert "样本外(OOS): 是" in md
+    assert "IS vs OOS" in md
+    assert "衰减" in md  # IS-OOS decay column
+    html = rpt.to_html()
+    assert "<svg" in html  # IS/OOS diverging bar chart present
+    assert "http" not in html  # still offline
+
+
+def test_registry_load_result_roundtrip() -> None:
+    session = _mem_session()
+    reg = ExperimentRegistry(session=session)
+    cfg = ExperimentConfig(
+        name="rptload",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2021-03-01",
+        codes=["600000"],
+        benchmark="csi300",
+    )
+    rid = reg.create("rptload", cfg.model_dump_json())
+    reg.record_metrics(rid, {"total_return": 0.15, "bench_beta": 0.9}, "full", False)
+    reg.record_equity(rid, {"2024-01-02": 100.0, "2024-01-03": 110.0}, "full", False)
+    reg.mark_done(rid)
+
+    loaded = reg.load_result(rid)
+    assert loaded is not None
+    assert loaded.windows == ["full"]
+    assert loaded.metrics["full"]["total_return"] == pytest.approx(0.15)
+    assert loaded.metrics["full"]["bench_beta"] == pytest.approx(0.9)
+    assert loaded.equity["full"]["2024-01-03"] == pytest.approx(110.0)
+
+    # from_run renders with the real DB metadata (name / benchmark / status)
+    run = reg.get(rid)
+    assert run is not None
+    rpt = ResearchReport.from_run(run, loaded)
+    assert rpt.name == "rptload"
+    assert rpt.benchmark == "csi300"
+    assert rpt.status == "done"
+    assert rpt.run_id == rid
+
+
+def test_cli_research_report_all_formats(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path / 'report.db'}")
+    reg = ExperimentRegistry()
+    cfg = ExperimentConfig(
+        name="rptcli",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2021-03-01",
+        codes=["600000"],
+        benchmark="csi300",
+    )
+    rid = reg.create("rptcli", cfg.model_dump_json())
+    reg.record_metrics(rid, {"total_return": 0.18, "bench_beta": 0.88}, "full", False)
+    reg.record_equity(rid, {"2024-01-02": 100.0}, "full", False)
+    reg.mark_done(rid)
+
+    md = _invoke(["research", "report", rid])
+    assert md.exit_code == 0, md.output
+    assert "exp_" in md.output
+    assert "样本外(OOS): 否" in md.output
+    assert "bench_beta" in md.output
+
+    js = _invoke(["research", "report", rid, "--format", "json"])
+    assert js.exit_code == 0, js.output
+    parsed = json.loads(js.output)
+    assert parsed["run_id"] == rid
+    assert parsed["metrics"]["full"]["bench_beta"] == pytest.approx(0.88)
+
+    htm = _invoke(["research", "report", rid, "--format", "html"])
+    assert htm.exit_code == 0, htm.output
+    assert "<html" in htm.output
+    assert "http" not in htm.output
+
+
+def test_cli_research_report_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path / 'report_nf.db'}")
+    out = _invoke(["research", "report", "exp_does_not_exist"])
+    assert out.exit_code == 1
+    assert "not found" in out.output

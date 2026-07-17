@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from core.database import Base, get_engine, get_sessionmaker
+from research.experiment import ExperimentResult
 from research.models import ExperimentEquity, ExperimentMetric, ExperimentRun
 
 
@@ -138,3 +139,43 @@ class ExperimentRegistry:
         run.status = status
         run.finished_at = datetime.now(UTC).replace(tzinfo=None)
         self.session.commit()
+
+    # ------------------------------------------------------------------ #
+    # Result reconstruction (Sprint 2.6) -- rebuild ExperimentResult from DB
+    # ------------------------------------------------------------------ #
+    def load_result(self, run_id: str) -> ExperimentResult | None:
+        """Reconstruct the :class:`ExperimentResult` persisted for ``run_id``.
+
+        Reads the long-form :class:`ExperimentMetric` rows and the JSON
+        :class:`ExperimentEquity` blobs grouped by window. Returns ``None`` when
+        the run is unknown (mirrors :meth:`get`). Window order is preserved by
+        first appearance across metric rows, then any equity-only windows.
+        """
+        if self.get(run_id) is None:
+            return None
+
+        metric_rows = self.session.query(ExperimentMetric).filter_by(run_id=run_id).all()
+        equity_rows = self.session.query(ExperimentEquity).filter_by(run_id=run_id).all()
+
+        raw_metrics: dict[str, dict[str, float | None]] = {}
+        equity: dict[str, dict[str, float]] = {}
+        windows: list[str] = []
+
+        def _add_window(w: str) -> None:
+            if w not in windows:
+                windows.append(w)
+
+        for m_row in metric_rows:
+            w = m_row.window or "full"
+            _add_window(w)
+            raw_metrics.setdefault(w, {})[m_row.metric_name] = m_row.value
+
+        for e_row in equity_rows:
+            w = e_row.window or "full"
+            _add_window(w)
+            equity[w] = {str(k): float(v) for k, v in json.loads(e_row.equity_json).items()}
+
+        metrics: dict[str, Mapping[str, float | None]] = {
+            w: raw_metrics[w] for w in windows if w in raw_metrics
+        }
+        return ExperimentResult(run_id=run_id, metrics=metrics, equity=equity, windows=windows)

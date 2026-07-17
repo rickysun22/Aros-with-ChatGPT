@@ -17,6 +17,7 @@ from .benchmark import BenchmarkComparison, BenchmarkEngine
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
 from .registry import ExperimentRegistry
+from .report import ResearchReport, render_experiment_report
 from .runner import ResearchRunner
 from .walk_forward import WalkForwardFold, WalkForwardRunner, WalkForwardSplitter
 
@@ -34,4 +35,6 @@ __all__ = [
     "WalkForwardSplitter",
     "WalkForwardRunner",
     "WalkForwardFold",
+    "ResearchReport",
+    "render_experiment_report",
 ]
