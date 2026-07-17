@@ -2,6 +2,52 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.1 — Strategy Library (2026-07-17)
+
+Implements the 10 research strategies from Phase 3 design §7, each as a
+:class:`ResearchStrategy` pairing the frozen `ResearchStrategySpec` contract
+(D1–D5, D7) with a *pure, explainable* entry-signal generator. Per design
+invariant: every signal at day T uses only data <= T (no look-ahead, no
+leakage); logic is a small explicit rule set (no ML); output is a per-code,
+per-date boolean `entry` signal feeding `EventBacktest` (T-day signal → T+1
+open fill). The 3.1 `run_strategy` helper runs **every** strategy through
+`EventBacktest` so all 10 share one comparable metric set (uniform V1.0
+research); `portfolio`-engine strategies additionally expose `score()` for the
+3.2 cross-sectional Top-N BatchRunner.
+
+### Added
+
+- `src/research/strategy_library.py` — the 10-strategy library, split by the
+  D8 data-trust batches:
+  - **Batch 1 (daily_full, high-confidence):** `ma_bull` 均线多头 (portfolio
+    engine, MA cross + volume filter + Top-N), `high_breakout` 新高突破,
+    `volume_breakout` 放量突破, `strong_pullback` 强势回踩, `leader_first_down`
+    龙头首阴.
+  - **Batch 2 (daily_approx):** `shrink_reversal` 缩量反包, `first_board` 首板,
+    `second_board_relay` 二板接力 (board-specific limit rates land in 3.2).
+  - **Batch 3 (needs_intraday, daily-approx research only — flagged as
+    reference):** `high_board` 连板博弈, `sentiment_rebound` 情绪冰点修复 (uses
+    an optional market-breadth index gate; intraday behaviour is out of scope
+    and clearly marked).
+  - Shared indicator helpers (`sma`, `is_limit_up` proxy at 9.5% close-to-prev
+    close, `vol_ratio`); a module-level `STRATEGIES` registry; `get_strategy` /
+    `list_strategies` / `run_strategy` entry points. Limit-up detection is a
+    9.5% main-board proxy (board-specific 10%/20%/5% rates refined in 3.2).
+- `tests/test_strategy_library.py` — 13 tests: every strategy's rule fires on
+  crafted data; a no-look-ahead test pins "no entry before data exists"; the
+  registry + `run_strategy` are wired; `ma_bull` runs the cross-sectional
+  Top-N path. Two rules hardened during review: `strong_pullback` now requires
+  a *recent shrinking-volume pullback* (not a low-volume relaunch day), and
+  `shrink_reversal` uses the standard bullish-engulfing definition (close >=
+  prior open, open <= prior close) instead of a gap-required one.
+
+### Changed
+
+- `src/research/__init__.py` — import `strategy_library` to trigger registration
+  and export `ResearchStrategy`, `STRATEGIES`, `get_strategy`, `list_strategies`,
+  `run_strategy` (the 3.1 strategy-instance API; the 3.0 contract-level
+  `get_strategy` remains reachable via `research.strategy_spec`).
+
 ## Sprint 3.0 — Strategy Research Framework (2026-07-17)
 
 Phase 3 foundation (the "地基" everything else builds on). Implements the

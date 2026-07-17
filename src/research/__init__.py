@@ -20,13 +20,18 @@ from .registry import ExperimentRegistry
 from .report import ResearchReport, render_experiment_report
 from .runner import ResearchRunner
 from .scorecard import Scorecard, ScoreInput, ScoreRow
+from .strategy_library import (
+    STRATEGIES,
+    ResearchStrategy,
+    get_strategy,
+    list_strategies,
+    run_strategy,
+)
 from .strategy_spec import (
     ResearchStrategySpec,
     StrategySpec,
     UniverseResolver,
     clear_registry,
-    get_strategy,
-    list_strategies,
     register_strategy,
 )
 from .walk_forward import WalkForwardFold, WalkForwardRunner, WalkForwardSplitter
@@ -57,4 +62,7 @@ __all__ = [
     "get_strategy",
     "list_strategies",
     "clear_registry",
+    "ResearchStrategy",
+    "STRATEGIES",
+    "run_strategy",
 ]
