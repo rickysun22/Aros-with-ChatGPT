@@ -32,7 +32,10 @@ _BASE_SPEC = ResearchStrategySpec(
 
 
 def _spec(**kw: object) -> ResearchStrategySpec:
-    return _BASE_SPEC.model_copy(update=kw)  # type: ignore[arg-type]
+    """Build a spec from the base + overrides; runs full Pydantic validation."""
+    d = _BASE_SPEC.model_dump()
+    d.update(kw)  # type: ignore[arg-type]
+    return ResearchStrategySpec.model_validate(d)
 
 
 def test_alias_resolves() -> None:
