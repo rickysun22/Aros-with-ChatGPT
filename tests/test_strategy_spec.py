@@ -22,17 +22,17 @@ from research.strategy_spec import (
     register_strategy,
 )
 
+_BASE_SPEC = ResearchStrategySpec(
+    name="trend_ma",
+    display_name="均线多头",
+    category="trend",
+    engine="portfolio",
+    universe="csi800",
+)
 
-def _spec(**kw) -> ResearchStrategySpec:
-    base = dict(
-        name="trend_ma",
-        display_name="均线多头",
-        category="trend",
-        engine="portfolio",
-        universe="csi800",
-    )
-    base.update(kw)
-    return ResearchStrategySpec(**base)
+
+def _spec(**kw: object) -> ResearchStrategySpec:
+    return _BASE_SPEC.model_copy(update=kw)  # type: ignore[arg-type]
 
 
 def test_alias_resolves() -> None:
