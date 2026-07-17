@@ -2,6 +2,48 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.2 — Batch Strategy Experiment (2026-07-18)
+
+Traverses **策略 × 冻结 ExperimentConfig × walk-forward** and persists every
+strategy as its own reproducible :class:`ExperimentRun`. Reuses the 2.5
+walk-forward machinery and the 3.1 uniform `EventBacktest` path so all 10
+strategies land in one comparable metric set (portfolio metrics +
+``bench_*`` relative metrics via :class:`BenchmarkEngine`).
+
+### Added
+
+- `src/research/batch.py` — `BatchRunner` (per-strategy walk-forward over the
+  frozen `ExperimentConfig`), `BatchResult` / `StrategyBatchOutcome` dataclasses.
+  Injectable `price_provider` / `benchmark_provider` / `benchmark_engine` so the
+  runner is exercisable end-to-end on synthetic data (no DB / no network).
+  One `ExperimentRun` per strategy (``{config.name}:{strategy}``) →
+  :meth:`ExperimentRegistry.load_result` reproduces it exactly. D7 universe
+  binding: codes come from `UniverseResolver` reading each strategy's own
+  `universe` (csi800 / all_a / custom), never a global pool. No look-ahead: the
+  benchmark is capped at the strategy's own last equity date (mirrors
+  `ResearchRunner`); the event engine also reindexes the benchmark to traded
+  dates. Optional regime robustness: each trade is tagged by the market regime
+  on its entry date (`regime.py`) and aggregated per regime without re-running.
+- `src/research/regime.py` — `classify_regime(benchmark_close)` returns an
+  explainable Bull / Neutral / Bear / Extreme label per date from momentum,
+  realised volatility and drawdown (no model, no look-ahead). Used for the
+  batch sub-period stability read.
+- `src/research/__init__.py` — exports `BatchRunner`, `BatchResult`,
+  `classify_regime`, `REGIMES`, `NEUTRAL`.
+- Tests: `tests/test_batch.py` (8 — batch run + persistence + `load_result`
+  reproducibility + regime breakdown + single-window + all_a resolution via
+  `data_manager` + `run_all` 10 strategies + bench_* merge via injected engine +
+  unknown-strategy guard), `tests/test_regime.py` (9 — Bull/Bear/Extreme labels,
+  no-look-ahead, empty input, warmup default). Four gates green.
+
+### Notes
+
+- `EventBacktest` reindexes the benchmark to the traded dates, so passing the
+  full fold benchmark to `run_strategy` never leaks future data.
+- D6 point-in-time constituents: still resolved through `UniverseResolver`; a
+  real historical-constituent feed is wired when the data layer exposes it
+  (the runner already passes `as_of` = fold end to the resolver).
+
 ## Sprint 3.1 — Strategy Library (2026-07-17)
 
 Implements the 10 research strategies from Phase 3 design §7, each as a

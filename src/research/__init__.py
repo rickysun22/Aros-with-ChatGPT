@@ -13,9 +13,11 @@ never duplicated into this package. This mirror-free rule is the reuse map from
 ``Phase2-Research-Engine-Revision.md``; do not re-add a metrics module here.
 """
 
+from .batch import BatchResult, BatchRunner
 from .benchmark import BenchmarkComparison, BenchmarkEngine
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
+from .regime import NEUTRAL, REGIMES, classify_regime
 from .registry import ExperimentRegistry
 from .report import ResearchReport, render_experiment_report
 from .runner import ResearchRunner
@@ -55,6 +57,11 @@ __all__ = [
     "Scorecard",
     "ScoreInput",
     "ScoreRow",
+    "BatchRunner",
+    "BatchResult",
+    "classify_regime",
+    "REGIMES",
+    "NEUTRAL",
     "ResearchStrategySpec",
     "StrategySpec",
     "UniverseResolver",
