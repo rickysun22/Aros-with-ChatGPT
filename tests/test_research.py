@@ -19,6 +19,7 @@ import json
 import os
 import re
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -35,10 +36,11 @@ from data.manager import DataManager
 from data.models import IndexBar
 from data.provider import normalize_index_daily
 from research.benchmark import BenchmarkEngine
-from research.experiment import ExperimentConfig
+from research.experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from research.models import ExperimentEquity, ExperimentMetric
 from research.registry import ExperimentRegistry
 from research.runner import ResearchRunner
+from research.walk_forward import WalkForwardFold, WalkForwardRunner, WalkForwardSplitter
 
 
 # --------------------------------------------------------------------------- #
@@ -818,3 +820,246 @@ def test_cli_research_run_dry_run(tmp_path, monkeypatch: pytest.MonkeyPatch) -> 
     # Nothing persisted: dry-run never calls the runner.
     lst = _invoke(["research", "list"])
     assert "No experiments yet." in lst.output
+
+
+# --------------------------------------------------------------------------- #
+# Sprint 2.5 -- walk-forward / out-of-sample splitting + orchestration
+# --------------------------------------------------------------------------- #
+def _window_grid(start: date, end: date, periods: int = 5) -> list[date]:
+    """Deterministic date grid shared by the fake equity and benchmark so the
+    two series align within every fold window."""
+    ts = pd.date_range(pd.Timestamp(start), pd.Timestamp(end), periods=periods)
+    return [d.date() for d in ts]
+
+
+class FakeWFDataManager:
+    """Benchmark source that synthesizes bars on the *same* grid the fake
+    portfolio uses, capped at ``as_of`` exactly like the real
+    :class:`DataManager` (so the per-window no-look-ahead ceiling holds)."""
+
+    def __init__(self) -> None:
+        self.config = get_config()
+
+    def get_index_daily(
+        self,
+        code: str,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        as_of: date | None = None,
+    ) -> pd.DataFrame:
+        s = pd.Timestamp(start_date) if start_date is not None else pd.Timestamp("2000-01-01")
+        e = pd.Timestamp(as_of) if as_of is not None else pd.Timestamp(end_date or s)
+        grid = pd.date_range(s, e, periods=5)
+        closes = [100.0 + float(i) for i in range(len(grid))]
+        return pd.DataFrame({"date": [d.date() for d in grid], "close": closes}).reset_index(
+            drop=True
+        )
+
+
+def _wf_portfolio_fn(ret_by_year: dict[int, float]):
+    """Window-aware portfolio seam: a deterministic, year-keyed total return."""
+
+    def _fn(codes: list[str], dm: Any, start: date, end: date) -> PortfolioResult:
+        grid = _window_grid(start, end)
+        ret = ret_by_year.get(start.year, 0.10)
+        vals = [100.0 * (1.0 + ret) ** (i / (len(grid) - 1)) for i in range(len(grid))]
+        return PortfolioResult(
+            equity=_pe(vals, grid),
+            metrics={},
+            selections=[],
+            trades=pd.DataFrame(),
+        )
+
+    return _fn
+
+
+def _wf_runner_for(ret_by_year: dict[int, float]) -> WalkForwardRunner:
+    dm = FakeWFDataManager()
+    return WalkForwardRunner(
+        data_manager=dm,
+        portfolio_fn=_wf_portfolio_fn(ret_by_year),
+        benchmark_engine=BenchmarkEngine(dm),
+        config=get_config(),
+    )
+
+
+def test_wf_split_basic() -> None:
+    spec = WalkForwardSpec(train_years=1, test_years=1, step_years=1)
+    folds = WalkForwardSplitter().split(spec, "2021-01-01", "2024-12-31")
+    # 2021->2022(is)+2022->2023(oos); 2022->2023(is)+2023->2024(oos); 3rd
+    # cursor would need test ending 2025-01-01 > range => dropped.
+    assert len(folds) == 2
+    assert [f.index for f in folds] == [0, 1]
+    # Core no-look-ahead boundary: OOS starts exactly where training ends.
+    assert folds[0].test_start == folds[0].train_end == "2022-01-01"
+    assert folds[1].test_start == folds[1].train_end == "2023-01-01"
+    # Step advances the cursor by step_years (not train+test).
+    assert folds[1].train_start == "2022-01-01"
+    assert all(isinstance(f, WalkForwardFold) for f in folds)
+
+
+def test_wf_split_too_short() -> None:
+    spec = WalkForwardSpec(train_years=2, test_years=2, step_years=2)
+    # Range of 3 years < 4 required => no folds.
+    assert WalkForwardSplitter().split(spec, "2021-01-01", "2023-12-31") == []
+
+
+def test_wf_split_leap_safe() -> None:
+    # Starting on 2020-02-29 (leap day) + 1 year must not raise and must land
+    # on 2021-02-28 (DateOffset, not date.replace).
+    spec = WalkForwardSpec(train_years=1, test_years=1, step_years=1)
+    folds = WalkForwardSplitter().split(spec, "2020-02-29", "2022-12-31")
+    assert folds, "leap-year start should still produce folds"
+    assert folds[0].train_start == "2020-02-29"
+    assert folds[0].train_end == "2021-02-28"
+    assert folds[0].test_start == folds[0].train_end
+    assert folds[0].test_end == "2022-02-28"
+
+
+def test_wf_runner_e2e_windows_and_persist() -> None:
+    ret = {2021: 0.10, 2022: 0.20, 2023: 0.30}
+    runner = _wf_runner_for(ret)
+    cfg = ExperimentConfig(
+        name="wf",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2024-01-01",
+        codes=["600000"],
+        benchmark="csi300",
+        metrics=["total_return"],
+        walk_forward=WalkForwardSpec(train_years=1, test_years=1, step_years=1),
+    )
+    session = _mem_session()
+    result = runner.run(cfg, session=session)
+
+    # Six windows: is_0, oos_0, is_1, oos_1, is_agg, oos_agg.
+    assert set(result.windows) == {"is_0", "oos_0", "is_1", "oos_1", "is_agg", "oos_agg"}
+    for w in ("is_0", "oos_0", "is_1", "oos_1", "is_agg", "oos_agg"):
+        assert w in result.metrics
+        assert "bench_beta" in result.metrics[w]  # benchmark metrics always attached
+
+    # Each fold equity curve was recorded.
+    for w in ("is_0", "oos_0", "is_1", "oos_1"):
+        assert result.equity[w], f"fold {w} should have an equity curve"
+
+    # Persistence: run marked done; aggregate rows recorded.
+    reg = ExperimentRegistry(session=session)
+    run = reg.get(result.run_id)
+    assert run is not None and run.status == "done"
+    agg_rows = (
+        session.query(ExperimentMetric).filter_by(run_id=result.run_id, window="is_agg").all()
+    )
+    assert agg_rows, "is_agg metrics should be persisted"
+    oos_agg_rows = (
+        session.query(ExperimentMetric)
+        .filter_by(run_id=result.run_id, window="oos_agg", is_oos=True)
+        .all()
+    )
+    assert oos_agg_rows, "oos_agg metrics should be persisted with is_oos=True"
+
+
+def test_wf_runner_aggregation() -> None:
+    # Year-keyed returns: is_0(2021)=10%, oos_0(2022)=20%, is_1(2022)=20%, oos_1(2023)=30%
+    ret = {2021: 0.10, 2022: 0.20, 2023: 0.30}
+    runner = _wf_runner_for(ret)
+    cfg = ExperimentConfig(
+        name="wfagg",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2024-01-01",
+        codes=["600000"],
+        benchmark="csi300",
+        metrics=["total_return"],
+        walk_forward=WalkForwardSpec(train_years=1, test_years=1, step_years=1),
+    )
+    result = runner.run(cfg, session=_mem_session())
+
+    # total_return is exactly the synthetic per-window return.
+    assert result.metrics["is_0"]["total_return"] == pytest.approx(0.10, abs=1e-9)
+    assert result.metrics["is_1"]["total_return"] == pytest.approx(0.20, abs=1e-9)
+    assert result.metrics["oos_0"]["total_return"] == pytest.approx(0.20, abs=1e-9)
+    assert result.metrics["oos_1"]["total_return"] == pytest.approx(0.30, abs=1e-9)
+
+    # Aggregates are the per-metric mean over IS folds / OOS folds.
+    assert result.metrics["is_agg"]["total_return"] == pytest.approx((0.10 + 0.20) / 2, abs=1e-9)
+    assert result.metrics["oos_agg"]["total_return"] == pytest.approx((0.20 + 0.30) / 2, abs=1e-9)
+
+
+def test_wf_runner_range_too_short_raises() -> None:
+    runner = _wf_runner_for({2021: 0.1})
+    cfg = ExperimentConfig(
+        name="wftooshort",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2022-01-01",  # only 1 year < train(1)+test(1)
+        codes=["600000"],
+        benchmark="csi300",
+        metrics=["total_return"],
+        walk_forward=WalkForwardSpec(train_years=1, test_years=1, step_years=1),
+    )
+    with pytest.raises(DataError):
+        runner.run(cfg, session=_mem_session())
+
+
+def test_wf_runner_no_spec_delegates_to_single() -> None:
+    # walk_forward=None must transparently delegate to the single-range runner.
+    runner = _wf_runner_for({2021: 0.1})
+    cfg = ExperimentConfig(
+        name="wfsingle",
+        strategy="weighted_momentum",
+        start="2021-01-01",
+        end="2021-03-01",
+        codes=["600000"],
+        benchmark="csi300",
+        metrics=["total_return"],
+        walk_forward=None,
+    )
+    result = runner.run(cfg, session=_mem_session())
+    assert result.windows == ["full"]
+    assert "full" in result.metrics
+    assert "bench_beta" in result.metrics["full"]
+
+
+def test_cli_research_run_walk_forward_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path / 'wf_cli.db'}")
+    calls: dict[str, object] = {}
+
+    class FakeWF:
+        def run(self, cfg: ExperimentConfig, session: Any = None, notes: str | None = None):
+            calls["called"] = True
+            calls["wf"] = cfg.walk_forward
+            return ExperimentResult(
+                run_id="exp_wf",
+                metrics={"is_agg": {}, "oos_agg": {}},
+                equity={},
+                windows=["is_agg", "oos_agg"],
+            )
+
+    # main imports WalkForwardRunner lazily inside research_run, so patching the
+    # module attribute routes the dispatch to our fake (no real data needed).
+    monkeypatch.setattr("research.walk_forward.WalkForwardRunner", FakeWF)
+    result = _invoke(
+        [
+            "research",
+            "run",
+            "--name",
+            "wfcli",
+            "--strategy",
+            "weighted_momentum",
+            "--start",
+            "2021-01-01",
+            "--end",
+            "2024-01-01",
+            "--codes",
+            "600000",
+            "--walk-forward",
+            "1",
+            "1",
+            "1",
+        ]
+    )
+    assert result.exit_code == 0, result.output
+    assert calls.get("called") is True
+    assert isinstance(calls.get("wf"), WalkForwardSpec)

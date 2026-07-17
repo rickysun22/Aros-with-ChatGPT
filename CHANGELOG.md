@@ -2,6 +2,35 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 2.5 — Walk-Forward / Out-of-Sample (2026-07-17)
+
+Sprint 2.5 fills the `src/research/walk_forward.py` stub with `WalkForwardSplitter`
+(date-only rolling-window arithmetic) and `WalkForwardRunner` (rolling OOS
+orchestration). The runner reuses the entire 2.4 pipeline through a new
+`ResearchRunner._execute_window` seam, so the backtest / metric / benchmark /
+persist logic is written exactly once. No new metric math, no ORM schema change.
+
+### Added
+
+- `src/research/walk_forward.py`
+  - `WalkForwardFold` dataclass (`index`, `train_start`, `train_end`, `test_start`, `test_end`; all `YYYY-MM-DD` strings).
+  - `WalkForwardSplitter.split(spec, start, end) -> list[WalkForwardFold]` — pure `pd.DateOffset(years=N)` arithmetic (leap-day safe, never `date.replace`). A fold is included only when its *whole* test window fits inside `[start, end]`; the OOS window starts exactly where training ends (`test_start == train_end`) — the core no-look-ahead boundary. Returns `[]` when the range is shorter than `train + test`.
+  - `WalkForwardRunner(config, session, notes)` — builds one `run_id`, computes IS (`is_<i>`) and OOS (`oos_<i>`) folds, then aggregates `is_agg` / `oos_agg` (per-metric mean over IS folds / OOS folds; `None`/`non-finite` skipped). `walk_forward=None` transparently delegates to `ResearchRunner` (single `"full"` window).
+- `src/research/runner.py` — extract `ResearchRunner._execute_window(config, session, *, window, run_id, is_oos) -> ExperimentResult` from `run()`. `run()` now creates the run and delegates the single `"full"` window to it; the public signature is unchanged.
+- `src/research/__init__.py` — export `WalkForwardSplitter` / `WalkForwardRunner` / `WalkForwardFold`.
+- `main.py` — `research run` transparently dispatches to `WalkForwardRunner` when `--walk-forward TRAIN TEST STEP` is supplied; prints IS vs OOS aggregates side by side. Single-range runs are unchanged.
+- `tests/test_research.py` — eight new walk-forward cases: splitter correctness + `test_start == train_end` boundary; too-short range ⇒ no folds; leap-year start (`2020-02-29` → `2021-02-28`); e2e produces the 6 windows and persists aggregates (`oos_agg` with `is_oos=True`); aggregation is the per-metric mean; range too short ⇒ `DataError`; `walk_forward=None` delegates to the single runner; CLI dispatch routes `--walk-forward` to `WalkForwardRunner`.
+
+### No-look-ahead (double guarantee)
+
+1. **Window isolation** — each fold runs on a `config.model_copy` bounded to that fold's `[start, end]`; the OOS fold's `start == train_end`, so it can never consume train-window data.
+2. **Within-window ceiling** — `_execute_window` keeps the 2.4 `as_of` ceiling: the benchmark is capped at the portfolio's *own* last date inside the fold, so a later benchmark bar never leaks into the fold's metrics.
+
+### Scope / non-goals
+
+- Report rendering (2.6) is still untouched.
+- No ORM schema change, no new metric functions — only splitting + orchestration + persistence.
+
 ## Sprint 2.4 — Research Runner (2026-07-17)
 
 Sprint 2.4 fills the `src/research/runner.py` stub with `ResearchRunner`, the

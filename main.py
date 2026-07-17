@@ -867,14 +867,28 @@ def research_run(
         return
 
     from research.runner import ResearchRunner
+    from research.walk_forward import WalkForwardRunner
 
-    result = ResearchRunner().run(exp_cfg, notes=notes)
-    m = result.metrics.get("full", {})
-    typer.echo(f"Run {result.run_id} complete (name={exp_cfg.name!r})")
-    typer.echo(f"  total_return      : {m.get('total_return')}")
-    typer.echo(f"  sharpe            : {m.get('sharpe')}")
-    typer.echo(f"  bench_excess_return: {m.get('bench_excess_return')}")
-    typer.echo(f"  bench_beta        : {m.get('bench_beta')}")
+    if exp_cfg.walk_forward is not None:
+        # Transparent dispatch to the walk-forward runner (Sprint 2.5).
+        result = WalkForwardRunner().run(exp_cfg, notes=notes)
+        is_agg = result.metrics.get("is_agg", {})
+        oos_agg = result.metrics.get("oos_agg", {})
+        folds = len(result.windows) // 2
+        typer.echo(
+            f"Run {result.run_id} complete (name={exp_cfg.name!r}, walk-forward, {folds} folds)"
+        )
+        for key in ("total_return", "sharpe", "bench_excess_return", "bench_beta"):
+            typer.echo(f"  IS  {key:<18}: {is_agg.get(key)}")
+            typer.echo(f"  OOS {key:<18}: {oos_agg.get(key)}")
+    else:
+        result = ResearchRunner().run(exp_cfg, notes=notes)
+        m = result.metrics.get("full", {})
+        typer.echo(f"Run {result.run_id} complete (name={exp_cfg.name!r})")
+        typer.echo(f"  total_return      : {m.get('total_return')}")
+        typer.echo(f"  sharpe            : {m.get('sharpe')}")
+        typer.echo(f"  bench_excess_return: {m.get('bench_excess_return')}")
+        typer.echo(f"  bench_beta        : {m.get('bench_beta')}")
 
 
 @research_app.command("list")

@@ -36,6 +36,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **2.2** | Metrics Extension | completed | Five metrics added into `src/backtest/metrics.py` dispatcher (no new module): `profit_factor` / `calmar` / `avg_holding_days` / `max_consecutive_losses` / `exposure`; 10 hand-checked unit tests; `compute_metrics` signature unchanged |
 | **2.3** | Benchmark Comparison | completed | `BenchmarkEngine.compare(...)` → typed `BenchmarkComparison` with `excess_return` / `alpha` / `beta` / `tracking_error` / `information_ratio` on the inner-joined window; benchmark bars via `DataManager.get_index_daily` (`as_of` no-look-ahead, default = portfolio end); `_daily_returns` promoted to public `daily_returns` (reused, no duplicated math); `IndexDataSource` Protocol for injectable data; 6 unit tests (β=1/β=0/hand-values/no-look-ahead/missing→`DataError`/unknown key→`ConfigError`); no ORM/CLI change |
 | **2.4** | Research Runner | completed | `ResearchRunner.run(...)` orchestrates resolve-candidates → portfolio backtest → `compute_metrics` → `BenchmarkEngine.compare` → persist → `ExperimentResult`; `portfolio_fn` injection seam (default `PortfolioBacktest.from_config`); 3 registry helpers `record_metrics`/`record_equity`/`mark_done` (non-finite→`None`, equity as `{date:value}` JSON, tz-aware `finished_at`); benchmark metrics stored under `bench_` prefix; no-look-ahead capped at portfolio's own last date; `research run` CLI reuses 2.1 config helper; 6 new tests (e2e persist + hand-checked bench metrics / no-look-ahead / missing→`DataError` / unknown key→`ConfigError` / empty candidates→`DataError` / CLI dry-run); 213 passed, 1 skipped; no ORM schema change, no new metric math |
+| **2.5** | Walk-Forward / OOS | completed | `WalkForwardSplitter.split(spec, start, end)` rolling IS/OOS windows via `pd.DateOffset` (leap-safe; OOS `test_start == train_end` no-look-ahead boundary; too-short range ⇒ `[]`); `WalkForwardRunner.run(...)` reuses the 2.4 pipeline via a new `ResearchRunner._execute_window` seam — one `run_id`, `is_<i>`/`oos_<i>` folds, aggregated `is_agg`/`oos_agg` (per-metric mean, `None`/non-finite skipped); `walk_forward=None` delegates to `ResearchRunner`; `research run --walk-forward TRAIN TEST STEP` prints IS vs OOS aggregates; double no-look-ahead guarantee (window isolation + within-window `as_of` ceiling); 8 new tests; no ORM schema change, no new metric math |
 
 ## Principles (non-negotiable)
 
@@ -47,7 +48,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 ## Next up
 
-Sprints 1.1–1.16 **and Sprints 2.0–2.4** are complete and on `main`; all four
+Sprints 1.1–1.16 **and Sprints 2.0–2.5** are complete and on `main`; all four
 quality gates (ruff / black / mypy / pytest) are green locally. Sprint 2.0 landed
 the **Phase 2 foundation** — index/benchmark data through `DataManager` and
 experiment-result persistence on `core.database` — Sprint 2.1 added the
@@ -55,11 +56,13 @@ experiment-result persistence on `core.database` — Sprint 2.1 added the
 `src/backtest/metrics.py` with five new metrics (no new module), Sprint 2.3
 filled the `benchmark.py` stub with `BenchmarkEngine.compare(...)` producing
 `excess_return` / `alpha` / `beta` / `tracking_error` / `information_ratio`
-(no-look-ahead via `as_of`, `daily_returns` reused — no duplicated math), and
-Sprint 2.4 chained those engines into `ResearchRunner.run(...)` + the `research
-run` CLI, persisting the benchmark comparison into `ExperimentMetric` (no new
-metric math, no ORM schema change). The reconciled Phase 2 plan (aligned to
-1.16) remains in `Phase2-Research-Engine-Revision.md` and `Phase2-Implementation-Plan.md`
-(single source of truth). Next up is **Sprint 2.5+**: walk-forward / out-of-sample
-validation (2.5) and the research report (2.6) — currently `NotImplementedError`
-stubs in `src/research/` (`walk_forward.py` / `report.py`).
+(no-look-ahead via `as_of`, `daily_returns` reused — no duplicated math), Sprint
+2.4 chained those engines into `ResearchRunner.run(...)` + the `research run` CLI
+(no new metric math, no ORM schema change), and Sprint 2.5 added rolling
+walk-forward / out-of-sample validation via `WalkForwardSplitter` +
+`WalkForwardRunner` (reusing the 2.4 pipeline through a new `_execute_window`
+seam; `is_agg`/`oos_agg` aggregation; `research run --walk-forward TRAIN TEST STEP`
+prints IS vs OOS side by side). The reconciled Phase 2 plan (aligned to 1.16)
+remains in `Phase2-Research-Engine-Revision.md` and `Phase2-Implementation-Plan.md`
+(single source of truth). Next up is **Sprint 2.6**: the research report
+(`report.py`) — currently a `NotImplementedError` stub in `src/research/`.

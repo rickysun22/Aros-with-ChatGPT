@@ -104,7 +104,36 @@ class ResearchRunner:
         session: Any = None,
         notes: str | None = None,
     ) -> ExperimentResult:
-        """Execute ``config`` end to end, persist, and return the result."""
+        """Execute ``config`` end to end, persist, and return the result.
+
+        Public behaviour is unchanged from 2.4 (a single ``"full"`` window).
+        The per-window work now lives in :meth:`_execute_window` so the
+        walk-forward runner can reuse it without duplicating the
+        backtest/metric/benchmark/persist logic.
+        """
+        reg = ExperimentRegistry(session)
+        run_id = reg.create(name=config.name, config_json=config.model_dump_json(), notes=notes)
+        result = self._execute_window(config, session, window="full", run_id=run_id, is_oos=False)
+        reg.mark_done(run_id)
+        return result
+
+    def _execute_window(
+        self,
+        config: ExperimentConfig,
+        session: Any,
+        *,
+        window: str,
+        run_id: str,
+        is_oos: bool,
+    ) -> ExperimentResult:
+        """Run one window of ``config`` and persist it under ``window``/``is_oos``.
+
+        Identical to the former ``run()`` body (steps 1-6) except it does NOT
+        create the run (``run_id`` is passed in) and does NOT call
+        ``mark_done`` -- the caller owns lifecycle. Used directly by
+        :class:`~research.walk_forward.WalkForwardRunner` for each IS/OOS fold.
+        Returns the result keyed by ``window``.
+        """
         cfg = self._config
 
         # 1. Resolve candidates (universe pool XOR explicit codes).
@@ -167,21 +196,19 @@ class ResearchRunner:
             as_of=str(as_of_date),
         )
 
-        # 6. Persist (all ORM writes go through the registry).
+        # 6. Persist this window (all ORM writes go through the registry).
         bench_metrics = {f"bench_{k}": v for k, v in bench.to_dict().items()}
         equity_dict = _equity_to_dict(equity)
         reg = ExperimentRegistry(session)
-        run_id = reg.create(name=config.name, config_json=config.model_dump_json(), notes=notes)
-        reg.record_metrics(run_id, portfolio_metrics, "full", False)
-        reg.record_metrics(run_id, bench_metrics, "full", False)
-        reg.record_equity(run_id, equity_dict, "full", False)
-        reg.mark_done(run_id)
+        reg.record_metrics(run_id, portfolio_metrics, window, is_oos)
+        reg.record_metrics(run_id, bench_metrics, window, is_oos)
+        reg.record_equity(run_id, equity_dict, window, is_oos)
 
-        # 7. Return the typed result keyed by window "full" (2.5 slots OOS in).
+        # 7. Return the typed result keyed by ``window`` (2.5 slots OOS in).
         combined = {**portfolio_metrics, **bench_metrics}
         return ExperimentResult(
             run_id=run_id,
-            metrics={"full": combined},
-            equity={"full": equity_dict},
-            windows=["full"],
+            metrics={window: combined},
+            equity={window: equity_dict},
+            windows=[window],
         )
