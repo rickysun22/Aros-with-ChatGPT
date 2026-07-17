@@ -10,6 +10,7 @@ Public surface:
 from .cache import BacktestCache
 from .cost import CostModel
 from .engine import BacktestEngine
+from .event import EventBacktest, EventResult
 from .metrics import compute_metrics
 from .portfolio import PortfolioBacktest, PortfolioResult
 
@@ -20,4 +21,6 @@ __all__ = [
     "BacktestCache",
     "PortfolioBacktest",
     "PortfolioResult",
+    "EventBacktest",
+    "EventResult",
 ]

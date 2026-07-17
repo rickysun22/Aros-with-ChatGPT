@@ -2,6 +2,57 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.0 — Strategy Research Framework (2026-07-17)
+
+Phase 3 foundation (the "地基" everything else builds on). Implements the
+frozen Phase 3 design (🟢 Design Approved, `docs/Phase3-Technical-Design.md`):
+the **Strategy Contract**, an **event-driven backtest engine** that coexists
+with the 1.16 portfolio engine, and the **AROS Strategy Score** skeleton. No
+strategy code yet — only standards + substrate. Three red-line gaps from the
+design are honestly addressed: daily-only data, portfolio-only backtest, and
+no broker interface.
+
+### Added
+
+- `src/research/strategy_spec.py` — the Phase 3 **Strategy Contract**
+  (`ResearchStrategySpec`, alias `StrategySpec`): `category` (trend/strong/emotion),
+  `engine` (portfolio/event), `universe` (csi800/all_a/custom, D7), holding
+  period, entry/exit rules, `risk_control`, and `data_fidelity` (daily_full /
+  daily_approx / needs_intraday, D3). Ships an in-process strategy registry
+  (`register_strategy` / `get_strategy` / `list_strategies`) and a
+  `UniverseResolver` whose `csi800` path **refuses an empty/undefined pool** to
+  block the survivor-ship bias D6 forbids (the point-in-time constituent fetch
+  itself lands in 3.2). Does not touch the 2.0 frozen `ExperimentConfig`.
+- `src/backtest/event.py` — `EventBacktest` (constraint B answer): T-day close
+  signal → **T+1 open entry**, position held until stop-loss / take-profit /
+  max-holding-days expiry → **close exit** (daily approximation). Reuses the
+  existing `CostModel` and `compute_metrics` exactly (no new metric math), so
+  `event`-engine strategies emit the same metric set as `portfolio`-engine ones
+  and are directly comparable. Equity is a cost-aware cash + mark-to-market book
+  capped at `max_positions`; a no-look-ahead test pins "no position on day 0".
+- `src/research/scorecard.py` — `Scorecard` (§4, E1–E5): 7-dimension weighted
+  score (0–100) over the realised metric keys via cross-sectional min-max
+  normalisation; `max_drawdown` is abs-then-reversed, `holding_experience`
+  averages `avg_holding_days` + `max_consecutive_losses`. The E3 anti-overfit
+  guard discounts the Sharpe dimension when walk-forward OOS decays > 50% vs IS.
+  Pure function of `ScoreInput` list, hand-anchor tested.
+- `src/core/config.py` — `ScorecardConfig` (weights + `oos_decay_*`); wired into
+  `ResearchConfig.scorecard` (E5 — weights configurable, no code change needed).
+- `config/settings.yaml` — `research.scorecard` block with the frozen 7 weights.
+- Exports: `EventBacktest`/`EventResult` in `backtest`, and `Scorecard`/
+  `ScoreInput`/`ScoreRow`/`StrategySpec`/`UniverseResolver`/registry helpers in
+  `research`.
+- Tests — 18 new cases: strategy contract enum guards + custom-universe guard +
+  `UniverseResolver` D6 path; event backtest take-profit / stop-loss /
+  max-holding-days / no-signal / no-look-ahead; scorecard hand-anchor (A=100,
+  B≈52.67, C=0) + reverse-direction + holding-experience composite + OOS-decay
+  penalty.
+
+### Scope / non-goals
+
+- No concrete strategy (those are Sprint 3.1). No point-in-time constituent
+  fetch (Sprint 3.2). The runner injection of `EventBacktest` lands in 3.2.
+
 ## Sprint 2.6 — Research Report (2026-07-17)
 
 Sprint 2.6 fills the `src/research/report.py` stub with `ResearchReport`, which

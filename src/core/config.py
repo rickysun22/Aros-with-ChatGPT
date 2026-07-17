@@ -264,6 +264,30 @@ class BenchmarkConfig(BaseModel):
     )
 
 
+class ScorecardConfig(BaseModel):
+    """AROS Strategy Score weights (Phase 3 / Sprint 3.0, E5).
+
+    Drives :class:`research.scorecard.Scorecard`. The seven dimensions map to
+    realised metric keys (see docs/Phase3-Technical-Design.md §4); the weights
+    sum to 1.0. ``oos_decay_*`` control the anti-overfit penalty on the Sharpe
+    dimension when walk-forward OOS decays vs IS.
+    """
+
+    weights: dict[str, float] = Field(
+        default_factory=lambda: {
+            "total_return": 0.20,
+            "cagr": 0.15,
+            "win_rate": 0.20,
+            "max_drawdown": 0.20,
+            "profit_factor": 0.10,
+            "sharpe": 0.10,
+            "holding_experience": 0.05,
+        }
+    )
+    oos_decay_penalty: bool = True
+    oos_decay_threshold: float = 0.5
+
+
 class ResearchConfig(BaseModel):
     """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
 
@@ -271,10 +295,12 @@ class ResearchConfig(BaseModel):
     runner / walk-forward / report parameters land in their own sprints
     (2.4-2.6). ``metrics=None`` means the research layer reuses
     ``BacktestConfig.metrics`` rather than defining a parallel metric list.
+    ``scorecard`` (Phase 3 / 3.0) carries the AROS Strategy Score weights.
     """
 
     experiment_id_prefix: str = "exp_"  # short-uuid prefix for ExperimentRun.id
     metrics: list[str] | None = None  # None => reuse backtest.metrics (no parallel list)
+    scorecard: ScorecardConfig = Field(default_factory=ScorecardConfig)
 
 
 class AppConfig(BaseModel):

@@ -19,6 +19,16 @@ from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
 from .registry import ExperimentRegistry
 from .report import ResearchReport, render_experiment_report
 from .runner import ResearchRunner
+from .scorecard import Scorecard, ScoreInput, ScoreRow
+from .strategy_spec import (
+    ResearchStrategySpec,
+    StrategySpec,
+    UniverseResolver,
+    clear_registry,
+    get_strategy,
+    list_strategies,
+    register_strategy,
+)
 from .walk_forward import WalkForwardFold, WalkForwardRunner, WalkForwardSplitter
 
 __all__ = [
@@ -37,4 +47,14 @@ __all__ = [
     "WalkForwardFold",
     "ResearchReport",
     "render_experiment_report",
+    "Scorecard",
+    "ScoreInput",
+    "ScoreRow",
+    "ResearchStrategySpec",
+    "StrategySpec",
+    "UniverseResolver",
+    "register_strategy",
+    "get_strategy",
+    "list_strategies",
+    "clear_registry",
 ]

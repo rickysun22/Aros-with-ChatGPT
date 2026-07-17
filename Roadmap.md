@@ -38,6 +38,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **2.4** | Research Runner | completed | `ResearchRunner.run(...)` orchestrates resolve-candidates → portfolio backtest → `compute_metrics` → `BenchmarkEngine.compare` → persist → `ExperimentResult`; `portfolio_fn` injection seam (default `PortfolioBacktest.from_config`); 3 registry helpers `record_metrics`/`record_equity`/`mark_done` (non-finite→`None`, equity as `{date:value}` JSON, tz-aware `finished_at`); benchmark metrics stored under `bench_` prefix; no-look-ahead capped at portfolio's own last date; `research run` CLI reuses 2.1 config helper; 6 new tests (e2e persist + hand-checked bench metrics / no-look-ahead / missing→`DataError` / unknown key→`ConfigError` / empty candidates→`DataError` / CLI dry-run); 213 passed, 1 skipped; no ORM schema change, no new metric math |
 | **2.5** | Walk-Forward / OOS | completed | `WalkForwardSplitter.split(spec, start, end)` rolling IS/OOS windows via `pd.DateOffset` (leap-safe; OOS `test_start == train_end` no-look-ahead boundary; too-short range ⇒ `[]`); `WalkForwardRunner.run(...)` reuses the 2.4 pipeline via a new `ResearchRunner._execute_window` seam — one `run_id`, `is_<i>`/`oos_<i>` folds, aggregated `is_agg`/`oos_agg` (per-metric mean, `None`/non-finite skipped); `walk_forward=None` delegates to `ResearchRunner`; `research run --walk-forward TRAIN TEST STEP` prints IS vs OOS aggregates; double no-look-ahead guarantee (window isolation + within-window `as_of` ceiling); 8 new tests; no ORM schema change, no new metric math |
 | **2.6** | Research Report | completed | `ResearchReport` aggregates metrics + benchmark + walk-forward IS/OOS into markdown/json/html (reuses `DailyReport` inline-CSS + inline-SVG style; HTML self-contained/offline, single-run has no chart); `from_run(run, result)` (DB metadata) + `from_result(result)` (stub fallback); `to_dict/to_json/to_markdown/to_html`; markdown shows `中文标签 \`raw_key\``; `render_experiment_report` stub delegates to `from_result`; `ExperimentRegistry.load_result(run_id)` reconstructs `ExperimentResult` from `ExperimentMetric`+`ExperimentEquity`; `research report <id> [--format markdown|json|html]` CLI; 8 new tests; no ORM schema change, no new metric math |
+| **3.0** | Strategy Research Framework | completed | Phase 3 地基（设计 🟢 Design Approved）：`StrategySpec` 契约（category/engine/universe/holding/exit/risk/data_fidelity）+ 注册表 + `UniverseResolver`（D6 拒空池防幸存者偏差）；`EventBacktest`（T日信号→T+1开盘入场→止损/止盈/到期收盘离场，复用 CostModel+compute_metrics，与 portfolio 产出统一 metrics）；`Scorecard`（AROS Strategy Score 7维加权 0–100，E1–E5，含 OOS 衰减惩罚）；`ScorecardConfig` 接入 `settings.yaml`；18 新测试；四门禁全绿 |
 
 ## Principles (non-negotiable)
 
@@ -72,3 +73,22 @@ and a `research report <id> [--format ...]` CLI (reuses the `DailyReport` inline
 CSS + SVG style; HTML self-contained and offline). All four quality gates are
 green locally. **Phase 2 is now complete** — the research engine (2.0–2.6) is
 fully implemented and on `main`.
+
+## Phase 3 — Alpha Research / Strategy Discovery
+
+**状态：Sprint 3.0 已完成（地基）**，设计 `docs/Phase3-Technical-Design.md` 已 🟢
+Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D8 按数据可信度排序）。
+
+约束（三条红线，已在设计中诚实处理）：① 数据只有日线（无分钟/tick）；② 回测是
+组合再平衡，3.0 新增 `EventBacktest` 补齐事件驱动；③ 无券商接口，「可实盘执行」=
+信号可复现产出（不含真实下单）。
+
+下一步（待 ChatGPT PASS 后推进）：
+- **3.1 Strategy Library** — 按数据可信度分批实现 10 套策略（均线多头/新高突破/
+  放量突破/强势回踩/龙头首阴 → 缩量反包/首板/二板接力 → 连板博弈[needs_intraday，
+  仅供参考]/情绪冰点修复）。
+- **3.2 Batch Strategy Experiment** — `BatchRunner` 遍历 策略 × 冻结实验配置，全走
+  walk-forward，落库；含 point-in-time 成分获取（D6）。
+- **3.3 Strategy Evaluation & Ranking** — `Scorecard` 完整评分 + 排名，接入 Report。
+- **3.4 Strategy Combination** — 分市场环境配权。
+- **3.5 Market Regime Engine** — 可解释规则分类（牛/震荡/熊/情绪冷热），产出 V1.0 报告。
