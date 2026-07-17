@@ -10,6 +10,8 @@ from the strategy code -- real ``get_daily`` output always shares one index).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
 import pandas as pd
 
@@ -23,12 +25,12 @@ from research.strategy_library import (
 
 
 def _frame(
-    close: list[float],
+    close: Sequence[float],
     *,
-    open_: list[float] | None = None,
-    high_: list[float] | None = None,
-    low_: list[float] | None = None,
-    vol: list[float] | None = None,
+    open_: Sequence[float] | None = None,
+    high_: Sequence[float] | None = None,
+    low_: Sequence[float] | None = None,
+    vol: Sequence[int | float] | None = None,
     start: str = "2024-01-01",
     n: int = 60,
 ) -> pd.DataFrame:
