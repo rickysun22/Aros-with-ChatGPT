@@ -1123,8 +1123,11 @@ def test_report_html_self_contained_single_run() -> None:
     # offline / self-contained: no external resource references
     assert "http://" not in html and "https://" not in html
     assert "exp_rpt" in html
-    # single-range run has no IS/OOS chart
-    assert "<svg" not in html
+    # single-range run has NO IS/OOS comparison chart (that section is walk-forward only)
+    assert "IS vs OOS 指标对比" not in html
+    # ...but it DOES render the equity + drawdown curves from the stored equity blob
+    assert "净值曲线与回撤曲线" in html
+    assert html.count("<svg") >= 2
 
 
 def test_report_walk_forward_has_is_oos_section_and_svg() -> None:

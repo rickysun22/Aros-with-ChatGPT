@@ -70,6 +70,130 @@ def _label_with_key(k: str) -> str:
     return f"{label} `{k}`"
 
 
+def _drawdown_series(eq: Mapping[str, float]) -> list[float]:
+    """Running drawdown at each equity point: value / running-peak - 1 (<= 0).
+
+    Derived purely for *visualisation* (the renderer presents, it does not
+    invent backtest metrics); the underlying equity is already persisted.
+    """
+    out: list[float] = []
+    peak = float("-inf")
+    for v in eq.values():
+        v = float(v)
+        peak = max(peak, v)
+        out.append(v / peak - 1.0 if peak > 0 else 0.0)
+    return out
+
+
+def _max_drawdown(eq: Mapping[str, float]) -> float:
+    """Largest drawdown over the equity series (<= 0)."""
+    dd = _drawdown_series(eq)
+    return min(dd) if dd else 0.0
+
+
+def _svg_equity(window_label: str, eq: Mapping[str, float]) -> str:
+    """Inline SVG equity curve -- self-contained, offline (no external JS/CSS)."""
+    items = sorted((str(d), float(v)) for d, v in eq.items())
+    if len(items) < 2:
+        return ""
+    labels = [d for d, _ in items]
+    vals = [v for _, v in items]
+    n = len(vals)
+    vmin, vmax = min(vals), max(vals)
+    if vmax == vmin:
+        vmax = vmin + 1e-9
+    W, H = 720.0, 240.0
+    px0, px1, py0, py1 = 52.0, 704.0, 16.0, 212.0
+
+    def X(i: int) -> float:
+        return px0 + (i / (n - 1)) * (px1 - px0)
+
+    def Y(v: float) -> float:
+        return py1 - ((v - vmin) / (vmax - vmin)) * (py1 - py0)
+
+    grid = ""
+    for g in range(5):
+        gv = vmin + (vmax - vmin) * g / 4
+        gy = Y(gv)
+        grid += (
+            f'<line x1="{px0:.1f}" y1="{gy:.1f}" x2="{px1:.1f}" y2="{gy:.1f}" class="gl"/>'
+            f'<text x="{px0 - 6:.1f}" y="{gy + 3:.1f}" class="gx" text-anchor="end">'
+            f"{gv:.2f}</text>"
+        )
+    pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, v in enumerate(vals))
+    base = ""
+    if vmin <= 1.0 <= vmax:
+        by = Y(1.0)
+        base = f'<line x1="{px0:.1f}" y1="{by:.1f}" x2="{px1:.1f}" y2="{by:.1f}" class="base"/>'
+    xl = (
+        f'<text x="{X(0):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">{labels[0]}</text>'
+        f'<text x="{X(n // 2):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">'
+        f"{labels[n // 2]}</text>"
+        f'<text x="{X(n - 1):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">'
+        f"{labels[-1]}</text>"
+    )
+    return (
+        f'<svg width="{W:.0f}" height="{H:.0f}" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'role="img" aria-label="equity {window_label}">'
+        + grid
+        + base
+        + f'<polyline points="{pts}" fill="none" stroke="#2563eb" stroke-width="2"/>'
+        + xl
+        + "</svg>"
+    )
+
+
+def _svg_drawdown(window_label: str, eq: Mapping[str, float]) -> str:
+    """Inline SVG drawdown area -- self-contained, offline (no external JS/CSS)."""
+    items = sorted((str(d), float(v)) for d, v in eq.items())
+    if len(items) < 2:
+        return ""
+    dd = _drawdown_series(dict(items))
+    n = len(dd)
+    dmin = min(dd)
+    dmax = max(dd)
+    if dmin == dmax:
+        dmin -= 1e-9
+    W, H = 720.0, 180.0
+    px0, px1, py0, py1 = 52.0, 704.0, 12.0, 152.0
+
+    def X(i: int) -> float:
+        return px0 + (i / (n - 1)) * (px1 - px0)
+
+    def Y(d: float) -> float:
+        return py0 + ((d - dmin) / (dmax - dmin)) * (py1 - py0)
+
+    zero_y = Y(0.0)
+    area = (
+        f"M {X(0):.1f} {zero_y:.1f} "
+        + " ".join(f"L {X(i):.1f} {Y(d):.1f}" for i, d in enumerate(dd))
+        + f" L {X(n - 1):.1f} {zero_y:.1f} Z"
+    )
+    line = " ".join(f"{X(i):.1f},{Y(d):.1f}" for i, d in enumerate(dd))
+    labels = [d for d, _ in items]
+    grid = (
+        f'<text x="{px0 - 6:.1f}" y="{zero_y + 3:.1f}" class="gx" text-anchor="end">0.0%</text>'
+        f'<text x="{px0 - 6:.1f}" y="{Y(dmin) + 3:.1f}" class="gx" text-anchor="end">'
+        f"{dmin:.1%}</text>"
+    )
+    xl = (
+        f'<text x="{X(0):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">{labels[0]}</text>'
+        f'<text x="{X(n // 2):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">'
+        f"{labels[n // 2]}</text>"
+        f'<text x="{X(n - 1):.1f}" y="{H - 8:.1f}" class="gx" text-anchor="middle">'
+        f"{labels[-1]}</text>"
+    )
+    return (
+        f'<svg width="{W:.0f}" height="{H:.0f}" viewBox="0 0 {W:.0f} {H:.0f}" '
+        f'role="img" aria-label="drawdown {window_label}">'
+        + grid
+        + f'<path d="{area}" fill="#fca5a5" fill-opacity="0.45"/>'
+        + f'<polyline points="{line}" fill="none" stroke="#dc2626" stroke-width="1.5"/>'
+        + xl
+        + "</svg>"
+    )
+
+
 def _is_oos_window(w: str) -> bool:
     return str(w).startswith("oos")
 
@@ -240,6 +364,23 @@ class ResearchReport:
             for k, v in m.items():
                 lines.append(f"- {_label_with_key(k)}: {_fmt(v)}")
             lines.append("")
+
+        if self.equity:
+            lines.append("## 三、净值与回撤")
+            lines.append("")
+            for w, eq in self.equity.items():
+                if not eq:
+                    continue
+                vals = list(eq.values())
+                peak = max(vals)
+                mdd = _max_drawdown(eq)
+                last = vals[-1] if vals else 0.0
+                tag = " (OOS)" if _is_oos_window(w) else ""
+                lines.append(
+                    f"- 窗口 {w}{tag}: 期末净值 {last:.3f}, 峰值 {peak:.3f}, " f"最大回撤 {mdd:.1%}"
+                )
+            lines.append("")
+
         return "\n".join(lines)
 
     # ------------------------------------------------------------------ #
@@ -265,6 +406,11 @@ class ResearchReport:
             ".bl{font-size:12px;fill:#374151;}"
             ".bv{font-size:11px;fill:#6b7280;}"
             ".zero{stroke:#9ca3af;stroke-width:1;}"
+            ".gl{stroke:#e5e7eb;stroke-width:1;}"
+            ".gx{font-size:10px;fill:#6b7280;}"
+            ".base{stroke:#9ca3af;stroke-width:1;stroke-dasharray:4 3;}"
+            ".ct{font-size:13px;font-weight:600;color:#111827;margin:6px 0 2px;}"
+            ".chart{margin:10px 0;}"
         )
 
         parts: list[str] = []
@@ -337,6 +483,19 @@ class ResearchReport:
                     f"<tr><td>{esc(_METRIC_LABELS.get(k, k))}</td>" f"<td>{esc(_fmt(v))}</td></tr>"
                 )
             parts.append("</table>")
+
+        if self.equity:
+            parts.append("<h2>三、净值曲线与回撤曲线</h2>")
+            for w, eq in self.equity.items():
+                if not eq or len(eq) < 2:
+                    continue
+                tag = " (OOS)" if _is_oos_window(w) else ""
+                wlabel = f"窗口 {esc(w)}{esc(tag)}"
+                parts.append(f"<div class='chart'><div class='ct'>{wlabel} · 净值</div>")
+                parts.append(_svg_equity(w, eq))
+                parts.append(f"<div class='ct'>{wlabel} · 回撤</div>")
+                parts.append(_svg_drawdown(w, eq))
+                parts.append("</div>")
 
         parts.append("</body></html>")
         return "\n".join(parts)

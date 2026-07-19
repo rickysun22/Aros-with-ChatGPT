@@ -2,6 +2,76 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.2 — Real A-share Data Bridge (2026-07-19)
+
+The Phase 3 research pipeline now runs end-to-end on **real A-share data**
+(AKShare primary, a-stock-data fallback). The synthetic-data-only era of 3.2 is
+over: real daily bars flow through `DataManager` → `BatchRunner` →
+`EventBacktest` and produce non-zero out-of-sample metrics.
+
+### Fixed
+
+- **Critical no-trade bug (real data only).** `run_strategy` now normalises each
+  OHLCV frame to a `DatetimeIndex` on `date`. `DataManager.get_daily` returns a
+  plain `RangeIndex` (its documented storage contract — `date` is a *column*), but
+  `EventBacktest._common_index` does `pd.DatetimeIndex(df.index)`, which turned the
+  RangeIndex into 1970-epoch timestamps. Every signal Series then `reindex`-ed to
+  `NaN` → all signals dropped to zero → **0 trades → +0.0% OOS for every strategy
+  on real data**. Synthetic tests never caught this because their frames were
+  already DatetimeIndex'd. The fix lives at the single funnel into `EventBacktest`
+  so it covers both the `event` and `portfolio` engines (and any future real-data
+  single-strategy run) without disturbing `DataManager`'s column contract.
+- **Re-run collision.** `research batch` default run name now carries a wall-clock
+  stamp, so repeating a run the same day no longer violates the `UNIQUE
+  experiment_runs.name` constraint.
+
+### Added
+
+- `main.py` — `research batch` command: real-data batch backtest with
+  `--strategies` (comma-separated) / `--start` / `--end` / `--benchmark` /
+  `--limit` (feasibility cap) / `--walk-forward TRAIN TEST STEP` / `--no-sync` /
+  `--seed-csi800` / `--emit-report`. Syncs the stock list, each strategy's universe
+  codes (csi800 seeded from AKShare `index_stock_cons` 000906; all_a from the stock
+  list), and the benchmark index, then runs `BatchRunner` and prints an OOS summary
+  (optionally writing a ranking report to `reports/`).
+- `src/data/provider.py` — `normalize_*` helpers accept **both Chinese and English**
+  AKShare column headers, defending against akshare version drift (newer releases
+  return `code`/`name`; daily/index still return Chinese headers).
+- `tests/test_batch_realdata_bridge.py` — offline bridge test: a `DataManager`
+  subclass returning deterministic OHLCV, proving the default `BatchRunner` price/
+  benchmark providers read through `DataManager` (no network) and that at least one
+  strategy yields a non-`None` OOS return.
+- `tests/test_data.py` — English-header normalisation tests (lock the akshare >=
+  1.18 fix); `test_manager_selects_astockdata_source` now pins `cfg.database.url` so
+  it is hermetically isolated from the shared `data/aros.db` (previously a real-data
+  sync elsewhere could leak into its 3-row expectation).
+
+### Added (follow-up: strategy 复盘 — equity/drawdown curves)
+
+- `src/research/report.py` — `research report --format html` now plots **净值曲线
+  (equity) + 回撤曲线 (drawdown)** for every window that has a stored equity blob
+  (the runner already persists `equity` via `ExperimentRegistry.record_equity` since
+  2.4). Inline self-contained SVG (offline, no external JS/CSS), one equity + one
+  drawdown panel per window (IS/OOS labelled). `to_markdown` gains a "三、净值与回撤"
+  summary (期末净值 / 峰值 / 最大回撤). This is the lightweight 复盘 layer requested:
+  visualise the equity the framework already records, without persisting trade
+  blotters or signal timelines.
+- `tests/test_report_equity_chart.py` — render asserts `<svg` equity + drawdown present
+  and the markdown max-drawdown summary is correct; empty-equity report renders without
+  charts. `tests/test_research.py` updated: a single-run report has no IS/OOS chart but
+  now DOES carry the equity/drawdown curves.
+
+### Verified
+
+- On real csi800 data (40 names, 105k bars, 2019–2023, 3/1/1 walk-forward) price/
+  volume strategies produce non-zero OOS, e.g. `volume_breakout` +13.0%,
+  `leader_first_down` +7.5%, `high_breakout` +6.7%. The emotion/limit-up strategies
+  (`first_board`, `second_board_relay`, `high_board`) legitimately stay ~0% because
+  limit-up detection on **qfq-adjusted** closes is unreliable — documented as
+  `daily_approx` / `needs_intraday` in their specs.
+- CI four gates green: `ruff check .` / `black --check .` / `mypy src tests main.py`
+  / `pytest -q` (full suite).
+
 ## Sprint 3.5 — Market Regime Engine + V1.0 Report (2026-07-19)
 
 Transparent 5-label market-regime classifier and dynamic strategy selection, plus
