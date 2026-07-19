@@ -16,10 +16,11 @@ in later sprints.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -89,3 +90,80 @@ class ExperimentEquity(Base):
     window: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_oos: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     equity_json: Mapped[str] = mapped_column(Text, nullable=False)  # {date: equity} serialized
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.0 -- Strategy knowledge base
+# --------------------------------------------------------------------------- #
+class RawStrategy(Base):
+    """The raw strategy pool (§3.1): ideas / rules / sources collected for later
+    implementation + validation. Missing fields are allowed (v2 principle 2) so a
+    strategy can be captured before it is fully specified."""
+
+    __tablename__ = "raw_strategies"
+
+    strategy_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    # manual/web/book/paper/other
+    source_type: Mapped[str] = mapped_column(String(16), default="manual")
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_rules: Mapped[str | None] = mapped_column(Text, nullable=True)
+    collected_at: Mapped[date] = mapped_column(Date, default=date.today)
+    # raw/pending_validation/validated/active/degraded/retired
+    status: Mapped[str] = mapped_column(String(16), default="raw")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class StrategyRegistry(Base):
+    """The executable formal library (§3.2): a validated strategy mapped to a
+    runnable implementation, with its verification evidence and quality signals.
+    Seeded from ``strategy_library`` (10 built-ins) at ``active`` status."""
+
+    __tablename__ = "strategy_registry"
+
+    strategy_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    # trend/strong/emotion
+    category: Mapped[str] = mapped_column(String(16), nullable=False)
+    # strategy_library name / module path
+    executable_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    # validated/active/degraded/retired
+    status: Mapped[str] = mapped_column(String(16), default="validated")
+    # -> experiment_runs.id
+    validation_run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # 0-5 OOS composite star
+    quality_star: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # 0-100 reliability
+    reliability_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Strategy Validation Gate
+    gate_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # JSON list of Regime labels
+    best_fit_regimes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class StrategyValidation(Base):
+    """One validation run for a strategy (§3.3): the evidence chain behind its
+    quality_star / reliability_score / gate result. One row per validation."""
+
+    __tablename__ = "strategy_validations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    strategy_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    # base experiment run -> experiment_runs.id
+    run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    metrics_json: Mapped[str] = mapped_column(Text, nullable=False)  # OOS metric summary
+    # OOS composite + components + fold returns
+    oos_json: Mapped[str] = mapped_column(Text, nullable=False)
+    # active/degraded (advisory only)
+    status_suggestion: Mapped[str] = mapped_column(String(16), default="degraded")
+    # in-sample window range (evidence)
+    is_range: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # out-of-sample window range (evidence)
+    oos_range: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    optimization: Mapped[str] = mapped_column(String(32), default="fixed")  # none/fixed/grid(...)
+    walk_forward_passed: Mapped[bool] = mapped_column(Boolean, default=True)
+    reliability_json: Mapped[str] = mapped_column(Text, nullable=False)  # reliability breakdown
+    gate_result_json: Mapped[str] = mapped_column(Text, nullable=False)  # gate PASS/FAIL detail
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

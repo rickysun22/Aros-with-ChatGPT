@@ -44,6 +44,8 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **3.3** | Strategy Evaluation & Ranking | completed | `Scorecard` 完整评分 + 排名落地（§4 E1–E5）：`build_score_inputs` 把 `BatchResult` 桥接为 `ScoreInput`（按 **OOS** walk-forward 指标评分，IS/OOS 供 E3 衰减惩罚，丢 `None`/非有限值防 `nan`）；`RankingReport` 渲染 §4 冻结排名表（md/json/html，含 OOS衰减 低/中/高 标签）并接入 `ResearchReport`；`BatchRunner` 增补 `profit_factor`/`avg_holding_days`/`max_consecutive_losses`（默认未算但 `compute_metrics` 可产）使评分维度齐全；E5 权重经 `settings.yaml` `research.scorecard` + `Scorecard.from_config` 驱动；14 新测试（手算锚定/反向指标/OOS惩罚/排名表）；四门禁全绿（含 CI `mypy src tests main.py`） |
 | **3.4** | Strategy Combination | completed | `CombinationEngine` 分市场环境（趋势市=Bull+Bear / 震荡市=Neutral+Extreme）对 Top-N AROS 策略做配权：每环境 raw=基准+类别适配偏置+该环境 regime 绩效倾斜，floor 后归一化（**权重归一**）；组合指标 = 按权重对各策略 **OOS 指标加权混合**（复用 `compute_metrics` 既有产物，丢 `None`/非有限值，不重新计算）；附合成示意净值（明确标注、不参与派生指标避免伪造波动）；`env_for_regime()` 供 3.5 动态选策略调用；`CombinationConfig` 接入 `settings.yaml` `research.combination`（E5）；接入 `ResearchReport` 与 `__init__`；8 新测试；四门禁全绿 |
 | **3.5** | Market Regime Engine + V1.0 Report | completed | 可解释规则分类器 `classify_market_regime`（5 标签 Bull/Neutral/Bear/EmotionHot/EmotionCold，非黑盒、无未来函数）：前三者由指数动量+已实现波动率判定，`EmotionHot/Cold` 由可选"涨停家数"净宽度序列判定（无宽度时永不触发，保证价格单输入确定性）；`MarketRegimeEngine` 按环境动态选策略（类别适配 `REGIME_CATEGORY_FIT` + 复用 3.2 各策略 regime_breakdown 经验 OOS 收益；情绪状态无独立宽度分段回测，诚实标注按 AROS 总评分择优）；`FinalReport.from_batch` 汇总策略库+3.3 排名+3.4 组合+3.5 引擎，输出 md/json/html 的 **V1.0 最终报告**并给出"若明天做 A 股短线最值得用哪套/哪组"的明确结论；`MarketRegimeConfig` 接入 `settings.yaml` `research.market_regime`（E5）；20 新测试（分类确定性/无未来函数/情绪驱动/趋势驱动/类别适配/动态选股/全5状态/报告结构）；四门禁全绿 |
+| **4.0** | Strategy Knowledge Base | completed | ORM `raw_strategies`/`strategy_registry`; `kb.py` (RawPool + StrategyRegistry, seeds 10 built-ins as `active`); `universe_provider.py` (CSI800/Watchlist/Custom, not hard-coded); `research kb` CLI (seed/list/add-raw/retire) |
+| **4.1** | Research Integrity Framework | completed | `validate.py` OOS Composite (return30/sharpe25/dd25/stability20) → quality_star + vetoes + param-sensitivity + period-stability + Reliability Score + Strategy Validation Gate; persists `strategy_validations`, auto-updates `strategy_registry`; `research validate` CLI; 6 new tests; four CI gates green |
 
 ## Principles (non-negotiable)
 
@@ -104,3 +106,16 @@ Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D
 后续可推进：
 - **Phase 4 — 实盘/调度**：把 3.2 真实数据 + 3.3–3.5 选股/组合/市场状态接入定时调度，
   产出可执行的每日/每周研究简报（无券商下单接口，仍止步于「信号可复现产出」）。
+
+## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 已完成 ✅）
+
+Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 **4.0 知识库 + 4.1 研究诚信框架**，
+作为 4.2–4.5 的依赖根。两者已提交 `main`，四门禁全绿。
+
+- **4.0 Strategy Knowledge Base（✅）** — `raw_strategies`/`strategy_registry` ORM + `kb.py`
+  （RawPool + StrategyRegistry，从 `strategy_library` 幂等 seed 10 内置策略为 `active`）+ `universe_provider.py`
+  （CSI800/Watchlist/Custom 三种 Provider，非硬编码）+ `research kb` CLI（seed/list/add-raw/retire）；11 新测试。
+- **4.1 Research Integrity Framework（✅）** — `validate.py`：OOS Composite（收益30/夏普25/回撤25/稳健20）
+  → quality_star(1–5, 含否决) + 参数敏感性（±1/±0.1 扰动）+ 周期稳定性 + Reliability Score
+  （OOS40/参数20/周期20/交易20）+ Strategy Validation Gate（无未来函数/OOS收益>0/OOS夏普>0.5/回撤<40%/交易≥100/参数稳定）；
+  落库 `strategy_validations` 并自动更新 `strategy_registry`；`research validate` CLI（run/all）；6 新测试。

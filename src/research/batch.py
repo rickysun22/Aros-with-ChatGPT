@@ -30,6 +30,7 @@ Key design points:
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
@@ -64,6 +65,21 @@ def _to_date(value: str | date) -> date:
 def _equity_to_dict(equity: pd.Series) -> dict[str, float]:
     """Serialize an equity series into ``{iso_date: float}`` (runner contract)."""
     return {pd.Timestamp(ts).strftime("%Y-%m-%d"): float(v) for ts, v in equity.items()}
+
+
+def _clone_with_params(strategy: Any, override: dict[str, Any]) -> Any:
+    """Return a deep copy of ``strategy`` with ``spec.parameters`` merged with
+    ``override`` (Phase 4.1 parameter-sensitivity perturbation).
+
+    The clone keeps the same ``spec.name`` so its persisted run id stays stable;
+    only the tunable parameters change. The global library registration is left
+    untouched (this is a local, throwaway clone for one validation run).
+    """
+    clone = copy.deepcopy(strategy)
+    params = dict(clone.spec.parameters)
+    params.update(override)
+    clone.spec = clone.spec.model_copy(update={"parameters": params})
+    return clone
 
 
 class _DmPriceProvider:
@@ -167,12 +183,18 @@ class BatchRunner:
         notes: str | None = None,
         *,
         regime_analysis: bool = True,
+        spec_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> BatchResult:
         """Batch-backtest ``strategies`` under the frozen ``config``.
 
         Each strategy is run through walk-forward (or a single full window when
         ``config.walk_forward is None``), persisted as its own
         :class:`ExperimentRun`, and returned as a :class:`StrategyBatchOutcome`.
+
+        ``spec_overrides`` (Phase 4.1) maps a strategy name to a parameter
+        override dict; matching strategies are cloned with the overridden
+        ``spec.parameters`` so parameter-sensitivity tests can re-run a strategy
+        without mutating the global library registration.
         """
         reg = ExperimentRegistry(session)
         cfg = self._config
@@ -200,6 +222,8 @@ class BatchRunner:
 
         for name in strategies:
             strategy = get_strategy(name)
+            if spec_overrides and name in spec_overrides:
+                strategy = _clone_with_params(strategy, spec_overrides[name])
             spec = strategy.spec
             run_id = reg.create(
                 name=f"{config.name}:{spec.name}",

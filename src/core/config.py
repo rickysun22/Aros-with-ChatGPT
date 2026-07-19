@@ -330,6 +330,86 @@ class MarketRegimeConfig(BaseModel):
     emotion_cold_threshold: float = -0.15  # smoothed net limit-up ratio <= -> EmotionCold
 
 
+class UniverseConfig(BaseModel):
+    """Phase 4.0 Universe Provider mode (design §5 4.0 / §10 Q1).
+
+    The daily screening universe is not hard-coded to csi800. ``type`` selects a
+    provider implementation; ``watchlist_path`` / ``custom_codes`` feed the
+    Watchlist / Custom providers. The CLI can override ``type`` at run time.
+    """
+
+    type: Literal["csi800", "watchlist", "custom"] = "csi800"
+    watchlist_path: str | None = None  # used when type == "watchlist"
+    custom_codes: list[str] | None = None  # used when type == "custom"
+
+
+class WalkForwardConfig(BaseModel):
+    """Walk-forward split (years). Mirrors ``research.experiment.WalkForwardSpec``
+    but declared here so ``core.config`` stays free of any ``research`` import
+    (avoids a circular import: ``research.batch`` imports ``core.config`` while
+    ``research/__init__`` executes). ``validate.py`` converts this to the
+    ``research.experiment.WalkForwardSpec`` the runner consumes."""
+
+    train_years: int = 3
+    test_years: int = 1
+    step_years: int = 1
+
+
+class ValidationGateConfig(BaseModel):
+    """Strategy Validation Gate (Phase 4.1, AROS 宪法级闸门, design §5 4.1).
+
+    Every check must PASS for a strategy to enter the formal library. Thresholds
+    are config-driven so the gate can be calibrated against the built-in 10
+    strategies (design §5 4.1 校准) without code changes.
+    """
+
+    no_lookahead: bool = True  # architecture guarantee (T+1); code future-func needs human/lint
+    oos_return_gt: float = 0.0  # OOS total return must exceed this
+    oos_sharpe_gt: float = 0.5  # OOS Sharpe must exceed this
+    max_drawdown_lt: float = 0.40  # OOS max drawdown must be below this (abs)
+    min_trades: int = 100  # at least this many OOS trades
+    param_stable: bool = True  # parameter-sensitivity test must pass
+    param_decay_threshold: float = 0.5  # avg OOS Sharpe decay above this fails param_stable
+
+
+class QualityStarConfig(BaseModel):
+    """OOS Composite Score -> quality_star (design §4.0).
+
+    The composite blends four OOS components, each normalised to 0-100 by a
+    tunable scale before weighted summation. Hard vetoes cap the star so a single
+    flaw (deep drawdown / too few trades) cannot be averaged away.
+    """
+
+    return_scale: float = 0.30  # OOS return of +return_scale -> 100 on the return component
+    sharpe_scale: float = 2.0  # OOS Sharpe of +sharpe_scale -> 100 on the Sharpe component
+    drawdown_scale: float = 0.60  # OOS max drawdown of this (abs) -> 0 on the drawdown component
+    stability_scale: float = 0.15  # std of per-fold OOS returns of this -> 0 on stability
+    # star veto rules (override the composite->star mapping)
+    drawdown_veto: float = 0.40  # max drawdown above this -> star capped at 2
+    min_trades_veto: int = 100  # OOS trades below this -> star capped at 3
+
+
+class ReliabilityConfig(BaseModel):
+    """Reliability Score weights (design §4.3): how *trustworthy* the evidence is.
+
+    Complements quality_star (how *good* it is). Weights sum to 1.0.
+    """
+
+    oos_weight: float = 0.40  # OOS performance (return>0 & Sharpe>=gate)
+    param_weight: float = 0.20  # parameter-sensitivity (perturbation Sharpe decay)
+    period_weight: float = 0.20  # period stability (positive OOS sub-windows ratio)
+    trades_weight: float = 0.20  # trade count adequacy
+
+
+class ValidationConfig(BaseModel):
+    """Phase 4.1 validation engine configuration (design §5 4.1)."""
+
+    walk_forward: WalkForwardConfig = Field(default_factory=WalkForwardConfig)
+    gate: ValidationGateConfig = Field(default_factory=ValidationGateConfig)
+    quality_star: QualityStarConfig = Field(default_factory=QualityStarConfig)
+    reliability: ReliabilityConfig = Field(default_factory=ReliabilityConfig)
+
+
 class ResearchConfig(BaseModel):
     """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
 
@@ -365,6 +445,8 @@ class AppConfig(BaseModel):
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
     research: ResearchConfig = Field(default_factory=ResearchConfig)
+    universe: UniverseConfig = Field(default_factory=UniverseConfig)
+    validation: ValidationConfig = Field(default_factory=ValidationConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:

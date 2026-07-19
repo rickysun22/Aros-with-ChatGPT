@@ -198,3 +198,38 @@ research:
     sentiment_window: 5
     emotion_hot_threshold: 0.15
     emotion_cold_threshold: -0.15
+
+# Phase 4.0 Universe Provider mode (design §5 4.0 / §10 Q1).
+# Daily screening universe is not hard-coded: type selects a provider.
+#   csi800   -> CSI800Provider (akshare index constituents, seeded)
+#   watchlist-> WatchlistProvider (--watchlist <file> or this path; one code per line)
+#   custom   -> CustomProvider (explicit custom_codes)
+universe:
+  type: csi800
+  watchlist_path: null
+  custom_codes: null
+
+# Phase 4.1 Research Integrity Framework (design §5 4.1 / §1.5).
+# Strategy Validation Gate (宪法级闸门) + OOS Composite quality_star + Reliability.
+validation:
+  walk_forward: { train_years: 3, test_years: 1, step_years: 1 }
+  gate:
+    no_lookahead: true          # 架构保证(T+1)；代码未来函数需人工/lint
+    oos_return_gt: 0.0          # OOS 收益 > 0
+    oos_sharpe_gt: 0.5          # OOS Sharpe > 0.5
+    max_drawdown_lt: 0.40       # 最大回撤 < 40%
+    min_trades: 100             # 至少 100 次交易
+    param_stable: true          # 参数敏感性测试通过(扰动后 Sharpe 衰减 < 阈值)
+    param_decay_threshold: 0.5  # 平均 Sharpe 衰减超过该比例则 param_stable 失败
+  quality_star:
+    return_scale: 0.30          # OOS 收益 +30% -> 收益分量满分
+    sharpe_scale: 2.0           # OOS Sharpe 2.0 -> Sharpe 分量满分
+    drawdown_scale: 0.60        # OOS 回撤 60% -> 回撤分量 0 分
+    stability_scale: 0.15       # 各 OOS 窗口收益标准差 15% -> 稳定性 0 分
+    drawdown_veto: 0.40         # 回撤 > 40% -> 最高 ⭐⭐
+    min_trades_veto: 100        # 交易不足 -> 最高 ⭐⭐⭐
+  reliability:
+    oos_weight: 0.40
+    param_weight: 0.20
+    period_weight: 0.20
+    trades_weight: 0.20

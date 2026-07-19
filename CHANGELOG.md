@@ -2,6 +2,102 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.1 — Research Integrity Framework (2026-07-17)
+
+The research-integrity gate (AROS 宪法): turns a walk-forward OOS run into a
+defensible **quality star**, a **reliability score**, and a pass/fail **Strategy
+Validation Gate**, and persists the whole evidence chain. This is the trust layer
+that 4.2–4.5 (combination glue, scheduling, live signals) build on.
+
+### Added
+
+- `src/research/validate.py` (new) — the Research Integrity Framework:
+  - Pure, unit-tested math: `compute_oos_composite(oos, fold_returns, qcfg)`
+    (return 30% / sharpe 25% / drawdown 25% / stability 20% → composite + breakdown);
+    `quality_star_from_composite(composite, max_dd_abs, num_trades, qcfg)` → 1–5 with
+    vetoes (drawdown > 40% ⇒ cap 2; trades < 100 ⇒ cap 3);
+    `compute_reliability(oos, fold_returns, num_params, avg_decay, vcfg)` (OOS 40% /
+    param 20% / period 20% / trades 20% → score + breakdown); `evaluate_gate(...)`
+    → (passed, detail) over the six gate conditions.
+  - `_perturbations` steps every numeric `spec.parameters` by ±1 (int) or ±0.1 (float);
+    `_clone_with_params` deep-clones a strategy with the override (used by the
+    parameter-sensitivity test). `_sharpe_decay` measures OOS sharpe loss under
+    perturbation.
+  - `ValidationEngine.__init__(batch_runner=None, config=None)` converts the local
+    `WalkForwardConfig` → `WalkForwardSpec` at runtime (no research import in
+    `core.config`, so no circular import). `run_strategy(name, session, *, start,
+    end, benchmark, notes)` runs the frozen walk-forward OOS → param-perturbation
+    loop → composite/star → reliability → gate → persists a `StrategyValidation` row
+    and auto-adds/updates the `strategy_registry` row (status = `active` if the gate
+    passed, else `degraded`); returns a `ValidationResult`. `_json` coerces numpy /
+    non-finite values to JSON-safe; `_evidence_ranges` drives IS/OOS windows via
+    `WalkForwardSplitter`.
+- `src/research/models.py` — `StrategyValidation` ORM (`strategy_validations`):
+  `id` (PK), `strategy_id` (FK index), `run_id`, `metrics_json`, `oos_json`,
+  `status_suggestion`, `is_range`, `oos_range`, `optimization`, `walk_forward_passed`,
+  `reliability_json`, `gate_result_json`, `created_at`.
+- `core/config.py` — `ValidationGateConfig` (`oos_return_gt` / `oos_sharpe_gt` /
+  `max_drawdown_lt` / `min_trades` / `param_stable` + `param_decay_threshold`),
+  `QualityStarConfig` (scales + vetoes), `ReliabilityConfig` (weights),
+  `ValidationConfig` (walk_forward / gate / quality_star / reliability); wired into
+  `AppConfig.validation` (and `settings.yaml` `validation`).
+- `main.py` — `research validate` Typer sub-app (`run <strategy>` / `all`) plus a
+  `_print_validation` renderer (star / composite / reliability / gate).
+- `tests/test_validate.py` (6) — 4 pure-math cases (composite / star / reliability /
+  gate anchors) + 2 integration cases on synthetic `ma_bull` (injected `BatchRunner`,
+  `min_trades=0`, 1/1/1 walk-forward).
+
+### Notes
+
+- **Circular-import avoidance.** `core.config` deliberately defines a *local*
+  `WalkForwardConfig` instead of importing `research.experiment.WalkForwardSpec`
+  (which would pull `research.batch` ← `core.config` into a loop). `validate.py`
+  maps config → Spec just before the run.
+- All four gates green: `ruff check .` / `black --check --line-length 100 .` /
+  `mypy src` / `pytest -q` (6 new tests; full suite green, 1 network skip).
+
+## Sprint 4.0 — Strategy Knowledge Base (2026-07-17)
+
+Phase 4 地基（设计 🟢 Design Approved, `Phase4_Technical_Design_v2.1.md` §9 建议首切）：
+策略知识库 + 自选股池 Provider 抽象，是 4.1 诚信框架与 4.2–4.5 的依赖根。把「原始想法」
+(raw) 与「可执行正式库」(registry) 分开，正式库从 `strategy_library` 的 10 套内置策略
+幂等 seed 为 `active`。
+
+### Added
+
+- `src/research/models.py` — `RawStrategy` (`raw_strategies`): `strategy_id` (PK),
+  `name`, `source_type`, `source`, `original_description`, `original_rules`,
+  `collected_at`, `status` (raw/pending_validation/validated/active/degraded/retired);
+  `StrategyRegistry` (`strategy_registry`): `strategy_id` (PK), `name`, `category`,
+  `executable_ref`, `status`, `validation_run_id`, `quality_star`, `reliability_score`,
+  `gate_passed`, `best_fit_regimes`, `added_at` (seeded from `strategy_library` at
+  `active`).
+- `src/research/kb.py` (new) — `RawPool` (add / get / list / set_status over
+  `raw_strategies`); `StrategyRegistry` (seed_builtins idempotent via `session.merge`,
+  derives `best_fit_regimes` from `REGIME_CATEGORY_FIT`; get / list_active /
+  list_by_status / add / update_validation / retire); `_new_raw_id` / `_new_validation_id`
+  helpers; `ensure_kb_tables`.
+- `src/research/universe_provider.py` (new) — `UniverseProvider` ABC
+  (`codes(as_of=None) -> list[str]`); `CSI800Provider` (via `UniverseEngine().get_codes("csi800")`),
+  `WatchlistProvider` (inline codes or one-per-line file, `#` ignored), `CustomProvider`
+  (fixed list, rejects empty); `get_universe_provider(type=None, *, config,
+  watchlist_path, codes)` factory resolving CSI800 / Watchlist / Custom **without any
+  hard-coded code list**.
+- `core/config.py` — `UniverseConfig` (`type: Literal["csi800","watchlist","custom"]`
+  default `csi800`, `watchlist_path`, `custom_codes`); wired into `AppConfig.universe`
+  (and `settings.yaml` `universe`).
+- `main.py` — `research kb` Typer sub-app (`seed` / `list` / `add-raw` / `retire`).
+- `tests/test_kb.py` (11) — raw pool add/list/status; seed_builtins seeds 10 active;
+  seed is idempotent (second run returns 0); registry update_validation / retire / add;
+  CSI800 / Watchlist / Custom + `get_universe_provider` factory.
+
+### Notes
+
+- The KB decouples "idea capture" from "executable library" so validation evidence
+  (4.1) attaches to a stable `strategy_id` rather than a strategy name.
+- All four gates green: `ruff check .` / `black --check --line-length 100 .` /
+  `mypy src` / `pytest -q` (11 new tests; full suite green, 1 network skip).
+
 ## Sprint 3.2 — Real A-share Data Bridge (2026-07-19)
 
 The Phase 3 research pipeline now runs end-to-end on **real A-share data**

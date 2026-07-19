@@ -42,6 +42,15 @@ app = typer.Typer(
 )
 
 
+def _kb_session() -> Any:
+    """Open a DB session with all ORM tables created (KB / validation CLI)."""
+    from core.database import Base, get_engine, get_sessionmaker
+
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    return get_sessionmaker(engine)()
+
+
 @app.command()
 def version() -> None:
     """Show the AROS version."""
@@ -1149,6 +1158,138 @@ def research_delete(run_id: str) -> None:
 
 
 app.add_typer(research_app, name="research")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.0 / 4.1 -- knowledge base + validation engine subcommands
+# --------------------------------------------------------------------------- #
+kb_app = typer.Typer(help="Phase 4.0 Strategy Knowledge Base (raw pool + registry)")
+
+
+@kb_app.command("seed")
+def kb_seed(
+    force: bool = typer.Option(False, "--force", help="Rebuild existing entries"),
+) -> None:
+    """Seed the 10 built-in strategies into the formal library as active."""
+    setup_logging()
+    from research.kb import StrategyRegistry
+
+    n = StrategyRegistry(_kb_session()).seed_builtins(overwrite=force)
+    typer.echo(f"Seeded {n} built-in strategies into strategy_registry")
+
+
+@kb_app.command("list")
+def kb_list() -> None:
+    """List the formal library entries."""
+    setup_logging()
+    from research.kb import StrategyRegistry
+
+    rows = StrategyRegistry(_kb_session()).list_active()
+    if not rows:
+        typer.echo("(empty) run `python main.py research kb seed` first")
+        return
+    typer.echo(f"{'id':<18}{'cat':<9}{'star':<6}{'rel':<8}{'gate':<7}{'status':<10}")
+    for r in rows:
+        star = "-" if r.quality_star is None else r.quality_star
+        rel = "-" if r.reliability_score is None else f"{r.reliability_score:.1f}"
+        gate = "-" if r.gate_passed is None else ("PASS" if r.gate_passed else "FAIL")
+        typer.echo(f"{r.strategy_id:<18}{r.category:<9}{star:<6}{rel:<8}{gate:<7}{r.status:<10}")
+
+
+@kb_app.command("add-raw")
+def kb_add_raw(
+    name: str = typer.Argument(..., help="Strategy name"),
+    source: str | None = typer.Option(None, "--source", help="Source description/link"),
+    source_type: str = typer.Option("manual", "--type", help="manual/web/book/paper/other"),
+    description: str | None = typer.Option(None, "--desc", help="Original description"),
+    rules: str | None = typer.Option(None, "--rules", help="Extractable rules"),
+) -> None:
+    """Add a raw strategy idea to the pool (for later implementation + validation)."""
+    setup_logging()
+    from research.kb import RawPool
+
+    sid = RawPool(_kb_session()).add(
+        name, source_type=source_type, source=source, description=description, rules=rules
+    )
+    typer.echo(f"Added raw strategy {sid} ({name!r})")
+
+
+@kb_app.command("retire")
+def kb_retire(strategy_id: str = typer.Argument(..., help="Registry strategy id")) -> None:
+    """Retire a formal-library entry (keeps the row for audit)."""
+    setup_logging()
+    from research.kb import StrategyRegistry
+
+    ok = StrategyRegistry(_kb_session()).retire(strategy_id)
+    typer.echo(f"retired {strategy_id}" if ok else f"{strategy_id} not found")
+
+
+validate_app = typer.Typer(help="Phase 4.1 Strategy Validation Engine + Gate")
+
+
+def _print_validation(res: Any) -> None:
+    """Render a :class:`research.validate.ValidationResult` to the console."""
+    typer.echo(f"Strategy : {res.strategy_id}")
+    typer.echo(f"  composite      : {res.composite}")
+    typer.echo(f"  quality_star   : {'*' * res.quality_star} ({res.quality_star})")
+    typer.echo(f"  reliability    : {res.reliability_score}")
+    gate_str = "PASS" if res.gate_passed else "FAIL"
+    typer.echo(f"  gate           : {gate_str} -> {res.status_suggestion}")
+    typer.echo(f"  avg param decay: {res.avg_decay}")
+    typer.echo(f"  IS range       : {res.is_range}")
+    typer.echo(f"  OOS range      : {res.oos_range}")
+    detail = ", ".join(f"{k}={'Y' if v else 'N'}" for k, v in res.gate_detail.items())
+    typer.echo("  gate detail    : " + detail)
+
+
+@validate_app.command("run")
+def validate_run(
+    strategy: str = typer.Option(..., "--strategy", help="Strategy name (library id)"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    benchmark: str | None = typer.Option(None, "--benchmark", help="Benchmark key"),
+) -> None:
+    """Validate one strategy (walk-forward OOS + Gate) and persist evidence."""
+    setup_logging()
+    from data.manager import DataManager
+    from research.batch import BatchRunner
+    from research.validate import ValidationEngine
+    from universe.engine import UniverseEngine
+
+    cfg = get_config()
+    runner = BatchRunner(data_manager=DataManager(), universe_engine=UniverseEngine())
+    res = ValidationEngine(batch_runner=runner, config=cfg).run_strategy(
+        strategy, _kb_session(), start=start, end=end, benchmark=benchmark
+    )
+    _print_validation(res)
+
+
+@validate_app.command("all")
+def validate_all(
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    benchmark: str | None = typer.Option(None, "--benchmark", help="Benchmark key"),
+) -> None:
+    """Validate every built-in strategy and persist the evidence chain."""
+    setup_logging()
+    from data.manager import DataManager
+    from research.batch import BatchRunner
+    from research.strategy_library import list_strategies
+    from research.validate import ValidationEngine
+    from universe.engine import UniverseEngine
+
+    cfg = get_config()
+    runner = BatchRunner(data_manager=DataManager(), universe_engine=UniverseEngine())
+    engine = ValidationEngine(batch_runner=runner, config=cfg)
+    names = [s.spec.name for s in list_strategies()]
+    for name in names:
+        res = engine.run_strategy(name, _kb_session(), start=start, end=end, benchmark=benchmark)
+        _print_validation(res)
+        typer.echo("")
+
+
+research_app.add_typer(kb_app, name="kb")
+research_app.add_typer(validate_app, name="validate")
 
 
 def main() -> None:
