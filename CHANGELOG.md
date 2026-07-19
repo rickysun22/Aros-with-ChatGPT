@@ -2,6 +2,41 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.5 — Market Regime Engine + V1.0 Report (2026-07-19)
+
+Transparent 5-label market-regime classifier and dynamic strategy selection, plus
+the project's single deliverable: the AROS A 股短线策略研究报告 V1.0 (Phase 3 §9).
+
+### Added
+
+- `core/config.py` — `MarketRegimeConfig` (E5): momentum/vol/drawdown windows,
+  `bull_mom` / `bear_mom` / `high_vol_cap`, `sentiment_window`,
+  `emotion_hot_threshold` / `emotion_cold_threshold`; wired into
+  `ResearchConfig.market_regime` (and `settings.yaml` `research.market_regime`).
+- `src/research/market_regime.py` (new) — explainable, no-look-ahead 5-label
+  classifier `classify_market_regime(close, breadth=None, config)`:
+  * `Bull` / `Neutral` / `Bear` from index momentum + realised volatility;
+  * `EmotionHot` / `EmotionCold` from an optional net limit-up breadth series
+    (never fire without breadth, so the function stays deterministic on price-only
+    data). `MarketRegimeEngine` maps the live regime to the best-fit strategy via
+  an explainable category-fit rule (`REGIME_CATEGORY_FIT`) refined by the empirical
+  per-regime walk-forward OOS return the 3.2 batch already produced
+  (`SelectionResult` carries the rationale).
+- `src/research/final_report.py` (new) — `FinalReport.from_batch(...)` composes the
+  whole pipeline (strategy library + 3.3 AROS ranking + 3.4 combination + 3.5 regime
+  engine) into the V1.0 deliverable, rendered to markdown / json / html; the verdict
+  answers *"若明天开始做 A 股短线，哪套（或哪组）策略最值得使用"*.
+- `report.py` / `__init__.py` re-export the new symbols (engine, classifier,
+  `FinalReport`, `SelectionResult`, 5-label constants).
+
+### Tests
+
+- `tests/test_market_regime.py` (11) — deterministic classification, no look-ahead,
+  trend/vol → Bull/Bear/Neutral, breadth → EmotionHot/Cold, category-fit mapping,
+  `select_strategy` empirical pick + determinism, `recommendations` covers all 5.
+- `tests/test_final_report.py` (9) — all five sections present, json round-trips,
+  market-data regime inference, determinism, self-contained html, entry point.
+
 ## Sprint 3.4 — Strategy Combination (2026-07-19)
 
 Regime-conditioned combination of the Top-N AROS strategies (Phase 3 design §3.4).

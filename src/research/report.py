@@ -21,6 +21,7 @@ from typing import Any
 
 # Sprint 3.3: cross-strategy ranking report -- part of the research report
 # family (sits beside :class:`ResearchReport` and is reachable from this module).
+# Sprint 3.5: Market Regime Engine + V1.0 final report join the same family.
 from research.experiment import ExperimentConfig, ExperimentResult
 from research.models import ExperimentRun
 

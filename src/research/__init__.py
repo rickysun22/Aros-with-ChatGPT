@@ -25,6 +25,17 @@ from .combination import (
     render_combination_report,
 )
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
+from .final_report import FinalReport, render_final_report
+from .market_regime import (
+    BEAR,
+    BULL,
+    EMOTION_COLD,
+    EMOTION_HOT,
+    REGIMES_5,
+    MarketRegimeEngine,
+    SelectionResult,
+    classify_market_regime,
+)
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
 from .ranking import RankingReport, build_score_inputs
 from .regime import NEUTRAL, REGIMES, classify_regime
@@ -73,6 +84,17 @@ __all__ = [
     "MarketEnv",
     "TRENDING",
     "OSCILLATING",
+    "FinalReport",
+    "render_final_report",
+    "MarketRegimeEngine",
+    "SelectionResult",
+    "classify_market_regime",
+    "REGIMES_5",
+    "BULL",
+    "NEUTRAL",
+    "BEAR",
+    "EMOTION_HOT",
+    "EMOTION_COLD",
     "Scorecard",
     "ScoreInput",
     "ScoreRow",

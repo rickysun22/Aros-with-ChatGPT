@@ -309,6 +309,27 @@ class CombinationConfig(BaseModel):
     equal_weight_floor: float = 0.1  # minimum weight so no selected strategy is dropped
 
 
+class MarketRegimeConfig(BaseModel):
+    """Market-regime classification (Phase 3 / Sprint 3.5, E5).
+
+    Drives :class:`research.market_regime.MarketRegimeEngine`. A transparent,
+    rule-based 5-label classifier (Bull / Neutral / Bear / EmotionHot /
+    EmotionCold) built from explainable signals only -- index MA/momentum
+    structure, realised volatility, and an optional market-breadth (net
+    limit-up) sentiment series. No black-box model, no look-ahead.
+    """
+
+    momentum_window: int = 20  # bars for the trend-momentum read
+    vol_window: int = 20  # bars for annualised realised-vol
+    drawdown_window: int = 20  # bars for the trailing-high drawdown
+    bull_mom: float = 0.05  # 20d return above this (and calm vol) -> Bull
+    bear_mom: float = -0.05  # 20d return below this -> Bear
+    high_vol_cap: float = 0.60  # annualised vol above this disqualifies a calm Bull
+    sentiment_window: int = 5  # bars for the smoothed net-sentiment read
+    emotion_hot_threshold: float = 0.15  # smoothed net limit-up ratio >= -> EmotionHot
+    emotion_cold_threshold: float = -0.15  # smoothed net limit-up ratio <= -> EmotionCold
+
+
 class ResearchConfig(BaseModel):
     """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
 
@@ -323,6 +344,7 @@ class ResearchConfig(BaseModel):
     metrics: list[str] | None = None  # None => reuse backtest.metrics (no parallel list)
     scorecard: ScorecardConfig = Field(default_factory=ScorecardConfig)
     combination: CombinationConfig = Field(default_factory=CombinationConfig)
+    market_regime: MarketRegimeConfig = Field(default_factory=MarketRegimeConfig)
 
 
 class AppConfig(BaseModel):

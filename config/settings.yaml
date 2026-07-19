@@ -186,3 +186,15 @@ research:
       holding_experience: 0.05
     oos_decay_penalty: true        # E3: discount Sharpe dim if OOS decays vs IS
     oos_decay_threshold: 0.5       # decay > 50% triggers the penalty
+  # Market Regime Engine (Phase 3 / Sprint 3.5, E5). Transparent 5-label
+  # classifier: index momentum + realised vol + optional net limit-up breadth.
+  market_regime:
+    momentum_window: 20
+    vol_window: 20
+    drawdown_window: 20
+    bull_mom: 0.05
+    bear_mom: -0.05
+    high_vol_cap: 0.60
+    sentiment_window: 5
+    emotion_hot_threshold: 0.15
+    emotion_cold_threshold: -0.15
