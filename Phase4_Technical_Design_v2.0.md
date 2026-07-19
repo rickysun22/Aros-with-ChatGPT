@@ -241,6 +241,7 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 
 ### Sprint 4.3 — Market Context & Money Flow
 - **新增**：`src/data/providers/moneyflow.py`（公开资金流：`stock_individual_fund_flow` / `stock_sector_fund_flow` / 行业·概念·板块接口）+ `HiddenFlowProvider` / `SmartMoneyProvider` **接口桩**（仅行为推断，返回评分+解释，绝无金额）。
+- **暗盘数据定位（设计原则，用户 2026-07-20 明确）**：当前阶段**仅作参考**——尚无可靠暗盘数据源，纯推测过于主观、易污染系统判断（故权重保守 0.1 且不能淘汰候选）。但暗盘是"主力想隐藏的意图"，长远看恰是**更重要的信号**；若未来接入可靠数据源（如 Level2 逐笔）或更优推断算法，`hidden_weight` 可上调、角色可升级为正式因子。本版守住三原则：**接口预留 + 不伪造金额 + 不污染主判断**。
 - **健壮性**：akshare 列名漂移已在 3.2 踩过——本 sprint 的归一化统一走 `provider.py` 的 `_canon_columns` 中英文兼容模式；任何单标的/单板块异常 `except` 跳过并降级评分（不中断整轮）。
 - **复用**：`DataManager` 作为入口（新增 `get_fund_flow` / `get_sector_concept` 方法）。
 - **验收**：能取个股/板块资金流与行业·概念映射；暗盘 provider 返回"行为推断评分+文字解释"，不出现伪造金额。
