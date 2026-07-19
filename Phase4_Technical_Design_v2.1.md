@@ -1,9 +1,12 @@
-# AROS Phase 4 — Alpha Intelligence System · Technical Design v2.0
+# AROS Phase 4 — Alpha Intelligence System · Technical Design v2.1
 
 > 设计依据：与 GPT 来回讨论形成的 `AROS_Phase4_Alpha_Intelligence_System_v2.md`（目标/原则/知识库/共振评分/资金流/Excel/路线）。
 > 本文件是它的**技术落地设计**：把它映射到 AROS 现有架构（Phase 3 资产），补齐 v2 中缺失的执行层（"validated" 策略如何变成可运行的代码、每日筛选的成本与可追溯性），并明确本版**不做**什么。
 >
+> **v2.1 变更（2026-07-20）**：新增「研究可信度框架（Research Integrity Framework）—— AROS 宪法」（§1.5），将反过拟合、反未来函数提升为宪法级原则；新增 Strategy Validation Gate（§5 4.1）与 Reliability Score（§4.3），补齐"策略鉴别能力"这一 AROS 真正护城河。
+>
 > 红线（沿用 v2，不可突破）：**不接入自动交易、不做黑盒股价预测、不伪造暗盘资金金额**（暗盘只输出行为推断评分+解释）。
+> 宪法级原则（v2.1 新增）：**Anti-Overfitting & Anti-Lookahead First**——任何策略进入正式库前，必须先证明：无未来信息、非参数拟合、样本外有效、跨市场环境下稳定；否则一切能力失去意义。
 
 ---
 
@@ -14,6 +17,7 @@
 | 指标层复盘（OOS / walk-forward / 排名 / 报告） | ✅ 已在 3.3 具备 |
 | 视觉层复盘（净值 / 回撤曲线） | ✅ 已在 3.2 复盘层具备 |
 | 决策跟踪（系统补后验价、人工填判断/复盘） | ✅ 本版 Sprint 4.5 |
+| 研究可信度框架（反过拟合/反未来函数 Gate + 可靠性评分，AROS 宪法） | ✅ 本版 Sprint 4.1（v2.1 新增） |
 | **逐笔交易明细 / 信号时序 / 单笔归因（trade-blotter）** | ❌ **延后**：用户明确由"上线后自选标的、自行记录"沉淀到个人交易库（4.5）来充实，不在系统自动落库范围 |
 | 自动交易 / 下单 | ❌ 永不（v2 红线） |
 | 黑盒股价预测 | ❌ 永不（v2 红线 + 3.5 已确立"no AI prediction"） |
@@ -36,6 +40,40 @@
 3. **每日运行须有界**：在受限 Universe（csi800 / 自选 watchlist）上跑，受 `limit` 约束，复用 3.2 的限流/容错模式。
 4. **全链路可追溯**：每个候选必须能回溯到"命中了哪些策略、当时 Regime、资金流快照、验证证据"，落库为 `DailyScreening` + `ScreeningHit`。
 5. **共振不是计数**：评分必须加权质量/独立性/Regime 匹配，并对高相关策略去重（见 §4）。
+
+---
+
+## 1.5 研究可信度框架（Research Integrity Framework）—— AROS 宪法
+
+> v2.1 新增。用户与 GPT 共识："找不到赚钱策略不是问题，找到一堆历史上赚钱、未来无法复制的假策略才是问题；若无法过滤，Phase 1–3 一切能力失去意义。" 故将 **反过拟合、反未来函数（Anti-Overfitting & Anti-Lookahead First）** 提升为 AROS 宪法级原则，高于一切收益目标。
+
+### 1.5.1 六大支柱
+1. **Look-ahead Bias Prevention（反未来函数）**：信号只能用 ≤T 的数据；T 日信号 → T+1 开盘成交（已架构保证）；禁止 `future_max` 类未来引用；禁止当天收盘价成交。
+2. **Survivorship Bias Prevention（反幸存者偏差）**：回测用 point-in-time Universe（D6），不在 2015 年用 2026 年股票池。
+3. **Overfitting Detection（过拟合检测）**：禁止无限参数搜索；用参数敏感性测试（perturbation）识别"MA17 恰好最好"型数据窥探（Data Snooping）。
+4. **OOS Validation（样本外验证）**：所有评级基于 walk-forward OOS，IS 仅用于开发。
+5. **Parameter Stability Test（参数稳定性）**：扰动参数后指标不应崩塌；稳定策略对邻近参数不敏感。
+6. **Strategy Validation Gate（入场闸门）**：策略进正式库前必须通过硬性闸门（§5 4.1）。
+
+### 1.5.2 AROS 已架构保证（非从零开始）
+- **T+1 执行已正确**：`src/backtest/event.py:7-13,121-126,217-221` —— day T 信号于 day T+1 开盘成交，无当天收盘未来函数。
+- **walk-forward / OOS** 已在 3.2 切断样本内/外。
+- **point-in-time Universe 概念** 已在 3.2（D6）设计。
+- **quality_star 回撤>40% 封顶 2 星** 已压制"冠军思维"。
+
+### 1.5.3 v2.1 补齐的缺口
+- **Strategy Validation Gate**（§5 4.1）：硬性 PASS/FAIL，阈值 `settings.yaml` 可配。
+- **Reliability Score**（§4.3）：可信度 = OOS 40% + 参数敏感 20% + 周期稳定 20% + 交易次数 20%。
+- **参数敏感性测试**（§5 4.1）：可调参数 ±1 扰动重跑 OOS，比较 Sharpe 崩塌。
+- **证据链结构化**（§3.3）：显式存 IS/OOS 区间、optimization、walk-forward、gate 结果。
+
+### 1.5.4 Known Limitations（诚实标注，非架构缺陷）
+1. **退出价用当日 close 非止损价**（`event.py:170-175`）：daily 近似、standing order 合法，但跳空低开时填在 close 比 stop 价略乐观；未来可改 `min(stop_px, low)`。
+2. **point-in-time 当前用"当前成分股"**：`ak.index_stock_cons` 返回当前 800 只，套历史年仍有轻微幸存者偏差；未来接历史成分源再补。
+3. **策略代码内未来函数无法 100% 自动发现**：架构保证 = walk-forward + T+1；手写 `future_max` 类需人工 review / 简单 lint（禁止信号函数引用未来偏移）。不夸大自动能力。
+
+### 1.5.5 禁止"冠军策略思维"
+系统目标是找 **Robust Strategy（稳健策略）**，非历史收益最高策略。由 quality_star 复合 + 回撤否决 + Gate 共同保证。
 
 ---
 
@@ -106,6 +144,8 @@
 | `status` | enum | validated / active / degraded / retired |
 | `validation_run_id` | str, FK→experiment_runs.id | 验证证据（4.1 写入） |
 | `quality_star` | float | 验证后质量星级（0–5，由 §4.0 的 OOS Composite Score 派生 + 否决规则，非单 Sharpe） |
+| `reliability_score` | float | 验证可信度评分（0–100，§4.3：OOS40%+参数敏感20%+周期稳定20%+交易次数20%） |
+| `gate_passed` | bool | Strategy Validation Gate 是否通过（§5 4.1）；False 不得进入正式库 |
 | `best_fit_regimes` | str(JSON) | 该策略历史表现最好的 Regime 列表（用于 4.2 匹配） |
 | `added_at` | datetime | |
 
@@ -120,6 +160,11 @@
 | `metrics_json` | str(JSON) | 统一指标：年化/最大回撤/胜率/盈亏比/交易次数/平均持仓/各 Regime 表现 |
 | `oos_json` | str(JSON) | walk-forward OOS 汇总 |
 | `status_suggestion` | enum | active / degraded（由阈值规则给出，**仅建议**，不自动启用） |
+| `is_range` / `oos_range` | str | 样本内/样本外区间（如 `2015-2021` / `2022-2026`），证据链 |
+| `optimization` | str | 参数优化方式：`none` / `fixed` / `grid(记录范围)`（反过拟合证据） |
+| `walk_forward_passed` | bool | walk-forward 是否通过 |
+| `reliability_json` | str(JSON) | 可靠性分项：参数敏感性 / 周期稳定性 / 交易次数 |
+| `gate_result_json` | str(JSON) | Strategy Validation Gate 各项 PASS/FAIL 明细 |
 | `created_at` | datetime | |
 
 ### 3.4 Daily Screening — `daily_screenings` / `screening_hits`（4.2）
@@ -207,7 +252,18 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 - **暗盘仅作风险增强因子，绝不定入选**：`hidden_flow_score` 只能对候选做"加分/减分"（如低分触发风险提示），不能单独淘汰候选（例：策略共振 90 + 公开资金 80 + 暗盘 30 仍保留，仅附风险提示）。接口保留，未来接入 Level2 可调高 `hidden_weight`（如 0.3）。
 - `risk_filter`：流动性/黑名单/高回撤惩罚后的 0–100（例如 `max_drawdown>40%` 扣 30 分）。
 
-### 4.3 评级（可配置阈值，示例）
+### 4.3 可靠性评分 Reliability Score（4.1 验证产出，供 Gate 与入库决策）
+与 `quality_star`（表现分级）互补：`quality_star` 回答"多好"，`reliability_score` 回答"多可信"。
+
+**组成（0–100）**：
+- OOS 表现 40%：OOS 收益为正且 Sharpe 达标（与 Gate 的 OOS 门槛同源）。
+- 参数敏感性 20%：对可调参数做 ±1（或小幅网格）扰动，重跑 OOS，比较 OOS Sharpe 相对基准的衰减；衰减越小分越高。无可调参数（固定规则）→ 直接满分（固定规则天然难过拟合）。
+- 周期稳定性 20%：将 OOS 期切为若干子区间（如 2015-2018 / 2019-2021 / 2022-2026），各子区间均正收益→满分；越多子区间失效扣分越多。
+- 交易次数 20%：`min(num_trades, 100)/100`；10 次赚 100% 无意义，1000 次稳定盈利更可信。
+
+**与 Gate 的关系**：`reliability_score` 是连续分；Gate（§5 4.1）对其分项设硬性阈值（参数敏感不达标 / 交易<100 → FAIL）。
+
+### 4.4 评级（可配置阈值，示例）
 `A+ ≥ 85` / `A ≥ 70` / `B ≥ 55` / `C < 55`。系统建议用语：强关注 / 重点观察 / 有研究价值 / 不优先。
 
 > **可解释性**：`daily_alpha_candidates` 同时落库各分量，报告里逐项展示，避免"黑盒分数"。
@@ -228,10 +284,29 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 - **复用**：`strategy_library.list_strategies()` 作为 `active` 种子来源；`REGIME_CATEGORY_FIT` 推 `best_fit_regimes`。
 - **验收**：可 `add-raw` 入库；启动时 10 策略自动 seed 为 `active`；`promote` 将 raw→validated 并写入 `strategy_registry`（需先有 `strategy_validations` 记录，故与 4.1 联动）；`CSI800Provider`/`WatchlistProvider` 能产出代码池。
 
-### Sprint 4.1 — Validation Engine
-- **新增**：`src/research/validate.py`：`ValidationEngine.run(strategy_id)` 调 `BatchRunner`（统一 `2015-01-01~2026-06-30`、统一成本/基准、walk-forward），写 `strategy_validations` + `strategy_registry.validation_run_id` + `quality_star`（按 §4.0 的 OOS Composite Score + 否决规则计算）+ `best_fit_regimes` + `status_suggestion`。
+### Sprint 4.1 — Validation Engine + Strategy Validation Gate
+- **新增**：`src/research/validate.py`：`ValidationEngine.run(strategy_id)` 调 `BatchRunner`（统一 `2015-01-01~2026-06-30`、统一成本/基准、walk-forward），产出：
+  - 统一指标 + OOS 汇总（写 `strategy_validations`）；
+  - `quality_star`（§4.0 OOS Composite + 否决规则）；
+  - **参数敏感性测试**：对 `spec.parameters` 做 ±1 扰动，重跑 OOS，比较 Sharpe 崩塌 → 写入 `reliability_json`；
+  - **周期稳定性**：切分 OOS 子区间统计正收益比例；
+  - **`reliability_score`**（§4.3）；
+  - **`Strategy Validation Gate`**（见下）；
+  - `best_fit_regimes` + `status_suggestion` + `gate_passed`。
+- **Strategy Validation Gate（宪法级闸门，阈值在 `settings.yaml` 可配）**：
+  ```yaml
+  validation_gate:
+    no_lookahead: true        # 架构保证(T+1)；策略代码未来函数需人工/lint
+    oos_return_gt: 0          # OOS 收益 > 0
+    oos_sharpe_gt: 0.5        # OOS Sharpe > 0.5
+    max_drawdown_lt: 0.40     # 最大回撤 < 40%
+    min_trades: 100           # 至少 100 次交易
+    param_stable: true        # 参数敏感性测试通过(扰动后 Sharpe 衰减 < 阈值)
+  ```
+  FAIL 规则：任意一项不通过 → `gate_passed=False`，**不得进入正式库**（`status_suggestion=degraded`，仅留证据）。
+- **校准（重要）**：4.1 实现后须对现有 10 个内置策略跑 Gate，确认阈值不自相矛盾（内置策略应全过；否则据结果微调阈值或标注 grandfathered + 已记录证据）。
 - **原则映射**：验证给证据，**不自动决定启用**（v2 §3.2）。`status_suggestion` 仅建议。
-- **验收**：一键验证任一策略，产出统一指标+OOS+星级+状态建议，落库可追溯。
+- **验收**：一键验证任一策略，产出指标+OOS+星级+可靠性+Gate 结果，落库可追溯（含证据链字段）。
 
 ### Sprint 4.2 — Multi-Strategy Consensus Engine
 - **新增**：`src/research/consensus.py`：`ConsensusEngine.daily(universe, date)` 加载 `active` 策略 → 对每个 `code` 跑当日信号（复用 `run_strategy` 单码信号，不重跑全样本）→ 归集 `screening_hits` → 算 `consensus` + `aros` → 写 `daily_alpha_candidates`（Top 5–10）。
@@ -303,6 +378,7 @@ class HiddenFlowProvider(Protocol):  # 行为推断，绝不返回金额
   1. akshare 资金流/板块接口偶发限流或列漂移 → 全链路 `except` 降级 + 复用 `_canon_columns`。
   2. 每日全 Universe 成本 → 限 Universe + `limit` + 信号级（非回测级）计算。
   3. 共振分数可解释性 → 各分量落库，报告逐项展示。
+  4. 过拟合/未来函数污染 → Strategy Validation Gate + 参数敏感性测试 + walk-forward 阻断；策略代码内未来函数需人工 review / lint（见 §1.5.4）。Gate 阈值须先用 10 内置策略校准，避免自相矛盾。
 - **建议首切**：**先做 4.0 + 4.1**（数据模型 + 验证引擎），因为它是 4.2–4.5 的依赖根；4.0 把现有 10 策略 seed 为 `active` 后可立刻用 4.1 产出验证证据，形成"知识库可用"的最小闭环，再逐 sprint 向上叠。
 - **调度**：`research alpha daily` CLI 提供完整单次运行；cron/任务计划程序调度属运维范畴，本设计不内置，但输出与落库均为幂等可重跑。
 
@@ -311,6 +387,7 @@ class HiddenFlowProvider(Protocol):  # 行为推断，绝不返回金额
 ## 10. 开放问题（已决策，2026-07-20 锁定）
 
 > 经用户与 GPT 讨论后于 2026-07-20 敲定，已落到各 Sprint 落地（§4.0 / §5 4.0 / §5 4.1 / §5 4.4）。
+> v2.1 另增「研究可信度框架」（§1.5）与 Strategy Validation Gate / Reliability Score（§4.3 / §5 4.1）。
 
 | # | 问题 | 最终决定 |
 |---|---|---|
