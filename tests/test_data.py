@@ -130,6 +130,45 @@ def test_normalize_daily_missing_columns_raises() -> None:
         normalize_daily(raw, "600000")
 
 
+def test_normalize_stock_list_english_headers() -> None:
+    """AKShare >=1.18 returns English `code`/`name` headers (real-data path)."""
+    raw = pd.DataFrame([{"code": "600000 ", "name": "浦发银行"}])
+    out = normalize_stock_list(raw)
+    assert list(out.columns) == ["code", "name"]
+    assert out.iloc[0]["code"] == "600000"
+    assert out.iloc[0]["name"] == "浦发银行"
+
+
+def test_normalize_daily_english_headers() -> None:
+    """Daily bars may also come back with English headers; must still normalize."""
+    raw = pd.DataFrame(
+        [
+            {
+                "date": "2024-01-03",
+                "open": 10.5,
+                "high": 10.6,
+                "low": 10.4,
+                "close": 10.55,
+                "volume": 1100,
+                "amount": 11500,
+            },
+            {
+                "date": "2024-01-02",
+                "open": 10.0,
+                "high": 10.2,
+                "low": 9.8,
+                "close": 10.1,
+                "volume": 1000,
+                "amount": 10100,
+            },
+        ]
+    )
+    out = normalize_daily(raw, "600000")
+    assert list(out.columns) == ["code", "date", "open", "high", "low", "close", "volume", "amount"]
+    assert out.iloc[0]["date"] == date(2024, 1, 2)  # sorted ascending
+    assert out.iloc[0]["code"] == "600000"
+
+
 # --------------------------------------------------------------------------- #
 # DataManager end-to-end (fake provider, temp database)
 # --------------------------------------------------------------------------- #
@@ -239,6 +278,11 @@ def test_manager_selects_astockdata_source(
         lambda: pd.DataFrame([{"code": "600000", "name": "浦发银行"}]),
     )
     cfg = AppConfig()
+    # Pin the DB explicitly: AppConfig() does not read AROS_DATABASE_URL (only
+    # get_config() does), so relying on the env var would silently fall back to
+    # the shared data/aros.db and a real-data sync elsewhere could leak into the
+    # fake 3-row expectation. Pinning the URL makes the run hermetically isolated.
+    cfg.database.url = f"sqlite:///{tmp_path}/t.db"
     cfg.data.source = "astockdata"
     dm = DataManager(config=cfg)
     assert isinstance(dm.provider, AStockDataProvider)

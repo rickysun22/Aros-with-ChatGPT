@@ -19,19 +19,39 @@ import pandas as pd
 from core.exceptions import DataError
 
 # AKShare raw column names -> canonical AROS field names.
-_DAILY_COLUMNS = {
-    "日期": "date",
-    "开盘": "open",
-    "最高": "high",
-    "最低": "low",
-    "收盘": "close",
-    "成交量": "volume",
-    "成交额": "amount",
+# Canonical AROS field -> accepted raw header candidates (in priority order).
+# AKShare has drifted column naming across releases (e.g. stock_info_a_code_name
+# now returns English `code`/`name`, while stock_zh_a_hist still returns the
+# Chinese 日期/开盘/... headers). The resolver below picks whichever header is
+# actually present so the provider keeps working across akshare versions.
+_DAILY_CANON: dict[str, tuple[str, ...]] = {
+    "date": ("日期", "date"),
+    "open": ("开盘", "open"),
+    "high": ("最高", "high"),
+    "low": ("最低", "low"),
+    "close": ("收盘", "close"),
+    "volume": ("成交量", "volume"),
+    "amount": ("成交额", "amount"),
 }
-_STOCK_COLUMNS = {
-    "代码": "code",
-    "名称": "name",
+_STOCK_CANON: dict[str, tuple[str, ...]] = {
+    "code": ("代码", "code"),
+    "name": ("名称", "name"),
 }
+
+
+def _canon_columns(raw: pd.DataFrame, canon: dict[str, tuple[str, ...]]) -> dict[str, str]:
+    """Map ``{present_raw_col: canonical_field}`` using the first matching
+    candidate for each field; raise :class:`DataError` if any field is absent.
+    """
+    rename: dict[str, str] = {}
+    for field, candidates in canon.items():
+        found = next((c for c in candidates if c in raw.columns), None)
+        if found is None:
+            raise DataError(
+                f"AKShare data missing expected columns {list(candidates)}; got {list(raw.columns)}"
+            )
+        rename[found] = field
+    return rename
 
 
 @runtime_checkable
@@ -63,10 +83,8 @@ class DataProvider(Protocol):
 
 def normalize_stock_list(raw: pd.DataFrame) -> pd.DataFrame:
     """Normalize an AKShare stock-list DataFrame to canonical columns."""
-    missing = [c for c in _STOCK_COLUMNS if c not in raw.columns]
-    if missing:
-        raise DataError(f"AKShare stock list missing columns: {missing}")
-    out = raw.rename(columns=_STOCK_COLUMNS)[list(_STOCK_COLUMNS.values())].copy()
+    rename = _canon_columns(raw, _STOCK_CANON)
+    out = raw.rename(columns=rename)[list(_STOCK_CANON)].copy()
     out["code"] = out["code"].astype(str).str.strip()
     out["name"] = out["name"].astype(str).str.strip()
     return out
@@ -74,10 +92,8 @@ def normalize_stock_list(raw: pd.DataFrame) -> pd.DataFrame:
 
 def normalize_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
     """Normalize an AKShare daily-bar DataFrame to the canonical AROS schema."""
-    missing = [c for c in _DAILY_COLUMNS if c not in raw.columns]
-    if missing:
-        raise DataError(f"AKShare daily bars missing columns: {missing}")
-    out = raw.rename(columns=_DAILY_COLUMNS)[list(_DAILY_COLUMNS.values())].copy()
+    rename = _canon_columns(raw, _DAILY_CANON)
+    out = raw.rename(columns=rename)[list(_DAILY_CANON)].copy()
     out["code"] = code
     out["date"] = pd.to_datetime(out["date"]).dt.date
     for col in ("open", "high", "low", "close", "volume", "amount"):
@@ -91,15 +107,13 @@ def normalize_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
 def normalize_index_daily(raw: pd.DataFrame, code: str) -> pd.DataFrame:
     """Normalize an AKShare index-history DataFrame to the canonical AROS schema.
 
-    ``ak.index_zh_a_hist`` returns the same Chinese OHLCV headers as stock
-    history, so the same column map applies. Unlike stocks, an index bar may
-    legitimately lack volume/amount, so those are coerced but kept (as ``NaN``)
-    rather than used to drop rows -- only a missing open/close drops a row.
+    ``ak.index_zh_a_hist`` returns the same OHLCV headers as stock history, so
+    the same column map applies. Unlike stocks, an index bar may legitimately
+    lack volume/amount, so those are coerced but kept (as ``NaN``) rather than
+    used to drop rows -- only a missing open/close drops a row.
     """
-    missing = [c for c in _DAILY_COLUMNS if c not in raw.columns]
-    if missing:
-        raise DataError(f"AKShare index bars missing columns: {missing}")
-    out = raw.rename(columns=_DAILY_COLUMNS)[list(_DAILY_COLUMNS.values())].copy()
+    rename = _canon_columns(raw, _DAILY_CANON)
+    out = raw.rename(columns=rename)[list(_DAILY_CANON)].copy()
     out["code"] = code
     out["date"] = pd.to_datetime(out["date"]).dt.date
     for col in ("open", "high", "low", "close", "volume", "amount"):

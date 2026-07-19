@@ -81,6 +81,33 @@ def _param(spec: ResearchStrategySpec, key: str, default: Any) -> Any:
     return spec.parameters.get(key, default)
 
 
+def _ensure_date_index(prices: dict[str, Any]) -> dict[str, Any]:
+    """Normalise each OHLCV frame to a DatetimeIndex on ``date``.
+
+    :class:`~backtest.event.EventBacktest` (and the cross-sectional score path)
+    require prices indexed by date. :meth:`data.manager.DataManager.get_daily`
+    returns a plain ``date`` *column* with a default RangeIndex (its documented
+    storage contract), so frames coming straight from the DataManager must be
+    re-indexed here -- otherwise the event engine builds a 1970-epoch common
+    index and every signal silently drops to zero (no trades). Frames that are
+    already DatetimeIndex'd (e.g. synthetic test data) pass through untouched.
+    """
+    out: dict[str, Any] = {}
+    for code, df in prices.items():
+        if isinstance(df, pd.Series):
+            out[code] = df  # e.g. the optional __index__ breadth series
+            continue
+        if isinstance(df.index, pd.DatetimeIndex):
+            out[code] = df
+            continue
+        norm = df.copy()
+        if "date" in norm.columns:
+            norm["date"] = pd.to_datetime(norm["date"])
+            norm = norm.set_index("date")
+        out[code] = norm
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Strategy contract
 # --------------------------------------------------------------------------- #
@@ -511,6 +538,8 @@ def run_strategy(
       day from ``score()`` (the 3.2 BatchRunner performs the real monthly
       rebalance; this is the faithful single-strategy V1.0 approximation).
     """
+    prices = _ensure_date_index(prices)
+
     if strategy.spec.engine == "portfolio":
         scores = strategy.score(prices)
         signals = _cross_section_top_n(scores, strategy.spec.risk_control.max_positions)

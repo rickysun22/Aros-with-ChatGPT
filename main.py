@@ -7,7 +7,7 @@ importable via the editable install or the pytest pythonpath setting.
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -890,6 +890,189 @@ def research_run(
         typer.echo(f"  sharpe            : {m.get('sharpe')}")
         typer.echo(f"  bench_excess_return: {m.get('bench_excess_return')}")
         typer.echo(f"  bench_beta        : {m.get('bench_beta')}")
+
+
+def _fmt_ratio_pct(value: float | None) -> str:
+    """Format a ratio as a signed percentage, or '-' for missing."""
+    if value is None:
+        return "-"
+    return f"{value * 100:+.1f}%"
+
+
+def _seed_csi800(ue: Any) -> None:
+    """Seed the csi800 pool from AKShare index constituents (index code 000906)."""
+    import akshare as ak
+
+    typer.echo("Seeding csi800 constituents from AKShare (000906) ...")
+    df = ak.index_stock_cons(symbol="000906")
+    # AKShare returns '股票代码' / '股票名称'; fall back to the first column.
+    code_col = "股票代码" if "股票代码" in df.columns else df.columns[0]
+    codes = [str(c).strip() for c in df[code_col].tolist() if str(c).strip()]
+    ue.add_codes("csi800", codes)
+    typer.echo(f"  {len(codes)} constituents")
+
+
+def _sync_batch_data(
+    dm: Any,
+    ue: Any,
+    names: list[str],
+    cfg: Any,
+    bench_key: str,
+    limit: int,
+    seed_csi800: bool,
+) -> None:
+    """Sync the market data a batch run needs: stock list, each universe's codes,
+    and the benchmark index. Codes are capped by ``limit`` for feasibility.
+    """
+    typer.echo("Syncing A-share stock list ...")
+    n_stocks = dm.sync_stock_list()
+    typer.echo(f"  {n_stocks} stocks")
+
+    if seed_csi800 or not ue.exists("csi800"):
+        _seed_csi800(ue)
+
+    from research.strategy_library import get_strategy
+
+    universes: set[str] = {get_strategy(n).spec.universe for n in names}
+    codes_to_sync: set[str] = set()
+    for u in sorted(universes):
+        if u == "csi800":
+            pool = list(ue.get_codes("csi800"))
+        elif u == "all_a":
+            df = dm.get_stock_list()
+            pool = df["code"].astype(str).tolist() if "code" in df.columns else []
+        else:  # custom
+            pool = []
+            for n in names:
+                spec = get_strategy(n).spec
+                if spec.universe == u:
+                    pool.extend(spec.custom_codes or [])
+        if limit and limit > 0:
+            pool = pool[:limit]
+        codes_to_sync.update(pool)
+
+    typer.echo(f"Syncing {len(codes_to_sync)} codes (limit={limit or 'none'}) ...")
+    synced = 0
+    for code in sorted(codes_to_sync):
+        try:
+            synced += dm.sync_daily(code)
+        except Exception as exc:  # noqa: BLE001 - one bad code must not abort the batch
+            typer.echo(f"  skip {code}: {exc}", err=True)
+    typer.echo(f"  {synced} bars stored")
+
+    bench_code = cfg.benchmark.indices[bench_key]
+    typer.echo(f"Syncing benchmark {bench_key} ({bench_code}) ...")
+    try:
+        dm.sync_index(bench_code)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"  benchmark sync failed: {exc}", err=True)
+
+
+@research_app.command("batch")
+def research_batch(
+    name: str | None = typer.Option(None, "--name", help="Batch experiment name"),
+    start: str | None = typer.Option(None, "--start", help="Start date YYYY-MM-DD"),
+    end: str | None = typer.Option(None, "--end", help="End date YYYY-MM-DD"),
+    benchmark: str | None = typer.Option(
+        None, "--benchmark", help="Benchmark key (default: configured)"
+    ),
+    strategies: str | None = typer.Option(
+        None, "--strategies", help="Comma-separated strategy names (default: all)"
+    ),
+    limit: int = typer.Option(
+        60, "--limit", help="Max codes per universe (feasibility cap; 0 = no cap)"
+    ),
+    walk_forward: tuple[int, int, int] | None = typer.Option(
+        None, "--walk-forward", help="Walk-forward TRAIN TEST STEP (years)"
+    ),
+    no_sync: bool = typer.Option(
+        False, "--no-sync", help="Skip data sync (use already-stored data)"
+    ),
+    seed_csi800: bool = typer.Option(
+        False, "--seed-csi800", help="Force reseed the csi800 pool from AKShare"
+    ),
+    emit_report: bool = typer.Option(
+        False, "--emit-report", help="Write a ranking report (md) to reports/"
+    ),
+    notes: str | None = typer.Option(None, "--notes", help="Run note"),
+) -> None:
+    """Batch-backtest strategies on REAL A-share data (Sprint 3.2 real-data path).
+
+    Syncs the prerequisite market data (stock list, each strategy's universe
+    codes, and the benchmark index) through DataManager, then runs BatchRunner
+    across the selected strategies using the DataManager-backed price/benchmark
+    providers. Use --no-sync to reuse already-stored data.
+    """
+    setup_logging()
+    cfg = get_config()
+    start = start or cfg.data.start_date
+    end = end or cfg.data.end_date
+    bench_key = benchmark or cfg.benchmark.default
+    if name is None:
+        # Include a wall-clock stamp so re-running the same day does not collide
+        # with the UNIQUE experiment_runs.name constraint (each strategy run is
+        # persisted as "{name}:{strategy}"). Pass --name for a stable label.
+        name = f"realdata-{date.today().isoformat()}-{datetime.now().strftime('%H%M%S')}"
+
+    from research.strategy_library import list_strategies
+
+    names = (
+        [s.strip() for s in strategies.split(",") if s.strip()]
+        if strategies
+        else [s.spec.name for s in list_strategies()]
+    )
+    known = {s.spec.name for s in list_strategies()}
+    for n in names:
+        if n not in known:
+            typer.echo(f"unknown strategy: {n}", err=True)
+            raise typer.Exit(code=2)
+
+    exp_cfg = ExperimentConfig(
+        name=name,
+        strategy=names[0],
+        start=start,
+        end=end,
+        benchmark=bench_key,
+        walk_forward=(
+            WalkForwardSpec(
+                train_years=walk_forward[0],
+                test_years=walk_forward[1],
+                step_years=walk_forward[2],
+            )
+            if walk_forward
+            else None
+        ),
+    )
+
+    dm = DataManager()
+    ue = UniverseEngine()
+
+    if not no_sync:
+        _sync_batch_data(dm, ue, names, cfg, bench_key, limit, seed_csi800)
+
+    from research.batch import BatchRunner
+
+    runner = BatchRunner(data_manager=dm, universe_engine=ue)
+    result = runner.run(names, exp_cfg, notes=notes, regime_analysis=True)
+
+    typer.echo(f"\nBatch {name} complete ({len(result.outcomes)} strategies)")
+    typer.echo(f"{'strategy':<22}{'cat':<9}{'OOS ret':<12}{'OOS sharpe':<12}")
+    for o in result.outcomes:
+        ret = o.oos_metrics.get("total_return")
+        sh = o.oos_metrics.get("sharpe")
+        typer.echo(f"{o.name:<22}{o.category:<9}{_fmt_ratio_pct(ret):<12}{_fmt_ratio_pct(sh):<12}")
+
+    if emit_report:
+        from pathlib import Path
+
+        from research.ranking import RankingReport
+        from research.scorecard import Scorecard
+
+        ranking = RankingReport.from_batch(result, scorecard=Scorecard())
+        out = Path(cfg.paths.report_dir) / f"batch-{name}.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(ranking.to_markdown(), encoding="utf-8")
+        typer.echo(f"Report written to {out}")
 
 
 @research_app.command("list")
