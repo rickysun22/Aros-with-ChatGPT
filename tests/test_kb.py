@@ -15,6 +15,7 @@ from research.universe_provider import (
     WatchlistProvider,
     get_universe_provider,
 )
+from universe.engine import UniverseEngine
 
 
 def _mem_session():
@@ -23,7 +24,7 @@ def _mem_session():
     return sessionmaker(eng)()
 
 
-class _FakeUE:
+class _FakeUE(UniverseEngine):
     """Stub UniverseEngine: csi800 -> a small fixed code list."""
 
     def get_codes(self, name: str) -> list[str]:
@@ -47,7 +48,9 @@ def test_raw_set_status() -> None:
     session = _mem_session()
     sid = RawPool(session).add("x")
     assert RawPool(session).set_status(sid, "pending_validation")
-    assert RawPool(session).get(sid).status == "pending_validation"
+    raw = RawPool(session).get(sid)
+    assert raw is not None
+    assert raw.status == "pending_validation"
     assert RawPool(session).set_status("nope", "raw") is False
 
 
@@ -88,12 +91,15 @@ def test_registry_update_validation_and_retire() -> None:
     )
     assert ok is True
     row = StrategyRegistry(session).get("ma_bull")
+    assert row is not None
     assert row.quality_star == 4
     assert row.reliability_score == 82.0
     assert row.gate_passed is True
     assert row.status == "active"
     assert StrategyRegistry(session).retire("ma_bull") is True
-    assert StrategyRegistry(session).get("ma_bull").status == "retired"
+    retired = StrategyRegistry(session).get("ma_bull")
+    assert retired is not None
+    assert retired.status == "retired"
 
 
 def test_registry_add_then_update() -> None:
@@ -103,7 +109,9 @@ def test_registry_add_then_update() -> None:
     )
     assert StrategyRegistry(session).get("RAW-1") is not None
     assert StrategyRegistry(session).update_validation("RAW-1", gate_passed=False) is True
-    assert StrategyRegistry(session).get("RAW-1").gate_passed is False
+    updated = StrategyRegistry(session).get("RAW-1")
+    assert updated is not None
+    assert updated.gate_passed is False
 
 
 # --------------------------------------------------------------------------- #

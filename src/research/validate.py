@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import math
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -96,7 +97,7 @@ def _sharpe_decay(base: float, perturbed: float) -> float:
 
 
 def compute_oos_composite(
-    oos_metrics: dict[str, float | None],
+    oos_metrics: Mapping[str, float | None],
     fold_returns: list[float | None],
     qcfg: Any,
 ) -> tuple[float, dict[str, float]]:
@@ -161,7 +162,7 @@ def quality_star_from_composite(
 
 
 def compute_reliability(
-    oos_metrics: dict[str, float | None],
+    oos_metrics: Mapping[str, float | None],
     fold_returns: list[float | None],
     num_params: int,
     avg_decay: float,
@@ -220,7 +221,7 @@ def compute_reliability(
 
 
 def evaluate_gate(
-    oos_metrics: dict[str, float | None],
+    oos_metrics: Mapping[str, float | None],
     max_drawdown_abs: float,
     num_trades: float | None,
     avg_decay: float,
