@@ -2,6 +2,44 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.3 — Strategy Evaluation & Ranking (2026-07-19)
+
+Completes the AROS Strategy Score (§4): bridges a `BatchResult` into the
+`Scorecard` and renders the cross-strategy ranking table in markdown / json /
+html, plugged into the research reporting family beside `ResearchReport`.
+
+### Added
+
+- `src/research/scorecard.py` — `SCORECARD_METRIC_KEYS` constant listing the 8
+  realised metric keys the 7-dimension score consumes (so the batch runner can
+  guarantee they are computed).
+- `src/research/ranking.py` (new) — `build_score_inputs(batch)` bridges a
+  `BatchResult` into `ScoreInput` (scored metrics = **OOS** walk-forward values,
+  IS/OOS carried for the E3 OOS-decay penalty; `None`/non-finite values dropped
+  so `inf`/`nan` can never poison the min-max normalisation). `RankingReport`
+  renders the §4-frozen ranking table (排名 / 策略 / 类别 / 评分 / 收益(OOS) /
+  胜率(OOS) / 回撤(OOS) / 持仓(天) / OOS衰减 / 数据可信度) as `to_markdown` /
+  `to_json` / `to_html`; `from_batch(batch, scorecard=None)` and a
+  `render_ranking_report(...)` entry point mirror `render_experiment_report`.
+- `src/research/report.py` — re-exports `RankingReport` / `build_score_inputs`
+  (接入 ResearchReport — ranking is part of the reporting family).
+- `src/research/batch.py` — `BatchRunner` now augments its requested metric list
+  with the scorecard keys (`profit_factor` / `avg_holding_days` /
+  `max_consecutive_losses`, which are *not* in the default `BacktestConfig.metrics`
+  but are produced by `compute_metrics`) so a `BatchResult` always carries
+  everything the scorer needs. Additive, no removal → no 3.2 regression.
+- `tests/test_scorecard.py` — hand-anchored scoring/ranking math, reverse
+  indicator direction (smaller drawdown scores higher), E3 OOS-decay penalty,
+  neutral (all-equal) case, configurable weights/threshold (E5).
+- `tests/test_ranking.py` — `build_score_inputs` bridge (OOS + None-drop),
+  `RankingReport` md/json/html structure, OOS-decay 低/中/高 tagging, single-window
+  (no decay) case, config-driven `Scorecard` passthrough.
+
+### Changed
+
+- `config/settings.yaml` — `research.scorecard` weights + `oos_decay_*` were
+  already present (E5); 3.3 exercises them end-to-end via `Scorecard.from_config`.
+
 ## Sprint 3.2 — Batch Strategy Experiment (2026-07-18)
 
 Traverses **策略 × 冻结 ExperimentConfig × walk-forward** and persists every

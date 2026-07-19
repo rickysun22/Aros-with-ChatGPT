@@ -47,6 +47,23 @@ _METRIC_META: dict[str, tuple[str, str | None]] = {
 # Holding-experience dimension combines two "down" metrics (averaged after norm).
 _HOLDING_METRICS: list[str] = ["avg_holding_days", "max_consecutive_losses"]
 
+# The full set of realised metric keys the 7-dimension score consumes. The
+# batch runner (3.2) augments its requested metric list with these so a
+# :class:`~research.batch.BatchResult` always carries everything the scorer
+# needs (``profit_factor`` / ``avg_holding_days`` / ``max_consecutive_losses``
+# are *not* in the default ``BacktestConfig.metrics`` but are produced by
+# :func:`backtest.metrics.compute_metrics`).
+SCORECARD_METRIC_KEYS: tuple[str, ...] = (
+    "total_return",
+    "cagr",
+    "win_rate",
+    "max_drawdown",
+    "profit_factor",
+    "sharpe",
+    "avg_holding_days",
+    "max_consecutive_losses",
+)
+
 
 @dataclass
 class ScoreInput:

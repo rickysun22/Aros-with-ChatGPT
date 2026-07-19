@@ -48,6 +48,7 @@ from research.strategy_spec import UniverseResolver
 from research.walk_forward import WalkForwardSplitter, _aggregate_walk_forward
 
 from .regime import NEUTRAL, classify_regime
+from .scorecard import SCORECARD_METRIC_KEYS
 
 PriceProvider = Callable[[list[str], str, str], dict[str, pd.DataFrame]]
 BenchmarkProvider = Callable[[str, str, str], pd.Series]
@@ -183,6 +184,14 @@ class BatchRunner:
 
         backtest_cfg = cfg.backtest.model_copy(deep=True)
         metrics_list = list(config.metrics) if config.metrics else list(cfg.backtest.metrics)
+        # Sprint 3.3: ensure the scorecard (7-dimension AROS Strategy Score) can
+        # be computed from this run. ``profit_factor`` / ``avg_holding_days`` /
+        # ``max_consecutive_losses`` are not in the default backtest metric set
+        # but ``compute_metrics`` produces them; add any that are missing so the
+        # realised metrics are always present for scoring (additive, no removal).
+        for key in SCORECARD_METRIC_KEYS:
+            if key not in metrics_list:
+                metrics_list.append(key)
         backtest_cfg.metrics = metrics_list
         backtest_cfg.benchmark = True
 

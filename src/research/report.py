@@ -22,6 +22,9 @@ from typing import Any
 from research.experiment import ExperimentConfig, ExperimentResult
 from research.models import ExperimentRun
 
+# Sprint 3.3: cross-strategy ranking report -- part of the research report
+# family (sits beside :class:`ResearchReport` and is reachable from this module).
+
 # Metric keys surfaced prominently in the report (portfolio + benchmark).
 _PORTFOLIO_KEYS = (
     "total_return",

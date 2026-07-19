@@ -17,11 +17,12 @@ from .batch import BatchResult, BatchRunner
 from .benchmark import BenchmarkComparison, BenchmarkEngine
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
+from .ranking import RankingReport, build_score_inputs
 from .regime import NEUTRAL, REGIMES, classify_regime
 from .registry import ExperimentRegistry
 from .report import ResearchReport, render_experiment_report
 from .runner import ResearchRunner
-from .scorecard import Scorecard, ScoreInput, ScoreRow
+from .scorecard import SCORECARD_METRIC_KEYS, Scorecard, ScoreInput, ScoreRow
 from .strategy_library import (
     STRATEGIES,
     ResearchStrategy,
@@ -54,9 +55,12 @@ __all__ = [
     "WalkForwardFold",
     "ResearchReport",
     "render_experiment_report",
+    "RankingReport",
+    "build_score_inputs",
     "Scorecard",
     "ScoreInput",
     "ScoreRow",
+    "SCORECARD_METRIC_KEYS",
     "BatchRunner",
     "BatchResult",
     "classify_regime",
