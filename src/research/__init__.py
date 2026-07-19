@@ -15,6 +15,15 @@ never duplicated into this package. This mirror-free rule is the reuse map from
 
 from .batch import BatchResult, BatchRunner
 from .benchmark import BenchmarkComparison, BenchmarkEngine
+from .combination import (
+    OSCILLATING,
+    TRENDING,
+    CombinationEngine,
+    CombinedResult,
+    MarketEnv,
+    env_for_regime,
+    render_combination_report,
+)
 from .experiment import ExperimentConfig, ExperimentResult, WalkForwardSpec
 from .models import ExperimentEquity, ExperimentMetric, ExperimentRun
 from .ranking import RankingReport, build_score_inputs
@@ -57,6 +66,13 @@ __all__ = [
     "render_experiment_report",
     "RankingReport",
     "build_score_inputs",
+    "CombinationEngine",
+    "CombinedResult",
+    "render_combination_report",
+    "env_for_regime",
+    "MarketEnv",
+    "TRENDING",
+    "OSCILLATING",
     "Scorecard",
     "ScoreInput",
     "ScoreRow",

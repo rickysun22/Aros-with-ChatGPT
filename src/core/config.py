@@ -288,6 +288,27 @@ class ScorecardConfig(BaseModel):
     oos_decay_threshold: float = 0.5
 
 
+class CombinationConfig(BaseModel):
+    """Cross-strategy combination weights (Phase 3 / Sprint 3.4, E5).
+
+    Drives :class:`research.combination.CombinationEngine`. Strategies are
+    combined per market environment (trending vs oscillating) so the allocation
+    tilts toward the categories / regimes that actually performed there. All
+    parameters are config-driven per the project's all-parameters-configurable
+    principle.
+    """
+
+    top_n: int = 3  # how many top-ranked strategies to combine
+    trending_regimes: list[str] = Field(default_factory=lambda: ["Bull", "Bear"])
+    oscillating_regimes: list[str] = Field(default_factory=lambda: ["Neutral", "Extreme"])
+    trending_bias_category: list[str] = Field(default_factory=lambda: ["trend", "strong"])
+    oscillating_bias_category: list[str] = Field(default_factory=lambda: ["emotion", "strong"])
+    category_bias: float = 0.5  # bonus added to a strategy's raw weight on category fit
+    perf_weight: float = 2.0  # scales the regime-performance tilt
+    perf_cap: float = 0.30  # clamp on the per-regime avg return used for the tilt
+    equal_weight_floor: float = 0.1  # minimum weight so no selected strategy is dropped
+
+
 class ResearchConfig(BaseModel):
     """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
 
@@ -301,6 +322,7 @@ class ResearchConfig(BaseModel):
     experiment_id_prefix: str = "exp_"  # short-uuid prefix for ExperimentRun.id
     metrics: list[str] | None = None  # None => reuse backtest.metrics (no parallel list)
     scorecard: ScorecardConfig = Field(default_factory=ScorecardConfig)
+    combination: CombinationConfig = Field(default_factory=CombinationConfig)
 
 
 class AppConfig(BaseModel):

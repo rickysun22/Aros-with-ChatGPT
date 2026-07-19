@@ -2,6 +2,45 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 3.4 — Strategy Combination (2026-07-19)
+
+Regime-conditioned combination of the Top-N AROS strategies (Phase 3 design §3.4).
+
+### Added
+
+- `core/config.py` — `CombinationConfig` (E5): `top_n`, trending/oscillating regime
+  lists, category-bias lists, `category_bias` / `perf_weight` / `perf_cap`,
+  `equal_weight_floor`; wired into `ResearchConfig.combination` (and `settings.yaml`
+  `research.combination`).
+- `src/research/combination.py` (new) — `CombinationEngine.combine(batch, ranking,
+  scorecard, config)` builds a per-environment (`trending` / `oscillating`) allocation:
+  * selection = Top-N by the 3.3 AROS Strategy Score (passed-in `RankingReport` or
+    recomputed);
+  * weights = base + category-fit bonus + regime-performance tilt, floored then
+    normalised to 1.0 per environment;
+  * combined metrics = weighted blend of the selected strategies' **already-computed
+    OOS metrics** (reuses `compute_metrics` output; `None`/non-finite dropped);
+  * an illustrative synthetic equity curve per environment for visualisation only
+    (clearly labelled, never used to derive a metric).
+  `env_for_regime()` maps a 3.2 regime label to an environment bucket (the seam 3.5's
+  Market Regime Engine consumes). `CombinedResult` carries `weights` / `combined_metrics`
+  / `combined_equity` + `to_dict` / `to_json` / `to_markdown`; `render_combination_report`
+  is the markdown entry point.
+- `report.py` re-exports the combination symbols; `__init__.py` exports them too.
+
+### Tests
+
+- `tests/test_combination.py` (8): weights normalise per environment + respect floor,
+  combined metrics reproducible, Top-N respected, category-bias direction
+  (trend beats emotion in trending / opposite in oscillating), regime-performance tilt,
+  hand-checked weighted blend (`total_return`/`win_rate`/`max_drawdown`), `env_for_regime`
+  mapping, reporting renders both buckets.
+
+### CI
+
+- All four gates green: `ruff check .`, `black --check .`, `mypy src tests main.py`,
+  `pytest -q` (8 new tests; full suite green).
+
 ## Sprint 3.3 — Strategy Evaluation & Ranking (2026-07-19)
 
 Completes the AROS Strategy Score (§4): bridges a `BatchResult` into the
