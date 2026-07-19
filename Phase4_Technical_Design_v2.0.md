@@ -53,16 +53,16 @@
                          └───────────────┬───────────────────────────────┘
                                          │ 验证证据(ExperimentRegistry)
                          ┌───────────────┴───────────────────────────────┐
-        Phase 4 新增      │  4.0 StrategyRegistry(可执行正式库) + RawPool   │
+        Phase 4 新增      │  4.0 StrategyRegistry + RawPool + UniverseProvider │
                          │  4.1 ValidationEngine(包裹 BatchRunner+Score)  │
                          │  4.2 ConsensusEngine(命中归集+共振评分)          │
-                         │  4.3 MarketContext + MoneyFlow(provider 接口)   │
-                         │  4.4 DailyAlphaReport(Excel, openpyxl)          │
+                         │  4.3 MarketContext + MoneyFlow(visible/hidden 权重可配)│
+                         │  4.4 DailyAlphaReport(Excel+HTML+Markdown 按日期归档)│
                          │  4.5 DecisionTracking + PersonalTradeDB         │
                          └───────────────┬───────────────────────────────┘
                                          │ research alpha daily (新增 CLI)
                          ┌───────────────┴───────────────────────────────┐
-                         │  reports/daily_alpha_<date>.xlsx + DB 落库      │
+                         │  reports/<date>/daily_alpha.{xlsx,html,md} + DB 落库 │
                          └───────────────────────────────────────────────┘
 ```
 
@@ -105,7 +105,7 @@
 | `executable_ref` | str | 运行入口：系统内置=`strategy_library` 注册名；外部=模块路径+函数 |
 | `status` | enum | validated / active / degraded / retired |
 | `validation_run_id` | str, FK→experiment_runs.id | 验证证据（4.1 写入） |
-| `quality_star` | float | 验证后质量星级（0–5，由 Scorecard/OOS 派生） |
+| `quality_star` | float | 验证后质量星级（0–5，由 §4.0 的 OOS Composite Score 派生 + 否决规则，非单 Sharpe） |
 | `best_fit_regimes` | str(JSON) | 该策略历史表现最好的 Regime 列表（用于 4.2 匹配） |
 | `added_at` | datetime | |
 
@@ -128,7 +128,7 @@
 |---|---|---|
 | `id` | str, PK | |
 | `run_date` | date | |
-| `universe` | str | csi800 / watchlist / … |
+| `universe` | str | Universe 类型：csi800 / watchlist / custom（Provider 模式，见 §5 4.0） |
 | `regime_label` | enum | 当日 Regime |
 | `regime_detail_json` | str(JSON) | 分类依据（动量/波动率/宽度），可追溯 |
 | `created_at` | datetime | |
@@ -167,6 +167,28 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 
 ## 4. 评分公式（4.2，明确数学 + 去重）
 
+### 4.0 质量星级 quality_star 派生（4.1 验证产出，供 4.2 评分使用）
+不重新发明指标——直接复用 Phase 3 Scorecard 的 OOS 分量，避免单指标（如 Sharpe）在 A 股短线语境下失真（高收益低 Sharpe 的策略对短线体系可能反而更有价值）。
+
+**OOS Composite Score（0–100）权重**：
+- OOS 收益 30%
+- OOS Sharpe 25%
+- OOS 最大回撤 25%（回撤越小分越高；该分量按 `100 * (1 - min(maxDD, 0.6)/0.6)` 折算，使回撤不单独主导）
+- OOS 稳定性 20%（各 OOS 窗口收益标准差的倒数归一，越稳越高）
+
+**星级映射（composite → star）**：
+- 90–100 → ⭐⭐⭐⭐⭐
+- 75–90  → ⭐⭐⭐⭐
+- 60–75  → ⭐⭐⭐
+- 40–60  → ⭐⭐
+- <40    → ⭐
+
+**硬性否决规则（覆盖上述映射）**：
+- OOS 最大回撤 > 40% → 最高 ⭐⭐
+- OOS 交易次数不足（< 阈值 N，依 Universe/频率定） → 最高 ⭐⭐⭐
+
+**理由**：策略库目标是寻找"可靠工具"，而非"最高收益"。
+
 ### 4.1 Consensus Score（0–100，候选级）
 分量（权重沿用 v2）：命中数量 20 / 策略质量 30 / 策略独立性 20 / Regime 匹配 15 / 板块资金 15。
 
@@ -181,7 +203,8 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 ### 4.2 AROS Final Score（0–100，候选最终优先级）
 `aros = 0.35*consensus + 0.20*market_sector_env + 0.30*money_flow + 0.15*risk_filter`
 - `market_sector_env`：Regime 友好度（Bull=100 / Neutral=70 / Bear=40 / EmotionHot=55 / EmotionCold=30）×0.5 + `sector_score`×0.5。
-- `money_flow`：`public_money_score`×0.6 + `hidden_flow_score`×0.4（行为推断，非金额）。
+- `money_flow`：`public_money_score`×0.9 + `hidden_flow_score`×0.1（行为推断，非金额）。权重来自 `settings.yaml` 的 `money_flow: {visible_weight:0.9, hidden_weight:0.1}`，可配置。
+- **暗盘仅作风险增强因子，绝不定入选**：`hidden_flow_score` 只能对候选做"加分/减分"（如低分触发风险提示），不能单独淘汰候选（例：策略共振 90 + 公开资金 80 + 暗盘 30 仍保留，仅附风险提示）。接口保留，未来接入 Level2 可调高 `hidden_weight`（如 0.3）。
 - `risk_filter`：流动性/黑名单/高回撤惩罚后的 0–100（例如 `max_drawdown>40%` 扣 30 分）。
 
 ### 4.3 评级（可配置阈值，示例）
@@ -193,15 +216,22 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 
 ## 5. Sprint 技术设计
 
-### Sprint 4.0 — Strategy Knowledge Base
-- **新增**：`src/research/kb.py`（RawPool + StrategyRegistry 管理）、ORM 表 3.1/3.2、`main.py` 下 `research kb` 子命令（`add-raw` / `list` / `promote` / `retire`）。
+### Sprint 4.0 — Strategy Knowledge Base + Universe Provider
+- **新增**：`src/research/kb.py`（RawPool + StrategyRegistry 管理）、`src/research/universe_provider.py`（Universe Provider 模式）、ORM 表 3.1/3.2、`main.py` 下 `research kb` 子命令（`add-raw` / `list` / `promote` / `retire`）。
+- **Universe Provider（不写死 csi800）**：抽象 `UniverseProvider` 协议，实现 `CSI800Provider`（调 `ak.index_stock_cons("000906")`，复用 3.2 播种逻辑）、`WatchlistProvider`（读 `--watchlist <file>` 或配置中的代码清单）、预留 `CustomProvider`（未来自定义强势池）。`settings.yaml` 配置：
+  ```yaml
+  universe:
+    type: csi800            # csi800 | watchlist | custom(未来)
+    watchlist_path: null    # type=watchlist 时生效
+  ```
+  CLI `research alpha daily --universe csi800 --watchlist my_stock.txt` 可覆盖 `type`。
 - **复用**：`strategy_library.list_strategies()` 作为 `active` 种子来源；`REGIME_CATEGORY_FIT` 推 `best_fit_regimes`。
-- **验收**：可 `add-raw` 入库；启动时 10 策略自动 seed 为 `active`；`promote` 将 raw→validated 并写入 `strategy_registry`（需先有 `strategy_validations` 记录，故与 4.1 联动）。
+- **验收**：可 `add-raw` 入库；启动时 10 策略自动 seed 为 `active`；`promote` 将 raw→validated 并写入 `strategy_registry`（需先有 `strategy_validations` 记录，故与 4.1 联动）；`CSI800Provider`/`WatchlistProvider` 能产出代码池。
 
 ### Sprint 4.1 — Validation Engine
-- **新增**：`src/research/validate.py`：`ValidationEngine.run(strategy_id)` 调 `BatchRunner`（统一 `2015-01-01~2026-06-30`、统一成本/基准、walk-forward），写 `strategy_validations` + `strategy_registry.validation_run_id` + `quality_star` + `best_fit_regimes` + `status_suggestion`。
+- **新增**：`src/research/validate.py`：`ValidationEngine.run(strategy_id)` 调 `BatchRunner`（统一 `2015-01-01~2026-06-30`、统一成本/基准、walk-forward），写 `strategy_validations` + `strategy_registry.validation_run_id` + `quality_star`（按 §4.0 的 OOS Composite Score + 否决规则计算）+ `best_fit_regimes` + `status_suggestion`。
 - **原则映射**：验证给证据，**不自动决定启用**（v2 §3.2）。`status_suggestion` 仅建议。
-- **验收**：一键验证任一策略，产出统一指标+OOS+状态建议，落库可追溯。
+- **验收**：一键验证任一策略，产出统一指标+OOS+星级+状态建议，落库可追溯。
 
 ### Sprint 4.2 — Multi-Strategy Consensus Engine
 - **新增**：`src/research/consensus.py`：`ConsensusEngine.daily(universe, date)` 加载 `active` 策略 → 对每个 `code` 跑当日信号（复用 `run_strategy` 单码信号，不重跑全样本）→ 归集 `screening_hits` → 算 `consensus` + `aros` → 写 `daily_alpha_candidates`（Top 5–10）。
@@ -215,11 +245,16 @@ quantity, direction, pnl, pnl_pct, note, source(人工录入), created_at`。
 - **复用**：`DataManager` 作为入口（新增 `get_fund_flow` / `get_sector_concept` 方法）。
 - **验收**：能取个股/板块资金流与行业·概念映射；暗盘 provider 返回"行为推断评分+文字解释"，不出现伪造金额。
 
-### Sprint 4.4 — Daily Alpha Report（Excel）
-- **新增**：`src/report/daily_alpha.py`，输出 `reports/daily_alpha_<date>.xlsx`（openpyxl，加入 `requirements.txt`）。
+### Sprint 4.4 — Daily Alpha Report（Excel + HTML + Markdown，按日期归档）
+三层定位（用户决策）：
+- **Excel**（`daily_alpha.xlsx`）：数据资产，用于保存/统计/后续分析，**必须**。
+- **HTML**（`daily_alpha.html`）：每日使用界面，浏览器/WorkBuddy 直接打开看 Top Candidates + 理由。
+- **Markdown**（`daily_alpha.md`）：给 AI/知识库用，便于未来"回顾过去半年哪些策略最有效"类检索。
+
+- **新增**：`src/report/daily_alpha.py`，输出到 `reports/<date>/daily_alpha.{xlsx,html,md}`（openpyxl 写 Excel；HTML/Markdown 复用现有 `report.py` 渲染能力；openpyxl 加入 `requirements.txt`）。
 - **Sheet1 Daily Alpha Candidate**：字段见 §3.5（v2 Sheet1）。
 - **Sheet2 Decision Tracking**：见 §3.6（v2 Sheet2），系统预填评分/评级/候选快照，人工列留空。
-- **验收**：每日运行产出 Excel，两表字段完整、可读性达 v2 要求。
+- **验收**：每日运行产出三格式报告于日期子目录，字段完整、可读性达 v2 要求。
 
 ### Sprint 4.5 — Human Feedback Loop
 - **新增**：`src/research/feedback.py` + `decision_tracking` / `personal_trades` 表；`research alpha decide` / `research alpha review` 子命令。
@@ -272,9 +307,13 @@ class HiddenFlowProvider(Protocol):  # 行为推断，绝不返回金额
 
 ---
 
-## 10. 开放问题（待你/后续确认）
+## 10. 开放问题（已决策，2026-07-20 锁定）
 
-1. 每日筛选的默认 Universe：`csi800` 还是固定 watchlist？是否允许用户维护自选池？
-2. `quality_star` 由 OOS Sharpe 还是 `Scorecard` 总分派生？阈值如何定？
-3. 暗盘行为推断的代理信号权重是否要可配置？
-4. Excel 之外是否需要同样内容的 Markdown/HTML 报告（复用现有 report 引擎）？
+> 经用户与 GPT 讨论后于 2026-07-20 敲定，已落到各 Sprint 落地（§4.0 / §5 4.0 / §5 4.1 / §5 4.4）。
+
+| # | 问题 | 最终决定 |
+|---|---|---|
+| 1 | 默认 Universe | 默认 **CSI800**，支持 `--watchlist` 覆盖；**采用 Provider 模式**（`CSI800Provider` / `WatchlistProvider` / 未来 `CustomProvider`），不写死。配置 `universe.type`。 |
+| 2 | quality_star 计算 | **不用单 OOS Sharpe**；改用 **OOS Composite Score**（OOS收益30% + Sharpe25% + 最大回撤25% + 稳定性20%）+ 否决规则（回撤>40% 封顶⭐⭐；交易次数不足 封顶⭐⭐⭐）。复用 Phase 3 Scorecard 分量，不重算。 |
+| 3 | 暗盘行为推断权重 | 可配置，默认 `visible 0.9 / hidden 0.1`；暗盘**仅作风险增强因子**，只能加减分、不能淘汰候选；保留接口，未来 Level2 可上调。 |
+| 4 | 报告格式 | **Excel + HTML + Markdown** 三格式，按 `reports/<date>/` 归档（Excel=数据资产 / HTML=每日界面 / Markdown=AI 知识库）。 |
