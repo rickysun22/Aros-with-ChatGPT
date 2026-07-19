@@ -88,10 +88,19 @@ Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D
 组合再平衡，3.0 新增 `EventBacktest` 补齐事件驱动；③ 无券商接口，「可实盘执行」=
 信号可复现产出（不含真实下单）。
 
-下一步（待 ChatGPT PASS 后推进）：
-- **3.2 Batch Strategy Experiment** — `BatchRunner` 遍历 策略 × 冻结实验配置，全走
-  walk-forward，落库；含 point-in-time 成分获取（D6）。3.1 已把所有策略收敛到统一的
-  `EventBacktest` 指标集，3.2 直接复用即可公平横评。
-- **3.3 Strategy Evaluation & Ranking** — `Scorecard` 完整评分 + 排名，接入 Report。
-- **3.4 Strategy Combination** — 分市场环境配权。
-- **3.5 Market Regime Engine** — 可解释规则分类（牛/震荡/熊/情绪冷热），产出 V1.0 报告。
+已完成（含真实 A 股数据接入）：
+
+- **3.2 Batch Strategy Experiment + 真实数据桥接（✅ 2026-07-19）** — `BatchRunner`
+  遍历 策略 × 冻结实验配置，全走 walk-forward，落库；含 point-in-time 成分获取（D6）。
+  真实数据桥接已打通：`research batch` 经 `DataManager` 取数，真实日线流入
+  `EventBacktest`，OOS 指标非零。关键修复 `run_strategy` 把 `get_daily` 的 `RangeIndex`
+  规整为 `DatetimeIndex`（否则事件引擎信号全清零、0 交易），并兼容 akshare 中英文列名漂移。
+  情绪/涨停类策略因 qfq 复权价下涨停判定失真，OOS 仍接近 0%（spec 已标注
+  `daily_approx`/`needs_intraday`），属已知数据保真度限制，非桥接缺陷。
+- **3.3 Strategy Evaluation & Ranking（✅）** — `Scorecard` 完整评分 + 排名，接入 Report。
+- **3.4 Strategy Combination（✅）** — 分市场环境配权。
+- **3.5 Market Regime Engine（✅）** — 可解释规则分类（牛/震荡/熊/情绪冷热），产出 V1.0 报告。
+
+后续可推进：
+- **Phase 4 — 实盘/调度**：把 3.2 真实数据 + 3.3–3.5 选股/组合/市场状态接入定时调度，
+  产出可执行的每日/每周研究简报（无券商下单接口，仍止步于「信号可复现产出」）。
