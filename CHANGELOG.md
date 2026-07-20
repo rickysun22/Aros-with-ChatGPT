@@ -2,6 +2,61 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.3 — Market Context & Money Flow (2026-07-20)
+
+Replaces the 4.2 neutral money-flow defaults with real, akshare-backed
+providers — while preserving the constitution ("暗盘永不淘汰候选") and the
+offline-testable property. Public money flow feeds the Consensus `S` component
+and the AROS `money_flow` weight; hidden flow is behavioural inference only
+(never a fabricated amount).
+
+### Added
+
+- `src/data/providers/moneyflow.py` (new) — Sprint 4.3 providers:
+  - `AkShareMoneyFlowProvider.get_stock_flow(code) -> MoneyFlowSignal`:
+    `public_money_score` from the stock's recent main-net-inflow %
+    (`stock_individual_fund_flow`, sigmoid around 50); `sector_score` from the
+    stock's net-inflow % **minus** its industry's (`stock_board_industry_rank_em`
+    via `stock_individual_info_em` industry lookup) so it is a *relative* strength.
+  - `AkShareHiddenFlowProvider.infer(code) -> HiddenFlowSignal`: pure
+    **behavioural inference** over recent OHLCV + fund flow — low-vol base +
+    volume pickup with net inflow ⇒ quiet accumulation (higher score);
+    up-on-rising-volume with net outflow ⇒ distribution (lower score). Returns
+    `(score, explanation)`; the explanation always states "非金额" / 行为推断.
+    No monetary amount is ever produced (v2 red line: 不伪造暗盘资金金额).
+  - Pure, unit-tested scoring helpers: `public_money_score`, `sector_score`,
+    `hidden_flow_infer`, `_recent_net_pct`, `_market_of` (sh/sz/bj mapping).
+  - **Defensive degradation**: every external fetch is wrapped; on any network
+    error / rate-limit / column drift the provider returns a **neutral** signal
+    (50) instead of raising — the daily run never aborts. Column drift is
+    handled by tolerant header resolution (`_col`), mirroring `data/provider.py`.
+- `src/data/manager.py` — `DataManager.get_fund_flow(code)` and
+  `get_sector_concept(code)` thin entry points (design §5 4.3), lazily
+  delegating to the moneyflow provider and degrading to empty on failure.
+- `main.py` — `research alpha daily` now wires `AkShareMoneyFlowProvider` /
+  `AkShareHiddenFlowProvider` by default (they self-degrade offline). New
+  `--no-money-flow` flag restores the 4.2 neutral behaviour.
+- `tests/test_moneyflow.py` (13) — pure scoring anchors (public/sector/hidden,
+  accumulation vs distribution, no-data neutral) + provider behaviour with
+  injected fakes + degradation-to-neutral on exception + contract check.
+- `tests/test_consensus.py` — +1 engine test (`test_daily_wires_43_providers`)
+  proving provider outputs flow through to `ConsensusResult`.
+
+### Notes
+
+- **No look-ahead.** Hidden-flow inference uses only historical bars up to the
+  signal date (price/volume fed from the same qfq history the engine already
+  uses); no future bar is read.
+- **Constitution preserved.** Hidden flow is a risk-enhancement factor only:
+  it can add/subtract points and attach a risk note, never eliminate a
+  candidate. On any failure it returns the neutral 50 (not a penalty).
+- **Offline-safe.** All akshare calls are lazy and guarded; the suite injects
+  fakes, so CI never needs network. Real fetches only happen on a live
+  `research alpha daily` run.
+- All four gates green: `ruff check .` / `black --check --line-length 100 .` /
+  `mypy src tests main.py --ignore-missing-imports` / `pytest -q` (13 new tests;
+  full suite 352 passed, 1 pre-existing network skip).
+
 ## Sprint 4.2 — Multi-Strategy Consensus Engine (2026-07-17)
 
 Turns the validated strategy pool (4.1) into a daily, ranked **alpha candidate**

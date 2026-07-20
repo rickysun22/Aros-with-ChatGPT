@@ -16,6 +16,8 @@ from core.config import AppConfig
 from core.database import Base
 from research.consensus import (
     ConsensusEngine,
+    HiddenFlowSignal,
+    MoneyFlowSignal,
     aros_score,
     consensus_score,
     independence_score,
@@ -76,11 +78,16 @@ def _flat_prices(codes, start, end):
     return out
 
 
-def _engine_with(custom_codes, price_provider):
+def _engine_with(custom_codes, price_provider, money_flow_provider=None, hidden_flow_provider=None):
     cfg = AppConfig()
     cfg.universe.type = "custom"
     cfg.universe.custom_codes = list(custom_codes)
-    return ConsensusEngine(config=cfg, price_provider=price_provider)
+    return ConsensusEngine(
+        config=cfg,
+        price_provider=price_provider,
+        money_flow_provider=money_flow_provider,
+        hidden_flow_provider=hidden_flow_provider,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -145,6 +152,36 @@ def test_daily_persists_ranking_by_aros() -> None:
     rows = session.query(DailyAlphaCandidate).order_by(DailyAlphaCandidate.aros_score.desc()).all()
     scores = [r.aros_score for r in rows]
     assert scores == sorted(scores, reverse=True)
+
+
+class _FakeMoneyFlow:
+    def get_stock_flow(self, code: str) -> MoneyFlowSignal:
+        return MoneyFlowSignal(sector_score=80.0, public_money_score=70.0)
+
+
+class _FakeHiddenFlow:
+    def infer(self, code: str) -> HiddenFlowSignal:
+        return HiddenFlowSignal(score=30.0, explanation="测试:行为推断(非金额)")
+
+
+def test_daily_wires_43_providers() -> None:
+    """The 4.3 provider outputs must flow through to ConsensusResult."""
+    session = _mem_session()
+    StrategyRegistry(session).seed_builtins()
+    codes = ["600000", "600036", "000001"]
+    engine = _engine_with(
+        codes,
+        lambda c, s, e: _rising_prices(c, s, e),
+        money_flow_provider=_FakeMoneyFlow(),
+        hidden_flow_provider=_FakeHiddenFlow(),
+    )
+    results = engine.daily(None, "2026-06-30", session=session, regime="Bull")
+    assert results
+    for r in results:
+        assert r.sector_score == 80.0
+        assert r.public_money_score == 70.0
+        assert r.hidden_flow_score == 30.0
+        assert r.system_suggestion == "测试:行为推断(非金额)"
 
 
 # --------------------------------------------------------------------------- #

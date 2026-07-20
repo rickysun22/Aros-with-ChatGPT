@@ -1313,12 +1313,19 @@ def alpha_daily(
     date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
     limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
     regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
+    no_money_flow: bool = typer.Option(
+        False, "--no-money-flow", help="skip 4.3 providers, use neutral (50) money-flow scores"
+    ),
 ) -> None:
     """Daily multi-strategy consensus screening -> ranked Alpha candidates."""
     setup_logging()
     import pandas as pd
 
     from data.manager import DataManager
+    from data.providers.moneyflow import (
+        AkShareHiddenFlowProvider,
+        AkShareMoneyFlowProvider,
+    )
     from research.consensus import ConsensusEngine
     from research.kb import StrategyRegistry
     from universe.engine import UniverseEngine
@@ -1338,8 +1345,22 @@ def alpha_daily(
         df = dm.get_index_daily(code, pd.Timestamp(start).date(), pd.Timestamp(end).date())
         return pd.Series(df["close"].to_numpy(dtype=float), index=pd.to_datetime(df["date"]))
 
+    # Sprint 4.3 — wire real money-flow / hidden-flow providers. They degrade to
+    # a neutral (50) signal on any network/akshare failure, so an offline run
+    # still completes (and the constitution "暗盘永不淘汰候选" holds).
+    money_flow_provider = None
+    hidden_flow_provider = None
+    if not no_money_flow:
+        money_flow_provider = AkShareMoneyFlowProvider()
+        hidden_flow_provider = AkShareHiddenFlowProvider()
+
     engine = ConsensusEngine(
-        data_manager=dm, universe_engine=ue, config=cfg, benchmark_provider=_bench
+        data_manager=dm,
+        universe_engine=ue,
+        config=cfg,
+        benchmark_provider=_bench,
+        money_flow_provider=money_flow_provider,
+        hidden_flow_provider=hidden_flow_provider,
     )
     results = engine.daily(universe, date, session=session, limit=limit, regime=regime)
     _print_consensus(results)

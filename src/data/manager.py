@@ -274,3 +274,32 @@ class DataManager:
         with self._sessionmaker() as session:
             state = session.get(SyncState, code)
             return state.last_date if state else None
+
+    # ------------------------------------------------------------------ #
+    # Sprint 4.3 — money-flow / sector-context entry points
+    # ------------------------------------------------------------------ #
+    def get_fund_flow(self, code: str) -> pd.DataFrame:
+        """Return recent individual-stock fund-flow rows (Sprint 4.3).
+
+        Delegates to the akshare-backed provider; returns an empty frame on any
+        failure so callers can degrade gracefully.
+        """
+        from data.providers.moneyflow import _ak_individual_flow
+
+        try:
+            return _ak_individual_flow(code)
+        except Exception:
+            return pd.DataFrame()
+
+    def get_sector_concept(self, code: str) -> tuple[str, str, list[str]]:
+        """Return ``(industry, concept, concept_list)`` for ``code`` (Sprint 4.3).
+
+        Concept is best-effort; empty strings/lists on failure.
+        """
+        from data.providers.moneyflow import _ak_industry_of
+
+        try:
+            industry = _ak_industry_of(code)
+            return (industry or "", "", [])
+        except Exception:
+            return ("", "", [])

@@ -47,6 +47,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **4.0** | Strategy Knowledge Base | completed | ORM `raw_strategies`/`strategy_registry`; `kb.py` (RawPool + StrategyRegistry, seeds 10 built-ins as `active`); `universe_provider.py` (CSI800/Watchlist/Custom, not hard-coded); `research kb` CLI (seed/list/add-raw/retire) |
 | **4.1** | Research Integrity Framework | completed | `validate.py` OOS Composite (return30/sharpe25/dd25/stability20) → quality_star + vetoes + param-sensitivity + period-stability + Reliability Score + Strategy Validation Gate; persists `strategy_validations`, auto-updates `strategy_registry`; `research validate` CLI; 6 new tests; four CI gates green |
 | **4.2** | Multi-Strategy Consensus Engine | completed | `consensus.py` ConsensusEngine: 信号聚合→相关性去重（Pearson OOS fold-returns，按 category+corr-cluster 并查集保留最高星）→Consensus Score(100)=H20+Q30+I20+R15+S15 与 AROS Score(100)=0.35·consensus+0.20·env+0.30·money+0.15·risk；3 张新 ORM（DailyScreening/ScreeningHit/DailyAlphaCandidate，全链路可追溯）；Provider 协议中性默认（暗盘 4.3 接入，不淘汰候选）；`alpha daily` CLI；9 新测试；四门禁全绿 |
+| **4.3** | Market Context & Money Flow | completed | `data/providers/moneyflow.py`：`AkShareMoneyFlowProvider`（get_stock_flow→MoneyFlowSignal，个股主力净流入+行业相对强弱）+ `AkShareHiddenFlowProvider`（infer→HiddenFlowSignal，纯量价行为推断评分+解释，**无金额**）；纯评分函数可单测；任意网络/列漂移异常降级为中性(50)不中断整轮；`DataManager.get_fund_flow`/`get_sector_concept` 入口；`alpha daily` 接线（--no-money-flow 可退回中性）；13 新测试；四门禁全绿 |
 
 ## Principles (non-negotiable)
 
@@ -108,10 +109,10 @@ Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D
 - **Phase 4 — 实盘/调度**：把 3.2 真实数据 + 3.3–3.5 选股/组合/市场状态接入定时调度，
   产出可执行的每日/每周研究简报（无券商下单接口，仍止步于「信号可复现产出」）。
 
-## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 + 4.2 已完成 ✅）
+## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 + 4.2 + 4.3 已完成 ✅）
 
 Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 **4.0 知识库 + 4.1 研究诚信框架**，
-作为 4.2–4.5 的依赖根。4.0 + 4.1 + 4.2 均已提交 `main`，四门禁全绿。
+作为 4.2–4.5 的依赖根。4.0 + 4.1 + 4.2 + 4.3 均已提交 `main`，四门禁全绿。
 
 - **4.0 Strategy Knowledge Base（✅）** — `raw_strategies`/`strategy_registry` ORM + `kb.py`
   （RawPool + StrategyRegistry，从 `strategy_library` 幂等 seed 10 内置策略为 `active`）+ `universe_provider.py`
@@ -128,3 +129,11 @@ Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 
   评级 A+≥85 / A≥70 / B≥55 / C<55；3 张新 ORM（DailyScreening → ScreeningHit → DailyAlphaCandidate，全链路可追溯）；
   资金流/暗盘走 Provider 协议并给中性默认（暗盘 4.3 接入，按宪法「暗盘永不淘汰候选」取中性分不淘汰）；
   `research alpha daily` CLI（--universe/--date/--limit/--regime，自动 seed 内置策略）；9 新测试；四门禁全绿。
+- **4.3 Market Context & Money Flow（✅）** — `data/providers/moneyflow.py`：`AkShareMoneyFlowProvider`
+  （`get_stock_flow(code)→MoneyFlowSignal`，个股主力净流入百分位 `public_money_score` + 相对所属行业强弱
+  `sector_score`，经 akshare `stock_individual_fund_flow`/`stock_board_industry_rank_em`/`stock_individual_info_em`）
+  + `AkShareHiddenFlowProvider`（`infer(code)→HiddenFlowSignal`，**纯量价行为推断**评分+解释，绝无金额，守住 v2 红线）；
+  评分数学抽为纯函数（`public_money_score`/`sector_score`/`hidden_flow_infer`）可单测；所有外部抓取包 try/except，
+  任一异常/限流/列漂移降级为中性(50)不中断整轮（保留 4.2 离线可测性与「暗盘永不淘汰候选」）；
+  `DataManager.get_fund_flow`/`get_sector_concept` 作为接入入口（设计 §5 4.3）；`alpha daily` 自动接线真实 Provider
+  （`--no-money-flow` 退回 4.2 中性行为）；13 新测试；四门禁全绿。
