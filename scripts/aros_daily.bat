@@ -1,15 +1,15 @@
 @echo off
 chcp 65001 >nul
 REM =====================================================================
-REM AROS 每日运行启动器 (Phase 4.9 日级运行闭环)
+REM AROS Daily Runner (Phase 4.9 daily closed loop)
 REM
-REM 用法:
-REM   1) 直接双击本文件可手动跑一次 (忽略时间检查);
-REM   2) 由 Windows 任务计划程序每日收盘后自动调用;
-REM   3) 由用户启动文件夹 VBS 守卫进程调用 (内置时间守卫)。
+REM Usage:
+REM   1) Double-click to run manually (bypasses time check);
+REM   2) Called by Windows Task Scheduler daily after market close;
+REM   3) Called by Startup folder VBS watchdog (has built-in time guard).
 REM
-REM 时间守卫: 非工作日 或 当前时间早于 18:00 则静默退出。
-REM           手动双击时传 --force 跳过守卫。
+REM Time guard: exits silently on weekends or before 18:00.
+REM            Pass --force to skip guard when running manually.
 REM =====================================================================
 
 setlocal
@@ -26,25 +26,25 @@ echo [INFO] Using python: %PYTHON%
 cd /d "%REPO%"
 set "PYTHONPATH=%REPO%\src"
 
-REM ---------- 时间守卫: 非 --force 时检查 ----------
+REM ---------- time guard: check unless --force ----------
 if not "%~1"=="--force" (
-    REM 取今天是星期几 (1=周一 ... 7=周日)
+    REM get day of week (1=Mon ... 7=Sun)
     for /f %%d in ('powershell -NoProfile -Command "(Get-Date).DayOfWeek.value__"') do set DOW=%%d
-    REM 周六(6)=周日(7) 直接退出
+    REM Saturday(6) Sunday(7) -> exit
     if %DOW% gtr 5 (
         exit /b 0
     )
-    REM 取当前小时, 早于 18 点则退出 (数据可能未就绪)
+    REM get current hour, exit if before 18:00 (data may not be ready)
     for /f %%h in ('powershell -NoProfile -Command "(Get-Date).Hour"') do set HOUR=%%h
     if %HOUR% lss 18 (
         exit /b 0
     )
 )
 
-echo [%date% %time%] AROS 每日运行开始 (universe=all_a)
+echo [%date% %time%] AROS daily run starting (universe=all_a)
 "%PYTHON%" main.py research alpha run --universe all_a
 set "RC=%errorlevel%"
-echo [%date% %time%] AROS 每日运行结束 (exit=%RC%)
+echo [%date% %time%] AROS daily run finished (exit=%RC%)
 
 endlocal
 exit /b %RC%

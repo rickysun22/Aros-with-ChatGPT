@@ -1,9 +1,10 @@
 @echo off
 REM =====================================================================
-REM 注册 AROS 为 Windows 定时任务
+REM Register AROS as a Windows scheduled task
 REM
-REM 效果: 每个工作日 18:30 自动调用 aros_daily.bat, 跑全 A 股日级筛选。
-REM 18:30 是 A 股收盘(15:00)后数据就绪的安全时间。
+REM Result: auto-runs aros_daily.bat every weekday at 18:30
+REM   for full A-share daily screening.
+REM 18:30 is safe after A-share market close (15:00) data ready.
 REM =====================================================================
 
 setlocal
@@ -11,72 +12,71 @@ set "BAT=%~dp0aros_daily.bat"
 set "VBS=%~dp0_aros_launcher.vbs"
 
 echo.
-echo  ====== AROS 定时任务注册 ======
+echo ====== AROS Task Scheduler Setup ======
 echo.
 
-REM ---------- 方案 1: 尝试用 schtasks 创建 ----------
-echo [步骤 1/2] 尝试创建计划任务 ...
+REM ---------- Method 1: try schtasks (needs admin) ----------
+echo [Step 1/2] Trying schtasks ...
 schtasks /create /tn "AROS Daily Alpha" /tr "\"%BAT%\"" /sc weekly /d MON,TUE,WED,THU,FRI /st 18:30 /f >nul 2>&1
 if %errorlevel%==0 (
     echo.
-    echo   [OK] 计划任务已创建!
-    echo       名称 : AROS Daily Alpha
-    echo       时间 : 每周一至周五 18:30
-    echo       命令 : "%BAT%"
+    echo   [OK] Scheduled task created!
+    echo       Name : AROS Daily Alpha
+    echo       Time : Mon-Fri 18:30
+    echo       Cmd  : "%BAT%"
     echo.
-    echo   管理命令:
+    echo   Manage with:
     echo     schtasks /query /tn "AROS Daily Alpha"
     echo     schtasks /delete /tn "AROS Daily Alpha" /f
     goto :done
 )
 
 echo.
-echo   [SKIP] schtasks 需要管理员权限, 当前账户没有。
-echo         切换到方案 2 (无需管理员) ...
+echo   [SKIP] schtasks needs admin. Falling back to Method 2 (no admin) ...
 
-REM ---------- 方案 2: 用 VBS 静默启动器 + 用户启动文件夹 ----------
+REM ---------- Method 2: VBS silent launcher + Startup folder ----------
 echo.
-echo [步骤 2/2] 创建 VBS 静默启动器 ...
+echo [Step 2/2] Creating VBS silent launcher ...
 
-REM 生成 VBS 启动器 (隐藏窗口运行 bat)
+REM Generate VBS launcher (runs bat hidden)
 (
 echo Set WshShell = CreateObject("WScript.Shell"^)
 echo WshShell.Run """" & Replace(WScript.ScriptFullName, "_aros_launcher.vbs", "aros_daily.bat") & """", 0, False
 ) > "%VBS%"
 
 if not exist "%VBS%" (
-    echo   [FAIL] 无法写入 VBS 文件。请检查目录权限。
+    echo   [FAIL] Cannot write VBS file. Check directory permissions.
     goto :fail
 )
 
-REM 放到用户启动文件夹 (开机自启 + 内部时间守卫)
+REM Place in user Startup folder (auto-start on login + internal time guard)
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 copy /y "%VBS%" "%STARTUP%\_aros_daily.vbs" >nul 2>&1
 if %errorlevel%==0 (
     echo.
-    echo   [OK] 已用「用户启动文件夹」方案部署!
-    echo       启动器 : %STARTUP%\_aros_daily.vbs
-    echo       原始脚本 : "%BAT%"
+    echo   [OK] Deployed via Startup folder!
+    echo       Launcher : %STARTUP%\_aros_daily.vbs
+    echo       Script   : "%BAT%"
     echo.
-    echo   注意: 此方案会在每次登录时后台启动守卫进程,
-    echo         守卫会等到工作日 18:30 才执行筛选。
-    echo         如需删除, 删除下面文件即可:
+    echo   Note: This runs a background watchdog on every login,
+    echo         which waits until weekday 18:30 to execute screening.
+    echo         To remove, delete this file:
     echo           del "%STARTUP%\_aros_daily.vbs"
 ) else (
     echo.
-    echo   [WARN] 无法写入启动文件夹。手动操作:
+    echo   [WARN] Cannot write to Startup folder. Manual steps:
     echo.
-    echo   方法 A - 任务计划程序 ^(GUI^):
-    echo     1. Win+R 输入 taskschd.msc 回车
-    echo     2. 右侧「创建基本任务」→ 名称填 AROS Daily Alpha
-    echo     3. 触发器选「每天」, 时间 18:30
-    echo     4. 操作选「启动程序」, 程序填: "%BAT%"
-    echo     5. 勾选「只在以下用户登录时运行」→ 完成
+    echo   Method A - Task Scheduler GUI:
+    echo     1. Win+R -> type taskschd.msc -> Enter
+    echo     2. Right side "Create Basic Task" -> name: AROS Daily Alpha
+    echo     3. Trigger: Daily, time 18:30
+    echo     4. Action: Start program, path: "%BAT%"
+    echo     5. Check "Run only when user is logged on" -> Finish
     echo.
-    echo   方法 B - 手动复制文件:
-    echo     复制 "%VBS%"
-    echo     到   C:\Users\你的用户名\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
-    echo     并重命名为 _aros_daily.vbs
+    echo   Method B - Manual copy:
+    echo     Copy "%VBS%"
+    echo     To   C:\Users\<YOUR_USER>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\
+    echo     Rename to _aros_daily.vbs
     goto :fail
 )
 
@@ -84,7 +84,7 @@ goto :done
 
 :fail
 echo.
-echo   部署未完成。请使用上方手动方法。
+echo   Deployment incomplete. Please use manual steps above.
 
 :done
 echo.

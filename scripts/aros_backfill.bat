@@ -1,13 +1,13 @@
 @echo off
 chcp 65001 >nul
 REM =====================================================================
-REM AROS 一次性全 A 股历史回填 (首次部署必跑)
+REM AROS Full A-Share Historical Backfill (run once on first deploy)
 REM
-REM 把全市场 (~5300 只) 的日线历史 (默认自 2024-01-01) 拉取并写入本地库。
-REM 后续每日运行只做增量同步, 因此这一步只需跑一次。
+REM Pulls daily bars for ~5300 stocks (from 2024-01-01) into local DB.
+REM After this, daily runs only do incremental sync -- so run this ONCE.
 REM
-REM 耗时: 取决于网络, 通常 20~60 分钟。建议在命令行前台运行并观察进度。
-REM 若中途失败, 重跑即可 —— 写入是幂等 upsert, 已拉取的不会重复。
+REM Takes 20-60 min depending on network. Run in foreground to watch.
+REM Safe to re-run on failure (idempotent upsert, already-fetched skipped).
 REM =====================================================================
 setlocal
 set "REPO=%~dp0.."
@@ -21,8 +21,8 @@ if exist "%REPO%\.venv\Scripts\python.exe" (
 echo [INFO] Using python: %PYTHON%
 
 if not exist "%PYTHON%" (
-    echo [ERROR] 未找到 python: %PYTHON%
-    echo         请编辑本文件, 把 PYTHON 指向你的解释器(建议 venv)。
+    echo [ERROR] Python not found: %PYTHON%
+    echo         Edit this file and set PYTHON to your interpreter path.
     pause
     exit /b 1
 )
@@ -30,19 +30,19 @@ if not exist "%PYTHON%" (
 cd /d "%REPO%"
 set "PYTHONPATH=%REPO%\src"
 
-echo [%date% %time%] 开始全 A 股历史回填 (all_a, 自 2024-01-01) ...
+echo [%date% %time%] Starting full A-share backfill (all_a, from 2024-01-01) ...
 "%PYTHON%" scripts/sync_universe.py all_a 2024-01-01
 set "RC=%errorlevel%"
-echo [%date% %time%] 回填结束 (exit=%RC%)
+echo [%date% %time%] Backfill finished (exit=%RC%)
 
 endlocal
 if not %RC%==0 (
     echo.
-    echo [提示] 回填似乎出错了 (exit=%RC%)。检查上面的报错信息。
-    echo        常见原因: 网络不通 / 东财被限流 / python 依赖缺失。
-    echo        重跑即可, 已拉取的数据不会重复 (幂等 upsert)。
+    echo [NOTE] Backfill may have failed (exit=%RC%). Check errors above.
+    echo       Common causes: network blocked, eastmoney rate-limit, missing deps.
+    echo       Safe to re-run -- already-fetched data will be skipped.
 )
 echo.
-echo 按任意键关闭本窗口...
+echo Press any key to close this window...
 pause >nul
 exit /b %RC%
