@@ -236,3 +236,72 @@ class DailyAlphaCandidate(Base):
     thesis: Mapped[str | None] = mapped_column(Text, nullable=True)
     system_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.5 -- Human feedback loop (Sprint 4.5)
+# --------------------------------------------------------------------------- #
+class DecisionTracking(Base):
+    """One human decision + system post-hoc on a daily Alpha candidate (§3.6).
+
+    System auto-fills post-hoc prices (result_1d/3d/5d/10d, float pnl, final
+    return) from ``DataManager``; the human only fills the judgement columns
+    (``human_decision`` / ``human_reason`` / plan-vs-actual / ``review_summary``
+    / ``verified_system``). ``signal_date`` anchors the post-hoc window (T+1
+    entry) and is stored redundantly so the record survives screening deletion.
+    """
+
+    __tablename__ = "decision_tracking"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    candidate_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("daily_alpha_candidates.id"), index=True, nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    # T-day signal date of the candidate; anchors the post-hoc window (entry = T+1).
+    signal_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    human_decision: Mapped[str] = mapped_column(
+        String(16), default="关注", nullable=False
+    )  # 关注/买入/放弃/忽略
+    human_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    plan_entry: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_entry: Mapped[float | None] = mapped_column(Float, nullable=True)
+    plan_position: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0-1 fraction
+    actual_position: Mapped[float | None] = mapped_column(Float, nullable=True)
+    review_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    result_1d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_3d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_5d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_10d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_float_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_float_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
+    final_return: Mapped[float | None] = mapped_column(Float, nullable=True)
+    verified_system: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    review_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class PersonalTrade(Base):
+    """A manually-recorded personal trade (§3.6, the deferred deep-review sink).
+
+    Live-from-launch the user records their own selected names here; the system
+    does NOT auto-ingest or derive — this is purely a self-kept trade blotter that
+    enriches the database over time. ``source`` marks 人工录入 / 导入.
+    """
+
+    __tablename__ = "personal_trades"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    entry_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    exit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    direction: Mapped[str | None] = mapped_column(String(8), nullable=True)  # long/short
+    pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pnl_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), default="人工录入", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

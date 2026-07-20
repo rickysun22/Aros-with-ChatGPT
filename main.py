@@ -1377,10 +1377,153 @@ def alpha_daily(
 
     run_date = pd.Timestamp(date).date() if date else _date.today()
     candidates = query_candidates(session, run_date)
-    paths = DailyAlphaReport().generate(candidates, run_date, out_dir="reports")
+    # Sprint 4.5 — fill Sheet2's human columns when the user has judged candidates.
+    from research.feedback import query_decisions
+
+    decisions = query_decisions(session, run_date)
+    paths = DailyAlphaReport().generate(
+        candidates, run_date, out_dir="reports", decision_by_candidate=decisions
+    )
     typer.echo(f"Report -> xlsx: {paths['xlsx']}")
     typer.echo(f"         html: {paths['html']}")
     typer.echo(f"         md  : {paths['md']}")
+
+
+@alpha_app.command("decide")
+def alpha_decide(
+    candidate_id: str = typer.Option(..., "--candidate", help="daily_alpha_candidates.id"),
+    decision: str = typer.Option(..., "--decision", help="关注 / 买入 / 放弃 / 忽略"),
+    reason: str | None = typer.Option(None, "--reason", help="人工理由"),
+) -> None:
+    """Record a human judgement on a daily Alpha candidate (4.5 human loop)."""
+    setup_logging()
+    from research.feedback import HUMAN_DECISIONS, record_decision
+
+    if decision not in HUMAN_DECISIONS:
+        typer.echo(f"ERROR: --decision must be one of {HUMAN_DECISIONS}", err=True)
+        raise typer.Exit(code=1)
+    session = _kb_session()
+    try:
+        dt = record_decision(session, candidate_id, decision, reason)
+    except ValueError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Recorded decision '{dt.human_decision}' for {dt.code} (tracking {dt.id})")
+
+
+@alpha_app.command("review")
+def alpha_review(
+    tracking_id: str = typer.Option(..., "--tracking", help="decision_tracking.id"),
+    verified: bool | None = typer.Option(
+        None, "--verified/--not-verified", help="系统是否被该候选验证"
+    ),
+    summary: str | None = typer.Option(None, "--summary", help="复盘总结"),
+) -> None:
+    """Fill auto post-hoc (1/3/5/10d + float pnl) and optional review fields."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.feedback import review
+
+    session = _kb_session()
+    dm = DataManager()
+
+    def _price(code: str, start: date, end: date) -> pd.DataFrame | None:
+        return dm.get_daily(code, start, end)
+
+    try:
+        dt = review(
+            session,
+            tracking_id,
+            _price,
+            verified_system=verified,
+            review_summary=summary,
+        )
+    except ValueError as exc:
+        typer.echo(f"ERROR: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    def _pct(v: float | None) -> str:
+        return f"{v * 100:+.1f}%" if v is not None else "-"
+
+    typer.echo(f"Review for {dt.code} (tracking {dt.id}):")
+    typer.echo(
+        f"  post-hoc: 1d {_pct(dt.result_1d)} · 3d {_pct(dt.result_3d)} · "
+        f"5d {_pct(dt.result_5d)} · 10d {_pct(dt.result_10d)}"
+    )
+    typer.echo(
+        f"  float: 最大盈利 {_pct(dt.max_float_profit)} · 最大亏损 {_pct(dt.max_float_loss)} · "
+        f"最终 {_pct(dt.final_return)}"
+    )
+    if dt.verified_system is not None:
+        typer.echo(f"  验证系统: {'是' if dt.verified_system else '否'}")
+    if dt.review_summary:
+        typer.echo(f"  复盘: {dt.review_summary}")
+
+
+@alpha_app.command("trades-add")
+def alpha_trades_add(
+    code: str = typer.Option(..., "--code", help="标的代码"),
+    name: str | None = typer.Option(None, "--name", help="标的名称"),
+    entry_date: str | None = typer.Option(None, "--entry-date", help="YYYY-MM-DD"),
+    entry_price: float | None = typer.Option(None, "--entry-price", help="买入价"),
+    exit_date: str | None = typer.Option(None, "--exit-date", help="YYYY-MM-DD"),
+    exit_price: float | None = typer.Option(None, "--exit-price", help="卖出价"),
+    quantity: float | None = typer.Option(None, "--quantity", help="数量"),
+    direction: str | None = typer.Option(None, "--direction", help="long / short"),
+    pnl: float | None = typer.Option(None, "--pnl", help="盈亏额"),
+    pnl_pct: float | None = typer.Option(None, "--pnl-pct", help="盈亏比例"),
+    note: str | None = typer.Option(None, "--note", help="备注"),
+    source: str = typer.Option("人工录入", "--source", help="人工录入 / 导入"),
+) -> None:
+    """Manually record a personal trade (design §3.6 — system never derives)."""
+    setup_logging()
+    from datetime import date as _date
+
+    from research.feedback import record_trade
+
+    session = _kb_session()
+    ed = _date.fromisoformat(entry_date) if entry_date else None
+    xd = _date.fromisoformat(exit_date) if exit_date else None
+    trade = record_trade(
+        session,
+        code,
+        name=name,
+        entry_date=ed,
+        entry_price=entry_price,
+        exit_date=xd,
+        exit_price=exit_price,
+        quantity=quantity,
+        direction=direction,
+        pnl=pnl,
+        pnl_pct=pnl_pct,
+        note=note,
+        source=source,
+    )
+    typer.echo(f"Recorded personal trade {trade.id} for {trade.code}")
+
+
+@alpha_app.command("trades-list")
+def alpha_trades_list(
+    code: str | None = typer.Option(None, "--code", help="按代码过滤"),
+) -> None:
+    """List recorded personal trades (most recent first)."""
+    setup_logging()
+    from research.feedback import list_trades
+
+    session = _kb_session()
+    trades = list_trades(session, code=code)
+    if not trades:
+        typer.echo("(no personal trades recorded)")
+        return
+    typer.echo(f"{'id':<12}{'code':<10}{'entry':<12}{'price':<10}{'exit':<12}{'pnl%':<9}")
+    for t in trades:
+        ep = f"{t.entry_price:.2f}" if t.entry_price is not None else "-"
+        pp = f"{t.pnl_pct * 100:+.1f}%" if t.pnl_pct is not None else "-"
+        ed = t.entry_date.isoformat() if t.entry_date else "-"
+        xd = t.exit_date.isoformat() if t.exit_date else "-"
+        typer.echo(f"{t.id:<12}{t.code:<10}{ed:<12}{ep:<10}{xd:<12}{pp:<9}")
 
 
 research_app.add_typer(kb_app, name="kb")

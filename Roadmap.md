@@ -49,6 +49,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **4.2** | Multi-Strategy Consensus Engine | completed | `consensus.py` ConsensusEngine: 信号聚合→相关性去重（Pearson OOS fold-returns，按 category+corr-cluster 并查集保留最高星）→Consensus Score(100)=H20+Q30+I20+R15+S15 与 AROS Score(100)=0.35·consensus+0.20·env+0.30·money+0.15·risk；3 张新 ORM（DailyScreening/ScreeningHit/DailyAlphaCandidate，全链路可追溯）；Provider 协议中性默认（暗盘 4.3 接入，不淘汰候选）；`alpha daily` CLI；9 新测试；四门禁全绿 |
 | **4.3** | Market Context & Money Flow | completed | `data/providers/moneyflow.py`：`AkShareMoneyFlowProvider`（get_stock_flow→MoneyFlowSignal，个股主力净流入+行业相对强弱）+ `AkShareHiddenFlowProvider`（infer→HiddenFlowSignal，纯量价行为推断评分+解释，**无金额**）；纯评分函数可单测；任意网络/列漂移异常降级为中性(50)不中断整轮；`DataManager.get_fund_flow`/`get_sector_concept` 入口；`alpha daily` 接线（--no-money-flow 可退回中性）；13 新测试；四门禁全绿 |
 | **4.4** | Daily Alpha Report | completed | `report/daily_alpha.py`：每日 Top-N 候选渲染为三格式并按 `reports/<date>/` 归档——`daily_alpha.xlsx`（Sheet1 候选表 + Sheet2 决策跟踪模板，系统列预填·人工列留空）、`daily_alpha.html`（自包含离线页 + AROS SVG 柱状图）、`daily_alpha.md`（AI/知识库友好）；`query_candidates(session,run_date)` 经 DailyScreening.run_date 取数，全链路可追溯；纯离线渲染无网络/无打分；`alpha daily` 自动产出报告；`openpyxl` 入 `requirements.txt`；6 新测试；四门禁全绿 |
+| **4.5** | Human Feedback Loop | completed | `research/feedback.py` + 2 张新 ORM（`decision_tracking`/`personal_trades`）+ `alpha decide`/`review`/`trades-add`/`trades-list` 子命令；`post_hoc(code,signal_date,price_provider)` 纯函数算 1/3/5/10 日结果+最大浮盈浮亏+最终收益（entry=T+1，无未来函数，无数据降级 None）；`review` 自动补后验、人工填 verified_system/复盘总结；`personal_trades` 仅 schema+录入不推导；`alpha daily` 报告 Sheet2 经 `query_decisions` 回填人工列（无决定则留空，4.4 行为保留）；11 新测试；四门禁全绿 |
 
 ## Principles (non-negotiable)
 
@@ -145,3 +146,10 @@ Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 
   取数，全链路可追溯；渲染**纯离线无网络/无打分**。设计所谓「复用 report.py」实为 `report/engine.py` 的 ReportEngine，
   二者数据结构不同，故新建独立模块并沿用其 HTML/Markdown 风格。`alpha daily` 在 screening 后自动产出报告；
   `openpyxl` 加入 `requirements.txt`；6 新测试；四门禁全绿。
+- **4.5 Human Feedback Loop（✅）** — `research/feedback.py` + 两张新 ORM（`decision_tracking`/`personal_trades`）：
+  `post_hoc(code, signal_date, price_provider)` 纯函数算 1/3/5/10 日结果 + 最大浮盈浮亏 + 最终收益
+  （entry=T+1 交易日，无未来函数；无数据降级为 `None`，绝不编造数字）；`record_decision` 落人工判断（关注/买入/放弃/忽略）
+  并冗余存 `signal_date` 锚定后验；`review` 经 `DataManager.get_daily` 自动补后验、人工填 `verified_system`/复盘总结；
+  `personal_trades` 仅 schema + 录入接口，系统不自动推导（对应「上线后自选标的自行记录充实数据库」）。CLI：`alpha decide`
+  /`alpha review`/`alpha trades-add`/`alpha trades-list`。`alpha daily` 报告经 `query_decisions` 回填 Sheet2 人工列
+  （无决定则留空，4.4 行为不变）。11 新测试；四门禁全绿。

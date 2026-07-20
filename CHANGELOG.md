@@ -2,6 +2,25 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.5 — Human Feedback Loop (2026-07-20)
+
+Close the human loop opened by 4.2 (consensus) + 4.4 (report):
+
+- `src/research/feedback.py`: `post_hoc(code, signal_date, price_provider)` — pure,
+  fully offline-testable forward-return math (1/3/5/10d + max float pnl + final
+  return; entry = T+1 trading day, no look-ahead; degrades to `None` on no data,
+  never fabricates numbers). `record_decision` (human judgement 关注/买入/放弃/忽略
+  + redundant `signal_date` anchor) → `review` (auto post-hoc via `DataManager.get_daily`
+  + human `verified_system`/复盘总结). `record_trade`/`list_trades`/`list_decisions`/
+  `query_decisions` for the personal blotter (schema + manual entry only; system
+  never derives).
+- `src/research/models.py`: new `DecisionTracking` + `PersonalTrade` ORM tables.
+- `main.py`: `research alpha decide` / `review` / `trades-add` / `trades-list`.
+- `src/report/daily_alpha.py`: Sheet2 now back-fills human columns from
+  `decision_tracking` (via `query_decisions`) when the user has judged a candidate;
+  returns render as percentages. Blank when undecided (4.4 behaviour preserved).
+- 11 new tests; all four CI gates green (ruff/black/mypy/pytest 371 passed, 1 skip).
+
 ## Sprint 4.4 — Daily Alpha Report (2026-07-20)
 
 Renders each day's ranked Alpha candidates (produced + persisted by the 4.2

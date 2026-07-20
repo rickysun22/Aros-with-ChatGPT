@@ -157,3 +157,54 @@ def test_report_from_db_roundtrip(tmp_path) -> None:
     assert paths["xlsx"].exists()
     text = paths["md"].read_text(encoding="utf-8")
     assert "平安银行" in text
+
+
+def test_sheet2_fills_human_columns_when_decided(tmp_path) -> None:
+    from research.models import DecisionTracking
+
+    cand = _candidate("000001", aros=88.0)
+    decisions = {
+        cand.id: DecisionTracking(
+            id="dt_x",
+            candidate_id=cand.id,
+            code=cand.code,
+            signal_date=date(2026, 7, 20),
+            human_decision="买入",
+            human_reason="conviction",
+            result_1d=0.02,
+            result_3d=0.05,
+            result_5d=0.07,
+            result_10d=0.12,
+            max_float_profit=0.15,
+            max_float_loss=-0.03,
+            final_return=0.12,
+            verified_system=True,
+            review_summary="validated system",
+        )
+    }
+    paths = DailyAlphaReport().generate(
+        [cand], date(2026, 7, 20), out_dir=tmp_path, decision_by_candidate=decisions
+    )
+    wb = load_workbook(paths["xlsx"])
+    ws = wb["Decision Tracking"]
+    # header row + 1 data row
+    rows = list(ws.iter_rows(values_only=True))
+    header = rows[0]
+    data = rows[1]
+    by_col = dict(zip(header, data, strict=False))
+    assert by_col["人工决定"] == "买入"
+    assert by_col["人工理由"] == "conviction"
+    assert "2.0%" in str(by_col["1·3·5·10日结果"])  # 0.02 -> 2.0%
+    assert by_col["是否验证系统"] == "是"
+    assert by_col["复盘总结"] == "validated system"
+
+
+def test_sheet2_blank_when_no_decision(tmp_path) -> None:
+    cand = _candidate("000001", aros=88.0)
+    paths = DailyAlphaReport().generate([cand], date(2026, 7, 20), out_dir=tmp_path)
+    wb = load_workbook(paths["xlsx"])
+    ws = wb["Decision Tracking"]
+    rows = list(ws.iter_rows(values_only=True))
+    data = rows[1]
+    # Human columns stay blank when no decision exists (4.4 behaviour preserved).
+    assert data[3] in (None, "")  # 人工决定 column

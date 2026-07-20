@@ -30,10 +30,11 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from sqlalchemy.orm import Session
 
-from research.models import DailyAlphaCandidate, DailyScreening
+from research.models import DailyAlphaCandidate, DailyScreening, DecisionTracking
 
-# A cell getter maps a candidate + the report date to a display value.
-CellFn = Callable[[DailyAlphaCandidate, date], Any]
+# A cell getter maps a candidate + the report date + its decision-tracking row (or
+# None when the human has not yet judged it) to a display value.
+CellFn = Callable[[DailyAlphaCandidate, date, "DecisionTracking | None"], Any]
 
 
 def _json_list(raw: str | None) -> list[str]:
@@ -68,45 +69,91 @@ def _fmt(v: Any) -> str:
 # Sheet specifications (design §7, v2 Sheet1 / Sheet2)
 # --------------------------------------------------------------------------- #
 SHEET1: list[tuple[str, CellFn]] = [
-    ("日期", lambda c, rd: rd),
-    ("代码", lambda c, rd: c.code),
-    ("名称", lambda c, rd: c.name),
-    ("行业", lambda c, rd: c.industry),
-    ("板块", lambda c, rd: c.sector),
-    ("概念", lambda c, rd: " / ".join(_json_list(c.concepts_json))),
-    ("Regime", lambda c, rd: c.regime_label),
-    ("命中套数", lambda c, rd: c.hit_count),
-    ("命中策略", lambda c, rd: " / ".join(_json_list(c.hit_strategies_json))),
-    ("平均星级", lambda c, rd: c.avg_quality_star),
-    ("最高星级", lambda c, rd: c.max_quality_star),
-    ("共振评分", lambda c, rd: c.consensus_score),
-    ("公开资金", lambda c, rd: c.public_money_score),
-    ("隐性行为", lambda c, rd: c.hidden_flow_score),
-    ("板块强度", lambda c, rd: c.sector_score),
-    ("AROS", lambda c, rd: c.aros_score),
-    ("评级", lambda c, rd: c.rating),
-    ("优势", lambda c, rd: c.advantages),
-    ("风险", lambda c, rd: c.risks),
-    ("Thesis", lambda c, rd: c.thesis),
-    ("系统建议", lambda c, rd: c.system_suggestion),
-    ("人工判断", lambda c, rd: ""),
-    ("跟踪状态", lambda c, rd: ""),
+    ("日期", lambda c, rd, dt: rd),
+    ("代码", lambda c, rd, dt: c.code),
+    ("名称", lambda c, rd, dt: c.name),
+    ("行业", lambda c, rd, dt: c.industry),
+    ("板块", lambda c, rd, dt: c.sector),
+    ("概念", lambda c, rd, dt: " / ".join(_json_list(c.concepts_json))),
+    ("Regime", lambda c, rd, dt: c.regime_label),
+    ("命中套数", lambda c, rd, dt: c.hit_count),
+    ("命中策略", lambda c, rd, dt: " / ".join(_json_list(c.hit_strategies_json))),
+    ("平均星级", lambda c, rd, dt: c.avg_quality_star),
+    ("最高星级", lambda c, rd, dt: c.max_quality_star),
+    ("共振评分", lambda c, rd, dt: c.consensus_score),
+    ("公开资金", lambda c, rd, dt: c.public_money_score),
+    ("隐性行为", lambda c, rd, dt: c.hidden_flow_score),
+    ("板块强度", lambda c, rd, dt: c.sector_score),
+    ("AROS", lambda c, rd, dt: c.aros_score),
+    ("评级", lambda c, rd, dt: c.rating),
+    ("优势", lambda c, rd, dt: c.advantages),
+    ("风险", lambda c, rd, dt: c.risks),
+    ("Thesis", lambda c, rd, dt: c.thesis),
+    ("系统建议", lambda c, rd, dt: c.system_suggestion),
+    ("人工判断", lambda c, rd, dt: ""),
+    ("跟踪状态", lambda c, rd, dt: ""),
 ]
 
 SHEET2: list[tuple[str, CellFn]] = [
-    ("候选日期", lambda c, rd: rd),
-    ("代码·名称", lambda c, rd: f"{c.code} {c.name or ''}".strip()),
-    ("系统评分·评级", lambda c, rd: f"{c.aros_score:.1f} {c.rating}"),
-    ("人工决定", lambda c, rd: ""),
-    ("人工理由", lambda c, rd: ""),
-    ("计划·实际入场价", lambda c, rd: ""),
-    ("计划·实际仓位", lambda c, rd: ""),
-    ("复盘日期", lambda c, rd: ""),
-    ("1·3·5·10日结果", lambda c, rd: ""),
-    ("最大浮盈·浮亏", lambda c, rd: ""),
-    ("最终收益", lambda c, rd: ""),
-    ("是否验证系统", lambda c, rd: ""),
-    ("复盘总结", lambda c, rd: ""),
+    ("候选日期", lambda c, rd, dt: rd),
+    ("代码·名称", lambda c, rd, dt: f"{c.code} {c.name or ''}".strip()),
+    ("系统评分·评级", lambda c, rd, dt: f"{c.aros_score:.1f} {c.rating}"),
+    ("人工决定", lambda c, rd, dt: dt.human_decision if dt else ""),
+    (
+        "人工理由",
+        lambda c, rd, dt: dt.human_reason if dt and dt.human_reason else "",
+    ),
+    (
+        "计划·实际入场价",
+        lambda c, rd, dt: (
+            f"{_fmt(dt.plan_entry)} / {_fmt(dt.actual_entry)}"
+            if dt and (dt.plan_entry is not None or dt.actual_entry is not None)
+            else ""
+        ),
+    ),
+    (
+        "计划·实际仓位",
+        lambda c, rd, dt: (
+            f"{_fmt(dt.plan_position)} / {_fmt(dt.actual_position)}"
+            if dt and (dt.plan_position is not None or dt.actual_position is not None)
+            else ""
+        ),
+    ),
+    ("复盘日期", lambda c, rd, dt: dt.review_date if dt and dt.review_date else ""),
+    (
+        "1·3·5·10日结果",
+        lambda c, rd, dt: (
+            " / ".join(
+                f"{x * 100:.1f}%" if x is not None else "-"
+                for x in (dt.result_1d, dt.result_3d, dt.result_5d, dt.result_10d)
+            )
+            if dt
+            else ""
+        ),
+    ),
+    (
+        "最大浮盈·浮亏",
+        lambda c, rd, dt: (
+            f"{(dt.max_float_profit or 0) * 100:.1f}% / {(dt.max_float_loss or 0) * 100:.1f}%"
+            if dt and (dt.max_float_profit is not None or dt.max_float_loss is not None)
+            else ""
+        ),
+    ),
+    (
+        "最终收益",
+        lambda c, rd, dt: (
+            f"{dt.final_return * 100:.1f}%" if dt and dt.final_return is not None else ""
+        ),
+    ),
+    (
+        "是否验证系统",
+        lambda c, rd, dt: (
+            "是"
+            if dt is not None and dt.verified_system
+            else "否" if dt is not None and dt.verified_system is not None else ""
+        ),
+    ),
+    ("复盘总结", lambda c, rd, dt: dt.review_summary if dt and dt.review_summary else ""),
 ]
 
 
@@ -133,8 +180,14 @@ class DailyAlphaReport:
         candidates: Sequence[DailyAlphaCandidate],
         run_date: date,
         out_dir: str | Path = "reports",
+        *,
+        decision_by_candidate: dict[str, DecisionTracking] | None = None,
     ) -> dict[str, Path]:
         """Write all three formats under ``<out_dir>/<run_date>/``.
+
+        ``decision_by_candidate`` (from ``feedback.query_decisions``) fills Sheet2's
+        human columns when the user has judged a candidate (4.5); omitted -> the
+        decision-tracking template stays blank, exactly as in 4.4.
 
         Returns the absolute paths of the three files. Idempotent / re-runnable.
         """
@@ -144,9 +197,19 @@ class DailyAlphaReport:
         html = base / "daily_alpha.html"
         md = base / "daily_alpha.md"
 
-        self.write_excel(list(candidates), run_date, xlsx)
-        html.write_text(self.to_html(list(candidates), run_date), encoding="utf-8")
-        md.write_text(self.to_markdown(list(candidates), run_date), encoding="utf-8")
+        self.write_excel(
+            list(candidates), run_date, xlsx, decision_by_candidate=decision_by_candidate
+        )
+        html.write_text(
+            self.to_html(list(candidates), run_date, decision_by_candidate=decision_by_candidate),
+            encoding="utf-8",
+        )
+        md.write_text(
+            self.to_markdown(
+                list(candidates), run_date, decision_by_candidate=decision_by_candidate
+            ),
+            encoding="utf-8",
+        )
         return {"xlsx": xlsx.resolve(), "html": html.resolve(), "md": md.resolve()}
 
     # ------------------------------------------------------------------ #
@@ -157,14 +220,16 @@ class DailyAlphaReport:
         candidates: list[DailyAlphaCandidate],
         run_date: date,
         path: str | Path,
+        *,
+        decision_by_candidate: dict[str, DecisionTracking] | None = None,
     ) -> Path:
         path = Path(path)
         wb = Workbook()
         ws1 = wb.active
         ws1.title = "Daily Alpha Candidate"
-        self._fill_sheet(ws1, SHEET1, candidates, run_date)
+        self._fill_sheet(ws1, SHEET1, candidates, run_date, decision_by_candidate)
         ws2 = wb.create_sheet("Decision Tracking")
-        self._fill_sheet(ws2, SHEET2, candidates, run_date)
+        self._fill_sheet(ws2, SHEET2, candidates, run_date, decision_by_candidate)
         wb.save(path)
         return path
 
@@ -174,6 +239,7 @@ class DailyAlphaReport:
         spec: Sequence[tuple[str, CellFn]],
         candidates: list[DailyAlphaCandidate],
         run_date: date,
+        decision_by_candidate: dict[str, DecisionTracking] | None = None,
     ) -> None:
         header_fill = PatternFill("solid", fgColor="1F4E78")
         header_font = Font(bold=True, color="FFFFFF")
@@ -184,7 +250,8 @@ class DailyAlphaReport:
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         for c in candidates:
-            ws.append([_fmt(fn(c, run_date)) for _, fn in spec])
+            dt = decision_by_candidate.get(c.id) if decision_by_candidate else None
+            ws.append([_fmt(fn(c, run_date, dt)) for _, fn in spec])
         for col in range(1, len(spec) + 1):
             ws.column_dimensions[get_column_letter(col)].width = 18
         ws.freeze_panes = "A2"
@@ -192,7 +259,13 @@ class DailyAlphaReport:
     # ------------------------------------------------------------------ #
     # HTML (self-contained, offline)
     # ------------------------------------------------------------------ #
-    def to_html(self, candidates: list[DailyAlphaCandidate], run_date: date) -> str:
+    def to_html(
+        self,
+        candidates: list[DailyAlphaCandidate],
+        run_date: date,
+        *,
+        decision_by_candidate: dict[str, DecisionTracking] | None = None,
+    ) -> str:
         from xml.sax.saxutils import escape
 
         def esc(s: Any) -> str:
@@ -234,6 +307,8 @@ class DailyAlphaReport:
         body.append("<h2>二、候选明细</h2>")
         for i, c in enumerate(candidates, 1):
             body.append(self._candidate_detail(c, i))
+
+        body.append(self._decision_section(candidates, run_date, decision_by_candidate, html=True))
 
         return (
             "<!DOCTYPE html><html lang='zh-CN'><head>"
@@ -287,10 +362,57 @@ class DailyAlphaReport:
         block.append("</div>")
         return "".join(block)
 
+    def _decision_section(
+        self,
+        candidates: list[DailyAlphaCandidate],
+        run_date: date,
+        decision_by_candidate: dict[str, DecisionTracking] | None,
+        html: bool,
+    ) -> str:
+        """Render the decision-tracking block (4.5): human cols filled when judged."""
+        if html:
+            from xml.sax.saxutils import escape
+
+            def esc(s: Any) -> str:
+                return escape(str(s)) if s is not None else ""
+
+            head = "<h2>三、决策跟踪</h2>"
+            if not candidates:
+                return head + "<p>无候选。</p>"
+            rows = ["<table><thead><tr>"]
+            rows.append("".join(f"<th>{esc(h)}</th>" for h, _ in SHEET2))
+            rows.append("</tr></thead><tbody>")
+            for c in candidates:
+                dt = decision_by_candidate.get(c.id) if decision_by_candidate else None
+                cells = [_fmt(fn(c, run_date, dt)) for _, fn in SHEET2]
+                rows.append("<tr>" + "".join(f"<td>{esc(x)}</td>" for x in cells) + "</tr>")
+            rows.append("</tbody></table>")
+            return head + "".join(rows)
+
+        # Markdown
+        lines: list[str] = ["", "## 三、决策跟踪", ""]
+        if not candidates:
+            lines.append("> 无候选。")
+            return "\n".join(lines)
+        header = [h for h, _ in SHEET2]
+        lines.append("| " + " | ".join(header) + " |")
+        lines.append("|" + "|".join(["---"] * len(header)) + "|")
+        for c in candidates:
+            dt = decision_by_candidate.get(c.id) if decision_by_candidate else None
+            cells = [_fmt(fn(c, run_date, dt)) for _, fn in SHEET2]
+            lines.append("| " + " | ".join(cells) + " |")
+        return "\n".join(lines)
+
     # ------------------------------------------------------------------ #
     # Markdown (AI / knowledge-base friendly)
     # ------------------------------------------------------------------ #
-    def to_markdown(self, candidates: list[DailyAlphaCandidate], run_date: date) -> str:
+    def to_markdown(
+        self,
+        candidates: list[DailyAlphaCandidate],
+        run_date: date,
+        *,
+        decision_by_candidate: dict[str, DecisionTracking] | None = None,
+    ) -> str:
         lines: list[str] = []
         lines.append("# AROS 每日 Alpha 报告")
         lines.append("")
@@ -333,6 +455,10 @@ class DailyAlphaReport:
             if c.system_suggestion:
                 lines.append(f"- 系统建议: {c.system_suggestion}")
             lines.append("")
+
+        lines.append(
+            self._decision_section(candidates, run_date, decision_by_candidate, html=False)
+        )
         return "\n".join(lines)
 
 
