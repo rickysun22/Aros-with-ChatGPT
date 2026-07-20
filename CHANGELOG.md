@@ -2,6 +2,34 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.6 — Rating Validation & Calibration (2026-07-20)
+
+Closes the loop opened by 4.2 (selection) + 4.5 (human feedback): proves the AROS
+rating ladder actually ranks opportunity quality before any capital is risked.
+
+- `src/research/calibration.py` (new): `fill_all_performances` auto-fills a
+  `CandidatePerformance` row for *every* daily Alpha candidate (incremental,
+  skips matured rows, never fabricates numbers). `rating_distribution` /
+  `significance_test` answer "do higher ratings earn significantly higher forward
+  returns (S>A>B>C)?" via a hand-rolled 95% bootstrap CI + Mann-Whitney U
+  (no `scipy`). `baseline_excess` attributes edge to the market,
+  `strategy_contribution` tallies each strategy's hit/success via
+  `hit_strategies_json`, `human_vs_ai` compares AI Top-20 vs Human Top-5.
+  `propose_calibration` is deliberately **two-stage** — it only *proposes*
+  thresholds after ≥60 trading days; early runs stay observe-only (design §5.2).
+  `generate_validation_reports` renders the four deliverables as md+html+xlsx.
+- `src/research/models.py`: new `CandidatePerformance` ORM (1:1 with a candidate,
+  T+1/3/5/10/20 + float excursion + `target_hit_date` + status).
+- `src/research/feedback.py`: `post_hoc` extended with `target_pct` →
+  `target_hit_date` and T+20 horizon (4.5 callers unaffected; `POSTHOC_DAYS` unchanged).
+- Rating rename `A+ → S`: `consensus.rating_from_score` now returns `"S"`;
+  `config.rating_a_plus` → `rating_s`; `migrate_rating_labels` migrates historical
+  rows idempotently. `alpha validate migrate` runs it.
+- `main.py`: `alpha validate` Typer sub-app (`migrate` / `fill` / `report` /
+  `calibrate`).
+- Design contract: `Phase4.6-4.8_Technical_Design.md` (supersedes the separate
+  4.6/4.7 drafts). 14 new tests; all four CI gates green.
+
 ## Sprint 4.5 — Human Feedback Loop (2026-07-20)
 
 Close the human loop opened by 4.2 (consensus) + 4.4 (report):

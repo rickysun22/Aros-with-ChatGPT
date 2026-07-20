@@ -7,6 +7,7 @@ importable via the editable install or the pytest pythonpath setting.
 from __future__ import annotations
 
 import json
+import math
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -1524,6 +1525,135 @@ def alpha_trades_list(
         ed = t.entry_date.isoformat() if t.entry_date else "-"
         xd = t.exit_date.isoformat() if t.exit_date else "-"
         typer.echo(f"{t.id:<12}{t.code:<10}{ed:<12}{ep:<10}{xd:<12}{pp:<9}")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.6 -- Rating validation & calibration (sub-group of `alpha`)
+# --------------------------------------------------------------------------- #
+alpha_validate_app = typer.Typer(help="Phase 4.6 Rating Validation & Calibration")
+
+
+def _bench_price_provider(dm: Any) -> Any:
+    """Build a benchmark PriceProvider returning the index's date+close frame."""
+
+    def _p(code: str, start: date, end: date) -> Any:
+        return dm.get_index_daily(code, start, end)
+
+    return _p
+
+
+@alpha_validate_app.command("migrate")
+def alpha_validate_migrate() -> None:
+    """Migrate the historical top rating label 'A+' -> 'S' (idempotent)."""
+    setup_logging()
+    from research.calibration import migrate_rating_labels
+
+    session = _kb_session()
+    n_cand, n_perf = migrate_rating_labels(session)
+    typer.echo(f"Migrated rating A+ -> S: {n_cand} candidates, {n_perf} performances")
+
+
+@alpha_validate_app.command("fill")
+def alpha_validate_fill(
+    as_of: str | None = typer.Option(None, "--as-of", help="YYYY-MM-DD, default today"),
+    target: float = typer.Option(0.05, "--target", help="目标达成收益率 (e.g. 0.05)"),
+) -> None:
+    """Auto-fill CandidatePerformance for every candidate (incremental)."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.calibration import fill_all_performances, migrate_rating_labels
+
+    session = _kb_session()
+    migrate_rating_labels(session)  # idempotent; ensures 'S' labels before fill
+    dm = DataManager()
+
+    def _price(code: str, start: date, end: date) -> pd.DataFrame | None:
+        return dm.get_daily(code, start, end)
+
+    run_date = pd.Timestamp(as_of).date() if as_of else date.today()
+    n = fill_all_performances(session, _price, as_of=run_date, target_pct=target)
+    typer.echo(f"Filled/updated {n} candidate performance rows (as of {run_date})")
+
+
+@alpha_validate_app.command("report")
+def alpha_validate_report(
+    as_of: str | None = typer.Option(None, "--as-of", help="YYYY-MM-DD, default today"),
+    no_benchmark: bool = typer.Option(False, "--no-benchmark", help="跳过基线超额对比"),
+) -> None:
+    """Generate the 4.6 validation reports (Calibration / Strategy / Human / Paper)."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.calibration import generate_validation_reports
+
+    session = _kb_session()
+    run_date = pd.Timestamp(as_of).date() if as_of else date.today()
+    bench_provider = None
+    bench_code = None
+    if not no_benchmark:
+        try:
+            cfg = get_config()
+            dm = DataManager()
+            if cfg.benchmark.indices:
+                bench_code = next(iter(cfg.benchmark.indices.values()))
+                bench_provider = _bench_price_provider(dm)
+        except Exception as exc:  # noqa: BLE001 - degrade gracefully if no benchmark
+            typer.echo(f"(benchmark unavailable: {exc}; skipping baseline)", err=True)
+    paths = generate_validation_reports(
+        session,
+        out_dir="reports",
+        as_of=run_date,
+        bench_price_provider=bench_provider,
+        bench_code=bench_code,
+    )
+    typer.echo(f"Report -> md : {paths['md']}")
+    typer.echo(f"         html: {paths['html']}")
+    typer.echo(f"         xlsx: {paths['xlsx']}")
+
+
+@alpha_validate_app.command("calibrate")
+def alpha_validate_calibrate(
+    as_of: str | None = typer.Option(None, "--as-of", help="YYYY-MM-DD, default today"),
+) -> None:
+    """Print rating distribution + significance + a two-stage calibration proposal."""
+    setup_logging()
+    import pandas as pd
+
+    from research.calibration import build_validation_payload
+
+    session = _kb_session()
+    run_date = pd.Timestamp(as_of).date() if as_of else date.today()
+    p = build_validation_payload(session, as_of=run_date)
+    cov = p["coverage"]
+    cov_str = f"{cov:.1%}" if isinstance(cov, float) and not math.isnan(cov) else "n/a"
+    typer.echo(
+        f"As of {p['as_of']}: candidates={p['n_candidates']} "
+        f"performances={p['n_performances']} coverage={cov_str}"
+    )
+    typer.echo(f"Monotone S>A>B>C: {'YES' if p['monotone'] else 'NO'}")
+    for pair, s in p["significance"].items():
+        if s["mean_diff"] is None:
+            typer.echo(f"  {pair}: sample {s['sample']} (insufficient)")
+        else:
+            flag = "SIGNIFICANT" if s["significant"] else "not significant"
+            typer.echo(f"  {pair}: mean_diff={s['mean_diff']:+.2%} p={s['mwu_p']:.4f} {flag}")
+    cal = p["calibration"]
+    typer.echo(
+        f"Calibration: {cal['trading_days']} trading days -> "
+        f"{'CAN calibrate' if cal['can_calibrate'] else 'OBSERVE ONLY'} ({cal['note']})"
+    )
+    if cal["proposed"] is not None:
+        pr = cal["proposed"]
+        typer.echo(
+            f"  proposed thresholds: S>={pr['rating_s']:.1f} A>={pr['rating_a']:.1f} "
+            f"B>={pr['rating_b']:.1f}"
+        )
+
+
+alpha_app.add_typer(alpha_validate_app, name="validate")
 
 
 research_app.add_typer(kb_app, name="kb")

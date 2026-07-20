@@ -19,6 +19,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import date
+from typing import Any
 
 import pandas as pd
 from sqlalchemy import select
@@ -56,7 +57,8 @@ def post_hoc(
     *,
     horizon_days: tuple[int, ...] = POSTHOC_DAYS,
     window: int = 30,
-) -> dict[str, float | None] | None:
+    target_pct: float | None = None,
+) -> dict[str, Any] | None:
     """Compute post-hoc outcomes for ``code`` from its ``signal_date``.
 
     Entry is the first trading day strictly after ``signal_date`` (T+1 fill, no
@@ -64,6 +66,10 @@ def post_hoc(
     ``max_float_profit`` / ``max_float_loss`` (favorable / adverse excursion over
     the longest horizon window) and ``final_return`` (= the longest available
     result). All values are total returns (price_N / entry - 1).
+
+    When ``target_pct`` is given, the dict also carries ``target_hit_date`` —
+    the first trading day the running max return reached ``target_pct`` (used by
+    the 4.6 candidate performance review). All values are total returns.
 
     Returns ``None`` when the provider yields no usable data, so callers degrade
     gracefully (no abort, no fabricated numbers).
@@ -92,7 +98,7 @@ def post_hoc(
     fwd = closes[entry_idx:]
     longest = min(max(horizon_days), len(fwd) - 1)
 
-    out: dict[str, float | None] = {}
+    out: dict[str, Any] = {}
     for n in horizon_days:
         if n <= len(fwd) - 1:
             out[f"result_{n}d"] = fwd[n] / entry_close - 1.0
@@ -104,6 +110,14 @@ def post_hoc(
     out["max_float_profit"] = max(rets) if rets else None
     out["max_float_loss"] = min(rets) if rets else None
     out["final_return"] = out[f"result_{max(horizon_days)}d"]
+    # First trading day the running max return reached ``target_pct`` (Phase 4.6).
+    if target_pct is not None:
+        hit: date | None = None
+        for i, c in enumerate(fwd):
+            if c / entry_close - 1.0 >= target_pct:
+                hit = dates[entry_idx + i]
+                break
+        out["target_hit_date"] = hit
     return out
 
 

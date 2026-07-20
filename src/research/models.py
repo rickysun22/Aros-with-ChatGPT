@@ -305,3 +305,43 @@ class PersonalTrade(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(16), default="人工录入", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.6 -- Candidate performance review (auto post-hoc for ALL candidates)
+# --------------------------------------------------------------------------- #
+class CandidatePerformance(Base):
+    """One auto-filled performance record per daily Alpha candidate (§3 / §4.6).
+
+    Unlike ``DecisionTracking`` (which only covers candidates a human judged),
+    this table covers *every* candidate so the rating system can be validated
+    statistically (S > A > B > C monotonicity + significance). One row per
+    candidate (1:1 via ``candidate_id``). Filled incrementally by
+    ``research.calibration.fill_all_performances`` as forward windows mature
+    (T+20 needs ~1 month of trading days before it has a value).
+    """
+
+    __tablename__ = "candidate_performance"
+    __table_args__ = (UniqueConstraint("candidate_id", name="uq_candidate_perf"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # f"cp_{candidate_id}"
+    candidate_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("daily_alpha_candidates.id"), index=True, nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    signal_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    aros_score: Mapped[float] = mapped_column(Float, nullable=False)
+    rating: Mapped[str] = mapped_column(String(8), nullable=False)
+    # Forward returns (T+1 entry, total return). None until the window matures.
+    result_1d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_3d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_5d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_10d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    result_20d: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_float_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_float_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # First trading day the running max return reached ``target_pct`` (e.g. +5%).
+    target_hit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # success / fail / pending (pending = T+10 not yet available).
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    filled_at: Mapped[date | None] = mapped_column(Date, nullable=True)

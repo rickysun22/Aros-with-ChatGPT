@@ -463,8 +463,8 @@ class ConsensusConfig(BaseModel):
     risk_dd_penalty: float = 30.0
     risk_dd_threshold: float = 0.40
 
-    # Rating thresholds (design §4.4); below rating_b -> "C".
-    rating_a_plus: float = 85.0
+    # Rating thresholds (design §4.4 / Phase 4.6). Top bucket is "S" (was "A+").
+    rating_s: float = 85.0
     rating_a: float = 70.0
     rating_b: float = 55.0
     # Top-N candidates persisted per daily screening.

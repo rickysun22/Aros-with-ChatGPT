@@ -258,7 +258,7 @@ consensus:
   money_hidden_weight: 0.1      # 暗盘权重(仅风险增强，绝不淘汰候选，§4.2)
   risk_dd_penalty: 30.0         # 最大回撤超阈值扣分
   risk_dd_threshold: 0.40
-  rating_a_plus: 85.0
+  rating_s: 85.0
   rating_a: 70.0
   rating_b: 55.0
   top_n: 10                     # 每日保留的候选数量

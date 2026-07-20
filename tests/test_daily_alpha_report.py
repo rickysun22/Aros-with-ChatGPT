@@ -69,7 +69,7 @@ def test_generate_writes_three_formats(tmp_path) -> None:
 
 
 def test_excel_sheets_and_headers(tmp_path) -> None:
-    cands = [_candidate("000001", name="平安银行", rating="A+", aros=90.0)]
+    cands = [_candidate("000001", name="平安银行", rating="S", aros=90.0)]
     xlsx = DailyAlphaReport().generate(cands, date(2026, 7, 20), out_dir=tmp_path)["xlsx"]
 
     wb = load_workbook(xlsx)
@@ -82,7 +82,7 @@ def test_excel_sheets_and_headers(tmp_path) -> None:
     row = [c.value for c in ws1[2]]
     assert "000001" in row
     assert "平安银行" in row
-    assert "A+" in row
+    assert "S" in row
     assert "thesis text" in row
     # concepts joined by " / "
     assert "概念A / 概念B" in row
@@ -94,7 +94,7 @@ def test_excel_sheets_and_headers(tmp_path) -> None:
     assert all(v in (None, "") for v in human_blank[3:])  # 人工决定..复盘总结 are blank
     # system side is prefilled
     assert "000001 平安银行" == ws2.cell(row=2, column=2).value
-    assert "90.0 A+" == ws2.cell(row=2, column=3).value
+    assert "90.0 S" == ws2.cell(row=2, column=3).value
 
 
 def test_markdown_contains_key_fields(tmp_path) -> None:

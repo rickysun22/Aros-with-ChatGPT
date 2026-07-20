@@ -109,7 +109,7 @@ def test_daily_produces_candidates_and_persists() -> None:
         assert r.regime_label == "Bull"
         assert r.consensus_score > 0
         assert r.aros_score > 0
-        assert r.rating in {"A+", "A", "B", "C"}
+        assert r.rating in {"S", "A", "B", "C"}
 
     # Traceability: 3 codes x 2 hits = 6 screening hits.
     assert session.query(ScreeningHit).count() == 6
@@ -265,7 +265,7 @@ def test_aros_weights_and_rating() -> None:
     for key in ("consensus", "market_sector_env", "money_flow", "risk_filter"):
         assert key in brk
     # rating buckets
-    assert rating_from_score(90.0, cfg) == "A+"
+    assert rating_from_score(90.0, cfg) == "S"
     assert rating_from_score(72.0, cfg) == "A"
     assert rating_from_score(60.0, cfg) == "B"
     assert rating_from_score(40.0, cfg) == "C"

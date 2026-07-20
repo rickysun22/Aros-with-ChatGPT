@@ -345,9 +345,13 @@ def aros_score(
 
 
 def rating_from_score(aros: float, cfg: ConsensusConfig) -> str:
-    """Map an AROS score to a rating bucket (design §4.4)."""
-    if aros >= cfg.rating_a_plus:
-        return "A+"
+    """Map an AROS score to a rating bucket (design §4.4 / Phase 4.6).
+
+    The top bucket is ``"S"`` (renamed from the historical ``"A+"`` so the
+    rating ladder reads S > A > B > C, matching the calibration vocabulary).
+    """
+    if aros >= cfg.rating_s:
+        return "S"
     if aros >= cfg.rating_a:
         return "A"
     if aros >= cfg.rating_b:
