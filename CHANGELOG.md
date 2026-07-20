@@ -31,6 +31,34 @@ split into two orthogonal axes so the result is attributable (no confounding).
   layer, ATR fallback, data isolation, Alpha indicators, and report generation.
 - All four CI gates green (ruff / black=100 / mypy / pytest).
 
+## Sprint 4.8 — Execution Intelligence Design (占位 / Backlog, 不开发)
+
+> **Design-only sprint — no engine code shipped.** Records the contract that Phase 5
+> must implement so the 4.8 intent is not lost. Full backlog table in
+> `Phase4.6-4.8_Technical_Design.md` §III.7.
+
+**4.8 should contain (frozen here, built in Phase 5):**
+- **Entry synthesis layer** — *not* following any collected strategy's raw `entry_rules`
+  (those are inputs only). Output a unified `Entry Signal + Entry Confidence Score`,
+  decoupled from the AROS Score. Synthesizes: (a) hit-strategy combo semantics,
+  (b) the stock's current state (price action / volume / position), (c) market
+  judgement (regime / sector flows). `EntryEngine.evaluate(code, date, market_state)
+  -> EntrySignal`.
+- **Entry model families** — trend breakout / pullback dip-buy / sentiment leader,
+  each with explainable triggers.
+- **Exit Intelligence** — upgrade 4.7's proxy score_decay to a real Daily Exit
+  Intelligence (re-run Consensus Engine for the live AROS Score); emit graded
+  Exit Alerts (High/Medium/Low) with explainable reasons; stays compatible with 4.7's
+  `fixed` / `trailing` / `score_decay` baselines.
+- **Position Management** — `position_fraction × current equity` sizing + Timing /
+  Rebalancing + 100-share (A-share) lots; `Portfolio.entry_mode` (immediate /
+  signal_confirmation / manual) takes effect.
+- **Interface contracts already landed in 4.7** (no Phase-5 schema migration):
+  `entry_mode`, `entry_score` / `score_type`, `ExitConfig`. Phase 5 only fills them
+  with real values.
+- Three engines frozen: **Alpha Selection** (done, 4.2) / **Alpha Execution** (won't
+  buy) / **Alpha Protection** (won't sell).
+
 ## Sprint 4.6 — Rating Validation & Calibration (2026-07-20)
 
 Closes the loop opened by 4.2 (selection) + 4.5 (human feedback): proves the AROS

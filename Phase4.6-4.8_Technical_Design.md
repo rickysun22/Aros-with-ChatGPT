@@ -353,6 +353,27 @@ Phase4.6 Calibration → Phase4.7 Paper Trading → Phase4.8 Execution Intellige
 - `ExitConfig`（4.7 已落，Phase 5 接真实 score_decay）。
 - Phase 5 新增：`EntryEngine.evaluate(code, date, market_state) -> EntrySignal`。
 
+## III.7 4.8 应交付内容（Backlog — 冻结契约，Phase 5 实现）
+
+> **本表即 4.8 的"应含清单"**。4.8 本身只做架构占位、不写引擎代码；下表每一项都是 Phase 5 实现时必须落地、且本设计已冻结契约的内容。立项 Phase 5 时以此表为验收基线，避免遗漏 4.8 的设计意图。
+
+| 模块 | 4.8 必须冻结 / Phase 5 必须交付 | 接口 / 字段（已预留） | 验收标准（不可妥协） |
+|---|---|---|---|
+| **Entry 合成层** | 综合「策略组合信号 + 标的当期实况 + 市场判断」产出统一 Entry Signal + Entry Confidence Score，与 AROS Score 解耦 | `EntryEngine.evaluate(code, date, market_state) -> EntrySignal` | ① 不复用任一原始策略 `entry_rules`（仅作 inputs）；② 输出含 confidence + 等级；③ 与 AROS Score（值不值得关注）明确分离 |
+| **Entry 模型族** | 按策略族实现 Entry Model：趋势突破 / 回调低吸 / 情绪龙头 | — | 每族有可解释触发条件；单测覆盖各族触发/不触发 |
+| **Exit Intelligence** | 4.7 proxy → 真实 Daily Exit Intelligence：每日重跑 Consensus Engine 得真实 AROS Score 驱动 score_decay；输出带等级 Exit Alert（High/Medium/Low） | `ExitConfig.score_decay` 接真实分 | ① 与 4.7 fixed/trailing 兼容；② 退出原因可解释（逻辑衰减 / 资金转弱 / 跌破趋势） |
+| **Position Management** | 仓位公式 `position_fraction × 当前净值` + Timing / Rebalancing + 100 股整数倍（A 股） | `Portfolio.entry_mode`（immediate / signal_confirmation / manual）生效 | ① 留现金缓冲；② 满足 A 股手数约束；③ 回测可复现 |
+| **接口契约落地** | `entry_mode` / `entry_score` / `score_type` / `ExitConfig` 全部填真实值，无 schema 迁移 | 全部已在 4.7 入 schema | Phase 5 不改动 4.7 已落字段结构 |
+| **防前视 / 数据隔离** | 沿用 4.6–4.7 约束（无未来函数、配置驱动、离线可测、三个数据域不串） | — | 通过既有四道 CI 门（ruff/black/mypy/pytest） |
+
+**4.8 自身 Done 标准（占位阶段即满足）**：
+- 三大引擎定义冻结（§III.2）；
+- Entry 合成层原则写清（§III.3，非 follow 原始规则）；
+- Exit / Position 设计写清（§III.4 / §III.5）；
+- 接口契约列清（§III.6）且字段已在 4.7 落地；
+- 本 §III.7 Backlog 评审通过。
+- 引擎代码**不在 4.8 写**，统一在 **Phase 5** 实现。
+
 ---
 
 ## 跨阶段约束（贯穿 4.6–4.8）
