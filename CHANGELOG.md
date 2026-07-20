@@ -2,6 +2,70 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.2 — Multi-Strategy Consensus Engine (2026-07-17)
+
+Turns the validated strategy pool (4.1) into a daily, ranked **alpha candidate**
+list. Aggregates each strategy's T-day signal across the universe, de-duplicates
+correlated strategies by OOS behaviour, then scores every candidate with the
+Consensus Score and the AROS Final Score, persisting the whole evidence chain.
+
+### Added
+
+- `src/research/consensus.py` (new) — the Multi-Strategy Consensus Engine:
+  - Pure, unit-tested math: `regime_match_fraction(current, best_fit_regimes)`
+    (fraction of hitting strategies whose best-fit regimes contain `current`;
+    full → 1.0, none → `regime_base`); `independence_score(survivors,
+    fold_by_strategy, cfg)` (uses `abs(avg_corr)` over |corr| ≥ `corr_dedup_threshold`
+    pairs so negatively-correlated ≠ independent); `consensus_score(...)` (H20+Q30+I20+R15+S15,
+    breakdown + survivors); `aros_score(...)` (0.35·consensus + 0.20·env +
+    0.30·money + 0.15·risk, breakdown); `rating_from_score(aros, cfg)` (A+≥85 / A≥70 / B≥55 / C<55).
+  - `_dedup_survivors` — union-find over `(category, correlation-cluster)`: within a
+    category, strategies whose OOS fold-return series correlate above
+    `corr_dedup_threshold` form a cluster; only the highest-`quality_star` member
+    survives into Q/I. Non-survivors still count toward hit count H.
+  - `ConsensusEngine.__init__(data_manager, universe_engine, config, price_provider,
+    benchmark_provider, money_flow_provider, hidden_flow_provider)`. `daily(universe=,
+    signal_date=, *, session, limit=, regime=, notes=)` → `list[ConsensusResult]`:
+    resolves the active strategy pool → fetches T-day prices → aggregates per-code
+    signals → scores → ranks by AROS → persists `DailyScreening` → `ScreeningHit`s →
+    `DailyAlphaCandidate`s. `_infer_regime` derives the regime from the benchmark's
+    `MarketRegimeEngine` (falls back to `NEUTRAL`); `_fetch_prices` / `_load_validations`
+    read `StrategyValidation.oos_json.fold_returns` + `metrics_json.max_drawdown`.
+  - `MoneyFlowProvider` / `HiddenFlowProvider` Protocols + neutral defaults
+    (`sector_score=50`, hidden-flow `score=50`, "无暗盘数据源(4.3 接入)，取中性分；不淘汰候选").
+    Keeps 4.2 offline/self-contained and honours the constitution's "暗盘永不淘汰候选".
+- `src/research/models.py` — 3 Phase 4.2 ORM tables: `DailyScreening`
+  (`daily_screenings`: run_date/index, universe, regime_label, regime_detail_json),
+  `ScreeningHit` (`screening_hits`: screening_id FK, strategy_id, code, signal_date,
+  quality_star_snapshot), `DailyAlphaCandidate` (`daily_alpha_candidates`: code/name/
+  industry/sector/concepts_json, hit_count, hit_strategies_json, avg/max_quality_star,
+  consensus_score, aros_score, public_money_score, hidden_flow_score, sector_score,
+  rating, consensus_breakdown_json, aros_breakdown_json, advantages/risks/thesis/
+  system_suggestion, all fully traceable back to the screening + hits).
+- `core/config.py` — `ConsensusConfig` (w_hit/w_quality/w_independence/w_regime/
+  w_sector_money, hit_cap, regime_full, regime_base, corr_dedup_threshold,
+  default_star_when_unvalidated, w_aros_*, regime_friendliness, money_visible/hidden
+  weights, risk_dd_penalty/threshold, rating_a_plus/a/b, top_n) wired into
+  `AppConfig.consensus` and `settings.yaml consensus`.
+- `main.py` — `research alpha` Typer sub-app (`alpha daily` with --universe/--date/
+  --limit/--regime); auto-seeds the 10 built-in strategies if no active registry row
+  exists; prints the ranked candidates and reports the persisted Top-N count.
+- `tests/test_consensus.py` (9) — 4 engine integration cases (produces+persists
+  candidates / no-hits→no-candidate / respects `top_n` / persists AROS ranking) + 5
+  pure-math cases (components sum to score / dedup drops a correlated strategy /
+  independence penalises correlation / regime-match fraction / AROS weights+rating).
+
+### Notes
+
+- **No look-ahead.** Strategy signals are T-day booleans (T+1 fill handled by the
+  backtester); the consensus daily run never reads future bars. The benchmark regime
+  is inferred from bars `<= signal_date` only.
+- **Neutral money-flow by design.** Real money-flow / hidden-flow providers are 4.3's
+  responsibility; 4.2 ships neutral defaults (score 50) so the pipeline is fully
+  testable offline and the constitution ("暗盘永不淘汰候选") is preserved.
+- All four gates green: `ruff check .` / `black --check --line-length 100 src tests main.py` /
+  `mypy src tests main.py --ignore-missing-imports` / `pytest -q` (9 new tests; full suite 339 passed, 1 skipped).
+
 ## Sprint 4.1 — Research Integrity Framework (2026-07-17)
 
 The research-integrity gate (AROS 宪法): turns a walk-forward OOS run into a

@@ -46,6 +46,7 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **3.5** | Market Regime Engine + V1.0 Report | completed | 可解释规则分类器 `classify_market_regime`（5 标签 Bull/Neutral/Bear/EmotionHot/EmotionCold，非黑盒、无未来函数）：前三者由指数动量+已实现波动率判定，`EmotionHot/Cold` 由可选"涨停家数"净宽度序列判定（无宽度时永不触发，保证价格单输入确定性）；`MarketRegimeEngine` 按环境动态选策略（类别适配 `REGIME_CATEGORY_FIT` + 复用 3.2 各策略 regime_breakdown 经验 OOS 收益；情绪状态无独立宽度分段回测，诚实标注按 AROS 总评分择优）；`FinalReport.from_batch` 汇总策略库+3.3 排名+3.4 组合+3.5 引擎，输出 md/json/html 的 **V1.0 最终报告**并给出"若明天做 A 股短线最值得用哪套/哪组"的明确结论；`MarketRegimeConfig` 接入 `settings.yaml` `research.market_regime`（E5）；20 新测试（分类确定性/无未来函数/情绪驱动/趋势驱动/类别适配/动态选股/全5状态/报告结构）；四门禁全绿 |
 | **4.0** | Strategy Knowledge Base | completed | ORM `raw_strategies`/`strategy_registry`; `kb.py` (RawPool + StrategyRegistry, seeds 10 built-ins as `active`); `universe_provider.py` (CSI800/Watchlist/Custom, not hard-coded); `research kb` CLI (seed/list/add-raw/retire) |
 | **4.1** | Research Integrity Framework | completed | `validate.py` OOS Composite (return30/sharpe25/dd25/stability20) → quality_star + vetoes + param-sensitivity + period-stability + Reliability Score + Strategy Validation Gate; persists `strategy_validations`, auto-updates `strategy_registry`; `research validate` CLI; 6 new tests; four CI gates green |
+| **4.2** | Multi-Strategy Consensus Engine | completed | `consensus.py` ConsensusEngine: 信号聚合→相关性去重（Pearson OOS fold-returns，按 category+corr-cluster 并查集保留最高星）→Consensus Score(100)=H20+Q30+I20+R15+S15 与 AROS Score(100)=0.35·consensus+0.20·env+0.30·money+0.15·risk；3 张新 ORM（DailyScreening/ScreeningHit/DailyAlphaCandidate，全链路可追溯）；Provider 协议中性默认（暗盘 4.3 接入，不淘汰候选）；`alpha daily` CLI；9 新测试；四门禁全绿 |
 
 ## Principles (non-negotiable)
 
@@ -107,10 +108,10 @@ Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D
 - **Phase 4 — 实盘/调度**：把 3.2 真实数据 + 3.3–3.5 选股/组合/市场状态接入定时调度，
   产出可执行的每日/每周研究简报（无券商下单接口，仍止步于「信号可复现产出」）。
 
-## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 已完成 ✅）
+## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 + 4.2 已完成 ✅）
 
 Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 **4.0 知识库 + 4.1 研究诚信框架**，
-作为 4.2–4.5 的依赖根。两者已提交 `main`，四门禁全绿。
+作为 4.2–4.5 的依赖根。4.0 + 4.1 + 4.2 均已提交 `main`，四门禁全绿。
 
 - **4.0 Strategy Knowledge Base（✅）** — `raw_strategies`/`strategy_registry` ORM + `kb.py`
   （RawPool + StrategyRegistry，从 `strategy_library` 幂等 seed 10 内置策略为 `active`）+ `universe_provider.py`
@@ -119,3 +120,11 @@ Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 
   → quality_star(1–5, 含否决) + 参数敏感性（±1/±0.1 扰动）+ 周期稳定性 + Reliability Score
   （OOS40/参数20/周期20/交易20）+ Strategy Validation Gate（无未来函数/OOS收益>0/OOS夏普>0.5/回撤<40%/交易≥100/参数稳定）；
   落库 `strategy_validations` 并自动更新 `strategy_registry`；`research validate` CLI（run/all）；6 新测试。
+- **4.2 Multi-Strategy Consensus Engine（✅）** — `consensus.py` `ConsensusEngine`：自 `strategy_registry`
+  (active) 取已验证策略 → T 日信号聚合（无未来函数，T+1 入场）→ Pearson OOS fold-returns 相关性去重
+  （按 `category` + 相关簇并查集，每簇保留最高 `quality_star`，非幸存仍计入命中数 H）→
+  Consensus Score(0–100) = H20 + Q30 + I20 + R15 + S15 与 AROS Score(0–100) =
+  0.35·consensus + 0.20·market_sector_env + 0.30·money_flow + 0.15·risk_filter；
+  评级 A+≥85 / A≥70 / B≥55 / C<55；3 张新 ORM（DailyScreening → ScreeningHit → DailyAlphaCandidate，全链路可追溯）；
+  资金流/暗盘走 Provider 协议并给中性默认（暗盘 4.3 接入，按宪法「暗盘永不淘汰候选」取中性分不淘汰）；
+  `research alpha daily` CLI（--universe/--date/--limit/--regime，自动 seed 内置策略）；9 新测试；四门禁全绿。

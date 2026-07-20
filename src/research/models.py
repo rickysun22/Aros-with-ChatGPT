@@ -167,3 +167,72 @@ class StrategyValidation(Base):
     reliability_json: Mapped[str] = mapped_column(Text, nullable=False)  # reliability breakdown
     gate_result_json: Mapped[str] = mapped_column(Text, nullable=False)  # gate PASS/FAIL detail
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.2 -- Daily multi-strategy screening & Alpha candidates
+# --------------------------------------------------------------------------- #
+class DailyScreening(Base):
+    """One daily screening run (§3.4): the universe + market regime snapshot."""
+
+    __tablename__ = "daily_screenings"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    run_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    # csi800 / watchlist / custom (Provider mode, §5 4.0)
+    universe: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Bull / Neutral / Bear / EmotionHot / EmotionCold (§3.5 market_regime)
+    regime_label: Mapped[str] = mapped_column(String(16), nullable=False)
+    regime_detail_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class ScreeningHit(Base):
+    """One strategy hit on one candidate (§3.4): the traceable core link."""
+
+    __tablename__ = "screening_hits"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    screening_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("daily_screenings.id"), index=True, nullable=False
+    )
+    strategy_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    signal_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # quality_star at hit time (0-5), used for scoring + dedup (§4.1 Q / I)
+    quality_star_snapshot: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class DailyAlphaCandidate(Base):
+    """One daily Alpha candidate (§3.5 / v2 Sheet1): scoring + explainability."""
+
+    __tablename__ = "daily_alpha_candidates"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    screening_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("daily_screenings.id"), index=True, nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    concepts_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    regime_label: Mapped[str] = mapped_column(String(16), nullable=False)
+    hit_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    hit_strategies_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON list
+    avg_quality_star: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_quality_star: Mapped[float | None] = mapped_column(Float, nullable=True)
+    consensus_score: Mapped[float] = mapped_column(Float, nullable=False)
+    public_money_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hidden_flow_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sector_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aros_score: Mapped[float] = mapped_column(Float, nullable=False)
+    rating: Mapped[str] = mapped_column(String(8), nullable=False)
+    # consensus + aros component breakdown (explainability, §4)
+    consensus_breakdown_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aros_breakdown_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    advantages: Mapped[str | None] = mapped_column(Text, nullable=True)
+    risks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thesis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    system_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

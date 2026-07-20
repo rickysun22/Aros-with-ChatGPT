@@ -1288,8 +1288,70 @@ def validate_all(
         typer.echo("")
 
 
+alpha_app = typer.Typer(help="Phase 4.2 Multi-Strategy Consensus Engine")
+
+
+def _print_consensus(results: list[Any]) -> None:
+    """Render ConsensusEngine results to the console."""
+    if not results:
+        typer.echo("(no candidates) check strategy_registry seed + universe")
+        return
+    typer.echo(
+        f"{'code':<10}{'hits':<6}{'cons':<7}{'aros':<7}{'rating':<7}{'regime':<10}"
+        f"{'hit_strategies'}"
+    )
+    for r in results:
+        typer.echo(
+            f"{r.code:<10}{r.hit_count:<6}{r.consensus_score:<7}{r.aros_score:<7}"
+            f"{r.rating:<7}{r.regime_label:<10}{','.join(r.hit_strategies)}"
+        )
+
+
+@alpha_app.command("daily")
+def alpha_daily(
+    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
+    limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
+    regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
+) -> None:
+    """Daily multi-strategy consensus screening -> ranked Alpha candidates."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.consensus import ConsensusEngine
+    from research.kb import StrategyRegistry
+    from universe.engine import UniverseEngine
+
+    cfg = get_config()
+    session = _kb_session()
+    # Auto-seed the 10 built-ins so the engine has a working library.
+    if not StrategyRegistry(session).list_by_status("active"):
+        n = StrategyRegistry(session).seed_builtins()
+        typer.echo(f"auto-seeded {n} built-in strategies as active")
+
+    dm = DataManager()
+    ue = UniverseEngine()
+
+    def _bench(bench_key: str, start: str, end: str) -> pd.Series:
+        code = cfg.benchmark.indices[bench_key]
+        df = dm.get_index_daily(code, pd.Timestamp(start).date(), pd.Timestamp(end).date())
+        return pd.Series(df["close"].to_numpy(dtype=float), index=pd.to_datetime(df["date"]))
+
+    engine = ConsensusEngine(
+        data_manager=dm, universe_engine=ue, config=cfg, benchmark_provider=_bench
+    )
+    results = engine.daily(universe, date, session=session, limit=limit, regime=regime)
+    _print_consensus(results)
+    top = cfg.consensus.top_n
+    typer.echo(
+        f"\nPersisted {min(len(results), top)} candidates (Top-{top}) to daily_alpha_candidates."
+    )
+
+
 research_app.add_typer(kb_app, name="kb")
 research_app.add_typer(validate_app, name="validate")
+research_app.add_typer(alpha_app, name="alpha")
 
 
 def main() -> None:

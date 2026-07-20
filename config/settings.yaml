@@ -233,3 +233,32 @@ validation:
     param_weight: 0.20
     period_weight: 0.20
     trades_weight: 0.20
+
+# Phase 4.2 Multi-Strategy Consensus Engine (design §4 / §5 4.2).
+# 共振评分 = 命中数量(H) + 策略质量(Q) + 独立性(I) + Regime 匹配(R) + 板块/资金(S)。
+# AROS 终分 = 0.35*consensus + 0.20*市场/板块环境 + 0.30*资金流 + 0.15*风险过滤。
+# 板块/资金流(S、money_flow)由 4.3 的 Provider 接入；未接入时取中性(50)，本 sprint 自洽可测。
+consensus:
+  w_hit: 20.0                  # 命中数量权重
+  w_quality: 30.0              # 策略质量(平均星级)权重
+  w_independence: 20.0         # 独立性(相关性去重)权重
+  w_regime: 15.0               # Regime 匹配权重
+  w_sector_money: 15.0         # 板块/资金权重(4.3 接入)
+  hit_cap: 5                   # 命中数量封顶(超过按 5 计)
+  regime_full: 15.0            # Regime 完全命中满分
+  regime_base: 0.3             # Regime 完全不命中时的基础分比例
+  corr_dedup_threshold: 0.7    # 同(类别,相关簇)去重阈值
+  default_star_when_unvalidated: 3.0  # 未验证策略的默认星级(库里 quality_star 为 None)
+  w_aros_consensus: 0.35
+  w_aros_env: 0.20
+  w_aros_money: 0.30
+  w_aros_risk: 0.15
+  regime_friendliness: { Bull: 100.0, Neutral: 70.0, Bear: 40.0, EmotionHot: 55.0, EmotionCold: 30.0 }
+  money_visible_weight: 0.9     # 公开资金流权重(行为推断，非金额)
+  money_hidden_weight: 0.1      # 暗盘权重(仅风险增强，绝不淘汰候选，§4.2)
+  risk_dd_penalty: 30.0         # 最大回撤超阈值扣分
+  risk_dd_threshold: 0.40
+  rating_a_plus: 85.0
+  rating_a: 70.0
+  rating_b: 55.0
+  top_n: 10                     # 每日保留的候选数量

@@ -410,6 +410,67 @@ class ValidationConfig(BaseModel):
     reliability: ReliabilityConfig = Field(default_factory=ReliabilityConfig)
 
 
+class ConsensusConfig(BaseModel):
+    """Phase 4.2 multi-strategy consensus (design §4 / §5 4.2).
+
+    All weights are config-driven so the resonance scoring can be calibrated
+    without code changes. Money-flow / sector components default to *neutral*
+    when no provider is wired in (the real providers land in Sprint 4.3), so
+    this sprint is self-contained and offline-testable.
+    """
+
+    # Consensus Score (0-100) component weights: H20 / Q30 / I20 / R15 / S15.
+    w_hit: float = 20.0
+    w_quality: float = 30.0
+    w_independence: float = 20.0
+    w_regime: float = 15.0
+    w_sector_money: float = 15.0
+
+    # Hit count saturates at ``hit_cap`` (H = w_hit * min(hit_count, cap)/cap).
+    hit_cap: int = 5
+
+    # Regime match (R): full when current regime is in the union of the hitting
+    # strategies' best_fit_regimes; no match -> base fraction of w_regime.
+    regime_full: float = 15.0
+    regime_base: float = 0.3
+
+    # Independence (I): avg pairwise Pearson correlation of OOS fold returns
+    # among the surviving (deduped) strategies; I = w_independence * (1 - avg_corr).
+    corr_dedup_threshold: float = 0.7  # same-(category, corr-cluster) dedup cutoff
+    # quality_star used when a strategy has no validation yet (registry star None).
+    default_star_when_unvalidated: float = 3.0
+
+    # AROS Final Score (0-100) weights: consensus35 / env20 / money30 / risk15.
+    w_aros_consensus: float = 0.35
+    w_aros_env: float = 0.20
+    w_aros_money: float = 0.30
+    w_aros_risk: float = 0.15
+
+    # market_sector_env = regime_friend*0.5 + sector_score*0.5.
+    regime_friendliness: dict[str, float] = Field(
+        default_factory=lambda: {
+            "Bull": 100.0,
+            "Neutral": 70.0,
+            "Bear": 40.0,
+            "EmotionHot": 55.0,
+            "EmotionCold": 30.0,
+        }
+    )
+    # money_flow = public*visible_weight + hidden*hidden_weight (design §4.2).
+    money_visible_weight: float = 0.9
+    money_hidden_weight: float = 0.1
+    # risk_filter penalty when a candidate's max drawdown exceeds threshold.
+    risk_dd_penalty: float = 30.0
+    risk_dd_threshold: float = 0.40
+
+    # Rating thresholds (design §4.4); below rating_b -> "C".
+    rating_a_plus: float = 85.0
+    rating_a: float = 70.0
+    rating_b: float = 55.0
+    # Top-N candidates persisted per daily screening.
+    top_n: int = 10
+
+
 class ResearchConfig(BaseModel):
     """Research engine configuration (Phase 2 / Sprint 2.0 foundation).
 
@@ -447,6 +508,7 @@ class AppConfig(BaseModel):
     research: ResearchConfig = Field(default_factory=ResearchConfig)
     universe: UniverseConfig = Field(default_factory=UniverseConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    consensus: ConsensusConfig = Field(default_factory=ConsensusConfig)
 
     @classmethod
     def from_file(cls, path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
