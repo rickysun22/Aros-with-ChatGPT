@@ -103,11 +103,13 @@ class AllAProvider(UniverseProvider):
 
     def codes(self, as_of: Any | None = None) -> list[str]:
         from data.manager import DataManager
+        from data.st_filter import filter_st_codes
 
         dm = self._dm if self._dm is not None else DataManager()
         df = dm.get_stock_list()
         if df.empty or "code" not in df.columns:
             return []
+        df = filter_st_codes(df)  # hard-exclude ST / *ST (data-quality gate)
         return sorted(set(str(c) for c in df["code"].tolist()))
 
 

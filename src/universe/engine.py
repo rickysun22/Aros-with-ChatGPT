@@ -67,11 +67,15 @@ class UniverseEngine:
         return list(pool.codes_json or []) if pool is not None else []
 
     def _all_a_codes(self) -> list[str]:
-        """Resolve the full A-share universe from the ``Stock`` table."""
-        from data.models import Stock
+        """Resolve the full A-share universe from the ``Stock`` table.
 
-        rows = self.session.query(Stock.code).order_by(Stock.code).all()
-        return [str(r.code) for r in rows]
+        ST / *ST names are hard-excluded (data-quality gate) by name prefix.
+        """
+        from data.models import Stock
+        from data.st_filter import is_st_name
+
+        rows = self.session.query(Stock.code, Stock.name).order_by(Stock.code).all()
+        return [str(code) for code, name in rows if not is_st_name(name)]
 
     def exists(self, name: str) -> bool:
         return self.session.get(UniversePool, name) is not None

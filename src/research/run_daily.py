@@ -195,8 +195,12 @@ def _sync_data(session: Session, deps: RunDeps, run_date: date) -> None:
     if pool == "all_a":
         # The full A-share universe lives in the persisted ``Stock`` table (filled
         # by sync_stock_list above), not in a named UniversePool row. Resolve it
-        # there so the daily incremental sync covers the whole market.
+        # there so the daily incremental sync covers the whole market. ST / *ST
+        # names are hard-excluded (data-quality gate) up front.
         stock_df = dm.get_stock_list()
+        from data.st_filter import filter_st_codes
+
+        stock_df = filter_st_codes(stock_df)
         codes = [str(c) for c in stock_df["code"].tolist()] if "code" in stock_df.columns else []
     else:
         try:

@@ -59,6 +59,14 @@ All notable changes to AROS are documented by Sprint.
   (registers a weekday-18:30 Scheduled Task), and `scripts/WINDOWS_TASK.md` (setup
   guide). Run on the user's own machine — the sandbox proxy blocks eastmoney, so the
   full sync only works off-sandbox.
+- **ST / *ST hard-exclusion (data-quality gate)**: `src/data/st_filter.py` adds
+  `is_st_name()` + `filter_st_codes()`; ST / *ST names (5% limit, elevated delisting
+  risk, frequent suspension) are now hard-excluded from the `all_a` universe at three
+  points — `AllAProvider.codes()`, `UniverseEngine._all_a_codes()` (now queries
+  `Stock.code, Stock.name`), and the `run_daily` `all_a` sync list. Detection keys off
+  the `name` prefix, so it needs **no schema change** and works on the existing DB
+  immediately. Tests: `test_st_filter_is_st_name`, `test_filter_st_codes_drops_st_rows`,
+  `test_all_a_provider_excludes_st_by_name`, `test_universe_all_a_excludes_st`.
 
 ### Tests (+12)
 - `tests/test_cache.py` (6): DayCache round-trip / TTL / miss + cache throttles
