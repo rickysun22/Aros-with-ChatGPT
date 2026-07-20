@@ -271,6 +271,32 @@ def list_trades(session: Session, *, code: str | None = None) -> list[PersonalTr
     return list(session.execute(stmt.order_by(PersonalTrade.created_at.desc())).scalars().all())
 
 
+def fill_all_posthoc(
+    session: Session,
+    price_provider: PriceProvider,
+    as_of: date | None = None,
+) -> int:
+    """Auto-fill post-hoc columns for every tracking row not yet fully filled.
+
+    Skips rows whose ``result_10d`` is already populated (a row is only "done"
+    once its longest horizon has resolved), so the call is idempotent and safe to
+    run daily — each pass fills the rows whose 10-day window has just closed.
+    Returns the number of rows updated.
+
+    Used by the daily operational loop (``research.run_daily``) to keep the human
+    feedback evidence growing without manual ``alpha review`` calls.
+    """
+    trackings = session.query(DecisionTracking).all()
+    filled = 0
+    for t in trackings:
+        if t.result_10d is not None:
+            continue
+        fill_posthoc(t, price_provider, review_date=as_of)
+        filled += 1
+    session.commit()
+    return filled
+
+
 def query_decisions(session: Session, run_date: date) -> dict[str, DecisionTracking]:
     """Map ``candidate_id -> DecisionTracking`` for a day's screening.
 

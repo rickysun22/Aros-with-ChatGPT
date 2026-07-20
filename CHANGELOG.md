@@ -2,6 +2,52 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Phase 4.9 — Daily Operational Loop (`run_daily` + disk cache) (2026-07-20)
+
+> Closes the gap between "parts that run" and "a system that runs". Wires the
+> already-built 4.2/4.4/4.5/4.6/4.7/4.8 engines into one idempotent, unattended
+> daily pass so real out-of-sample evidence starts accruing (the constitution's
+> anti-overfit / no-look-ahead guarantees only matter once data exists).
+
+### Daily orchestrator (`src/research/run_daily.py`, new)
+- `run_daily(session, run_date, deps)` runs one idempotent per-date pass:
+  1. seed KB (4.0) → 2. incremental data sync → 3. consensus screen (4.2)
+  → 4. daily report xlsx/html/md (4.4) → 5. calibration performance fill (4.6)
+  → 6. human-decision post-hoc fill (4.5) → 7. optional paper-trading sim
+  (4.7/4.8) → 8. checkpoint validation report at `auto_validate_at` trading days.
+- `catch_up(session, since, until, deps)` backfills every missing trading day
+  (self-heals missed scheduled runs). Both skip work already done for a date, so
+  re-running is a safe refresh — no duplicate candidates.
+- All network-bound deps are injected via `RunDeps` (money-flow / price /
+  benchmark / score providers, `screen_fn`, `sync_fn`), so the loop is fully
+  offline-testable; production builds cached, real AKShare-backed providers.
+
+### Disk cache (`src/data/cache.py`, new)
+- `DayCache` (TTL, pickle) + `CachedMoneyFlowProvider` / `CachedHiddenFlowProvider`
+  / `cached_daily_price_provider` throttle the ~100 daily network calls the design
+  flagged (money-flow providers + repeated price windows). Cache is best-effort:
+  a write/parse failure never breaks a run; a TTL miss == a normal miss.
+
+### Shared score provider
+- `consensus_score_provider(session)` added to `research/exit.py`; returns the real
+  AROS read for the 4.8 Exit Engine. Reused by `run_daily` and the `alpha exit eval`
+  CLI (removed the duplicated local copy in `main.py`).
+
+### CLI (`main.py`)
+- `research alpha run [--date --universe --limit --regime --no-money-flow
+  --no-papertrade --no-sync --auto-validate-at --cache-dir --report-dir]` runs the
+  full loop for one date (idempotent). Schedule it daily via OS Task Scheduler /
+  cron.
+- `research alpha catch-up --since … [--until …]` backfills missing trading days.
+
+### Tests (+12)
+- `tests/test_cache.py` (6): DayCache round-trip / TTL / miss + cache throttles
+  money-flow & price-provider calls.
+- `tests/test_run_daily.py` (6): in-memory session + fakes prove the loop wires
+  4.2/4.4/4.6/4.5, is idempotent per date, auto-fills decision post-hoc, emits the
+  checkpoint validation report at `auto_validate_at=1`, and that `catch_up` backfills
+  a skipped day.
+
 ## Phase 4 Completion — Entry Intelligence Engine (4.7) + Exit Intelligence Engine (4.8) (2026-07-20)
 
 > Closes Phase 4. 4.6 (calibration) was already complete; this sprint builds the

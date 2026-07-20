@@ -12,6 +12,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import typer
 import yaml
 
@@ -32,6 +33,7 @@ from report.engine import ReportEngine
 from research.experiment import ExperimentConfig, WalkForwardSpec
 from research.registry import ExperimentRegistry
 from research.report import ResearchReport
+from research.run_daily import RunDeps, catch_up, run_daily
 from scheduler import Scheduler, build_notifier
 from strategies.engine import StrategyEngine
 from universe.engine import UniverseEngine
@@ -1422,7 +1424,6 @@ def alpha_review(
 ) -> None:
     """Fill auto post-hoc (1/3/5/10d + float pnl) and optional review fields."""
     setup_logging()
-    import pandas as pd
 
     from data.manager import DataManager
     from research.feedback import review
@@ -1839,39 +1840,6 @@ def alpha_entry_eval(
 alpha_exit_app = typer.Typer(help="Phase 4.8 Exit Intelligence (卖点评估)")
 
 
-def _consensus_score_provider(session: Any) -> Any:
-    """ScoreProvider wired to the system's real daily screening output.
-
-    Returns the latest ``DailyAlphaCandidate`` AROS Score (+ money-flow) for the
-    code on/before ``as_of`` — the honest "real AROS Score" source for the 4.8
-    Daily Exit Intelligence. Returns ``None`` when no candidate exists (so the
-    engine never fabricates a decay signal).
-    """
-    from research.exit import ExitScoreInput
-    from research.models import DailyAlphaCandidate, DailyScreening
-
-    def _p(code: str, as_of: date) -> ExitScoreInput | None:
-        c = (
-            session.query(DailyAlphaCandidate)
-            .filter_by(code=code)
-            .join(DailyScreening, DailyAlphaCandidate.screening_id == DailyScreening.id)
-            .filter(DailyScreening.run_date <= as_of)
-            .order_by(DailyScreening.run_date.desc())
-            .first()
-        )
-        if c is None:
-            return None
-        return ExitScoreInput(
-            aros_score=c.aros_score,
-            entry_aros_score=c.aros_score,
-            public_money_score=c.public_money_score,
-            hidden_flow_score=c.hidden_flow_score,
-            sector_score=c.sector_score,
-        )
-
-    return _p
-
-
 @alpha_exit_app.command("eval")
 def alpha_exit_eval(
     trade_id: str = typer.Option(..., "--trade-id", help="持仓模拟交易ID"),
@@ -1885,7 +1853,7 @@ def alpha_exit_eval(
     setup_logging()
     import pandas as pd
 
-    from research.exit import ExitEngine
+    from research.exit import ExitEngine, consensus_score_provider
     from research.models import SimulatedTrade
 
     session = _kb_session()
@@ -1903,7 +1871,7 @@ def alpha_exit_eval(
     def _price(c: str, s: date, e: date) -> Any:
         return dm.get_daily(c, s, e)
 
-    provider = _consensus_score_provider(session)
+    provider = consensus_score_provider(session)
     sig = ExitEngine().evaluate(
         t.code,
         d,
@@ -1925,6 +1893,126 @@ def alpha_exit_eval(
 
 alpha_app.add_typer(alpha_entry_app, name="entry")
 alpha_app.add_typer(alpha_exit_app, name="exit")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.9 -- daily operational orchestrator (the "run loop")
+# --------------------------------------------------------------------------- #
+def _print_run_summary(s: dict[str, Any]) -> None:
+    """Render a run_daily / catch_up summary dict to the console."""
+    typer.echo(f"Daily run {s['run_date']}:")
+    typer.echo(
+        f"  candidates={s['candidates']} perf_rows={s['performance_rows']} "
+        f"posthoc_rows={s['posthoc_rows']}"
+    )
+    typer.echo(f"  papertrade entries={s['entries']} exits={s['exits']}")
+    rp = s.get("report_paths") or {}
+    if rp:
+        typer.echo(f"  report -> xlsx: {rp.get('xlsx')}")
+        typer.echo(f"         html: {rp.get('html')}")
+        typer.echo(f"         md  : {rp.get('md')}")
+    if s.get("validation_report_paths"):
+        typer.echo(f"  checkpoint validation report: {s['validation_report_paths']}")
+    elif s.get("validation_can_calibrate"):
+        typer.echo("  can_calibrate=True (no checkpoint triggered this run)")
+    else:
+        typer.echo("  can_calibrate=False (still accumulating OOS evidence)")
+
+
+@alpha_app.command("run")
+def alpha_run(
+    run_date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
+    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
+    regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
+    no_money_flow: bool = typer.Option(
+        False, "--no-money-flow", help="neutral (50) money-flow; skip 4.3 providers"
+    ),
+    no_papertrade: bool = typer.Option(
+        False, "--no-papertrade", help="skip paper-trading simulation"
+    ),
+    no_sync: bool = typer.Option(
+        False, "--no-sync", help="skip incremental data sync (use stored data)"
+    ),
+    auto_validate_at: int = typer.Option(
+        60,
+        "--auto-validate-at",
+        help="trading days before checkpoint validation report; 0 disables",
+    ),
+    cache_dir: str | None = typer.Option(
+        None, "--cache-dir", help="disk cache dir (default .cache)"
+    ),
+    report_dir: str = typer.Option("reports", "--report-dir", help="report output dir"),
+) -> None:
+    """Run the full daily loop for one date (idempotent).
+
+    screen(4.2) -> report(4.4) -> calibration fill(4.6) -> decision post-hoc(4.5)
+    -> optional paper-trading sim(4.7/4.8) -> checkpoint validation report.
+
+    Schedule daily via OS Task Scheduler / cron: `python main.py alpha run`.
+    Re-running the same date is a safe refresh. Real providers are cached on disk.
+    """
+    setup_logging()
+    d = pd.Timestamp(run_date).date() if run_date else date.today()
+    session = _kb_session()
+    ava = None if auto_validate_at == 0 else auto_validate_at
+    deps = RunDeps(
+        universe=universe,
+        limit=limit,
+        regime=regime,
+        no_money_flow=no_money_flow,
+        no_papertrade=no_papertrade,
+        no_sync=no_sync,
+        auto_validate_at=ava,
+        report_out_dir=report_dir,
+        cache_dir=cache_dir or ".cache",
+    )
+    summary = run_daily(session, d, deps)
+    _print_run_summary(summary)
+
+
+@alpha_app.command("catch-up")
+def alpha_catch_up(
+    since: str = typer.Option(..., "--since", help="YYYY-MM-DD start (inclusive)"),
+    until: str | None = typer.Option(None, "--until", help="YYYY-MM-DD end (default today)"),
+    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
+    regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
+    no_money_flow: bool = typer.Option(False, "--no-money-flow", help="neutral money-flow"),
+    no_papertrade: bool = typer.Option(False, "--no-papertrade", help="skip paper-trading sim"),
+    no_sync: bool = typer.Option(False, "--no-sync", help="skip incremental data sync"),
+    auto_validate_at: int = typer.Option(
+        60, "--auto-validate-at", help="trading days before checkpoint; 0 disables"
+    ),
+    cache_dir: str | None = typer.Option(
+        None, "--cache-dir", help="disk cache dir (default .cache)"
+    ),
+    report_dir: str = typer.Option("reports", "--report-dir", help="report output dir"),
+) -> None:
+    """Backfill every missing trading day in [since, until] (self-heal missed runs)."""
+    setup_logging()
+    sd = pd.Timestamp(since).date()
+    ud = pd.Timestamp(until).date() if until else date.today()
+    session = _kb_session()
+    ava = None if auto_validate_at == 0 else auto_validate_at
+    deps = RunDeps(
+        universe=universe,
+        limit=limit,
+        regime=regime,
+        no_money_flow=no_money_flow,
+        no_papertrade=no_papertrade,
+        no_sync=no_sync,
+        auto_validate_at=ava,
+        report_out_dir=report_dir,
+        cache_dir=cache_dir or ".cache",
+    )
+    result = catch_up(session, sd, ud, deps)
+    typer.echo(
+        f"catch-up {result['since']}..{result['until']}: "
+        f"examined={result['examined']} backfilled={len(result['backfilled'])}"
+    )
+    for b in result["backfilled"]:
+        typer.echo(f"  + {b}")
 
 
 research_app.add_typer(kb_app, name="kb")

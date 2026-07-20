@@ -27,6 +27,7 @@ from datetime import date
 from typing import Protocol
 
 import pandas as pd
+from sqlalchemy.orm import Session
 
 from research.feedback import PriceProvider
 
@@ -284,3 +285,39 @@ def _grade(
     if stop_hit or trailing_hit:  # defensive: any forced flag is at least Medium
         return "Medium", True
     return "None", False
+
+
+def consensus_score_provider(session: Session) -> ScoreProvider:
+    """Build the real-AROS :class:`ScoreProvider` from the daily screening output.
+
+    Returns a callable ``(code, as_of) -> ExitScoreInput | None`` that reads the
+    latest :class:`~research.models.DailyAlphaCandidate` AROS Score (+ money-flow)
+    for the code on/before ``as_of`` — the honest "real AROS Score" source for the
+    4.8 Daily Exit Intelligence. Returns ``None`` when no candidate exists, so the
+    engine never fabricates a decay signal.
+
+    Shared by ``research.run_daily`` (the daily loop) and the ``alpha exit eval``
+    CLI so both use one definition.
+    """
+    from research.models import DailyAlphaCandidate, DailyScreening
+
+    def _p(code: str, as_of: date) -> ExitScoreInput | None:
+        c = (
+            session.query(DailyAlphaCandidate)
+            .filter_by(code=code)
+            .join(DailyScreening, DailyAlphaCandidate.screening_id == DailyScreening.id)
+            .filter(DailyScreening.run_date <= as_of)
+            .order_by(DailyScreening.run_date.desc())
+            .first()
+        )
+        if c is None:
+            return None
+        return ExitScoreInput(
+            aros_score=c.aros_score,
+            entry_aros_score=c.aros_score,
+            public_money_score=c.public_money_score,
+            hidden_flow_score=c.hidden_flow_score,
+            sector_score=c.sector_score,
+        )
+
+    return _p
