@@ -11,12 +11,55 @@ tested with plain DataFrames.
 
 from __future__ import annotations
 
+import logging
+import os
 from datetime import date
 from typing import Protocol, runtime_checkable
 
 import pandas as pd
 
 from core.exceptions import DataError
+
+logger = logging.getLogger(__name__)
+
+
+def _clear_proxies() -> None:
+    """Remove ALL proxy configuration so akshare connects directly.
+
+    Critical for the user's environment: a dead system proxy
+    (``127.0.0.1:3067``) is configured in the **Windows registry** (IE ->
+    Internet Options -> LAN Settings).  ``requests``/``urllib3`` read this via
+    :func:`urllib.request.getproxies`, which survives both ``.bat`` env-var
+    scrubbing and ``os.environ`` deletion.  We therefore (a) delete every proxy
+    env var and (b) monkey-patch ``urllib.request.getproxies`` to return ``{}``
+    process-wide -- this also covers akshare's internally-created sessions that
+    we cannot otherwise control.
+    """
+    for _key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "NO_PROXY",
+        "no_proxy",
+    ):
+        os.environ.pop(_key, None)
+    os.environ["NO_PROXY"] = "*"
+    os.environ["no_proxy"] = "*"
+    try:
+        import urllib.request
+
+        if not getattr(urllib.request, "_aros_patched", False):
+            urllib.request.getproxies = lambda: {}  # type: ignore[assignment]
+            urllib.request._aros_patched = True  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# Run once at module import so any later akshare call is proxy-free.
+_clear_proxies()
 
 # AKShare raw column names -> canonical AROS field names.
 # Canonical AROS field -> accepted raw header candidates (in priority order).
@@ -137,18 +180,26 @@ class AkShareProvider:
     def get_stock_list(self) -> pd.DataFrame:
         import akshare as ak
 
+        _clear_proxies()
         return normalize_stock_list(ak.stock_info_a_code_name())
 
     def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
         import akshare as ak
 
-        raw = ak.stock_zh_a_hist(
-            symbol=code,
-            period="daily",
-            start_date=start_date.strftime("%Y%m%d"),
-            end_date=end_date.strftime("%Y%m%d"),
-            adjust=self.adjust,
-        )
+        _clear_proxies()
+        try:
+            raw = ak.stock_zh_a_hist(
+                symbol=code,
+                period="daily",
+                start_date=start_date.strftime("%Y%m%d"),
+                end_date=end_date.strftime("%Y%m%d"),
+                adjust=self.adjust,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("akshare daily FAILED for %s: %s", code, exc)
+            return pd.DataFrame(
+                columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+            )
         return normalize_daily(raw, code)
 
     def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
@@ -156,10 +207,17 @@ class AkShareProvider:
         # date-range support and integer-date alignment with get_daily_bars.
         import akshare as ak
 
-        raw = ak.index_zh_a_hist(
-            symbol=code,
-            period="daily",
-            start_date=start_date.strftime("%Y%m%d"),
-            end_date=end_date.strftime("%Y%m%d"),
-        )
+        _clear_proxies()
+        try:
+            raw = ak.index_zh_a_hist(
+                symbol=code,
+                period="daily",
+                start_date=start_date.strftime("%Y%m%d"),
+                end_date=end_date.strftime("%Y%m%d"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("akshare index FAILED for %s: %s", code, exc)
+            return pd.DataFrame(
+                columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+            )
         return normalize_index_daily(raw, code)

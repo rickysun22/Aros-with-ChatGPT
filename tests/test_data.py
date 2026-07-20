@@ -353,3 +353,62 @@ def test_manager_rejects_unknown_source() -> None:
     cfg.data.source = "magic"
     with pytest.raises(ConfigError):
         DataManager(config=cfg)
+
+
+def test_provider_nukes_proxy_and_catches_connectionerror(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproduce the user's exact failure mode and prove it is now handled.
+
+    The user's machine had a dead system proxy (127.0.0.1:3067) configured in
+    the Windows registry. Every akshare call raised
+    ``ConnectionError: RemoteDisconnected`` and the exception propagated up to
+    ``sync_universe`` as a hard FAIL, aborting the whole backfill.
+
+    This test:
+    1. sets a fake HTTP(S)_PROXY env var (simulating the dead proxy),
+    2. re-runs the real ``_clear_proxies()`` scrubber,
+    3. asserts ``urllib.request.getproxies()`` returns ``{}`` (registry proxy
+       also gone — this is what the previous 6 rounds failed to do),
+    4. makes akshare raise the exact ``ConnectionError`` the user saw,
+    5. asserts ``get_daily_bars`` returns an EMPTY frame (no exception escapes).
+    """
+    # 1) simulate the user's dead proxy
+    monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3067")
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:3067")
+
+    # 2) run the real scrubber (also patched at provider.py import time)
+    from data.provider import _clear_proxies
+
+    _clear_proxies()
+
+    # 3) urllib must report NO proxies at all (covers Windows-registry proxy)
+    import urllib.request
+
+    assert urllib.request.getproxies() == {}
+
+    # 4) make akshare raise the exact error the user hit
+    import akshare as ak
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise ConnectionError("RemoteDisconnected('Remote end closed connection without response')")
+
+    monkeypatch.setattr(ak, "stock_zh_a_hist", _boom)
+
+    # 5) get_daily_bars must NOT raise — it returns an empty frame so the
+    #    backfill batch keeps going instead of aborting.
+    from data.provider import AkShareProvider
+
+    prov = AkShareProvider()
+    df = prov.get_daily_bars("000001", date(2024, 1, 1), date(2024, 12, 31))
+    assert df.empty
+    assert list(df.columns) == [
+        "code",
+        "date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount",
+    ]
