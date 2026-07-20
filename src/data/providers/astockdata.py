@@ -38,6 +38,11 @@ def _clear_proxies() -> None:
     file is not enough — we must also scrub them from ``os.environ`` inside
     the running process, before any ``import requests`` or ``import akshare``
     triggers a session creation.
+
+    As a nuclear option we also monkey-patch
+    :func:`urllib.request.getproxies` so that **nothing** in the process
+    can discover a proxy — this covers akshare's internally-created
+    :class:`requests.Session` objects which we cannot control directly.
     """
     for _key in (
         "HTTP_PROXY",
@@ -53,6 +58,19 @@ def _clear_proxies() -> None:
     # Also set no-proxy wildcard for libraries that check it
     os.environ["NO_PROXY"] = "*"
     os.environ["no_proxy"] = "*"
+
+    # Nuclear option: patch urllib so getproxies() always returns {}.
+    # This prevents requests / urllib3 / akshare from picking up the
+    # Windows-registry proxy (IE / LAN Settings) which survives env-var
+    # scrubbing.
+    try:
+        import urllib.request
+
+        if not getattr(urllib.request, "_aros_patched", False):
+            urllib.request.getproxies = lambda: {}  # type: ignore[assignment]
+            urllib.request._aros_patched = True  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # Scrub once at module import time (covers all subsequent calls)
