@@ -7,9 +7,10 @@ data sources with built-in fallback and rate limiting.
 
 Implemented here (the parts AROS needs):
 
-* **Daily bars** -- Baidu 股市通 K-line (``finance.pae.baidu.com``), zero-auth
-  HTTP, returns OHLCV (+ MA). It yields *raw* (unadjusted) prices; for
-  forward-adjusted research data keep ``data.source: akshare`` as the default.
+* **Daily bars** -- Eastmoney push2his K-line (``push2his.eastmoney.com``) is
+  the **preferred** source: zero-auth HTTP, returns raw (unadjusted) OHLCV
+  reliably. Sina Finance (``akshare``) and Baidu 股市通 are fallbacks used only
+  when Eastmoney is unreachable (e.g. behind a proxy that blocks it).
 * **Stock list** -- Eastmoney clist (``push2.eastmoney.com``), zero-auth HTTP.
 
 ``requests`` is imported lazily so the module (and the test suite) never
@@ -18,9 +19,12 @@ requires network access unless a real fetch is performed.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # Baidu K-line field order -> canonical AROS field.
 _BAIDU_FIELD_MAP = {
@@ -35,6 +39,17 @@ _BAIDU_FIELD_MAP = {
 
 _BAIDU_URL = "https://finance.pae.baidu.com/selfselect/getstockquotation"
 _EASTMONEY_LIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
+
+# Sina field order -> canonical AROS field.
+_SINA_FIELD_MAP = {
+    "date": "date",
+    "open": "open",
+    "high": "high",
+    "low": "low",
+    "close": "close",
+    "volume": "volume",
+    "amount": "amount",
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -102,6 +117,115 @@ def _eastmoney_stock_list() -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["code", "name"])
 
 
+_EASTMONEY_KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
+
+
+def _secid(code: str) -> str:
+    """Map a 6-digit A-share code to Eastmoney's ``market.code`` secid."""
+    if code.startswith("6"):
+        return f"1.{code}"  # Shanghai
+    if code.startswith(("0", "3")):
+        return f"0.{code}"  # Shenzhen (incl. ChiNext 3xxxxx)
+    if code.startswith(("8", "4")):
+        return f"2.{code}"  # Beijing Exchange
+    return f"0.{code}"
+
+
+def _eastmoney_daily(code: str) -> pd.DataFrame:
+    """Return daily bars from Eastmoney push2his K-line API (raw, unadjusted).
+
+    This is the **preferred** daily source: it is Eastmoney's canonical
+    endpoint, returns raw OHLCV reliably, and works once the system proxy
+    (which previously blocked ``push2his.eastmoney.com``) is disabled.
+
+    Returns a DataFrame with the canonical AROS schema
+    ``[code, date, open, high, low, close, volume, amount]``.
+    """
+    import requests
+
+    params = {
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+        "klt": "101",  # 101 = daily
+        "fqt": "0",  # 0 = raw (unadjusted)
+        "secid": _secid(code),
+        "beg": "0",
+        "end": "20500101",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://quote.eastmoney.com/",
+    }
+    session = requests.Session()
+    session.trust_env = False  # bypass any system proxy; Eastmoney was blocked by it
+    resp = session.get(_EASTMONEY_KLINE_URL, params=params, headers=headers, timeout=10)
+    payload = resp.json()
+    klines = (payload.get("data") or {}).get("klines") or []
+    if not klines:
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
+    rows = []
+    for line in klines:
+        parts = line.split(",")
+        if len(parts) < 7:
+            continue
+        rows.append(
+            {
+                "date": parts[0],
+                "open": parts[1],
+                "close": parts[2],
+                "high": parts[3],
+                "low": parts[4],
+                "volume": parts[5],
+                "amount": parts[6],
+            }
+        )
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["open", "close"])
+    out = df[["date", "open", "high", "low", "close", "volume", "amount"]].copy()
+    out.insert(0, "code", code)
+    return out.sort_values("date").reset_index(drop=True)
+
+
+def _sina_daily(code: str) -> pd.DataFrame:
+    """Return daily bars from Sina Finance (``stock_zh_a_daily``).
+
+    This is a **fallback** source, used only when Eastmoney push2his is
+    unreachable. Sina's endpoint tends to work through proxies/firewalls where
+    Eastmoney is blocked.
+
+    Returns a DataFrame with columns matching the canonical AROS schema:
+    ``[code, date, open, high, low, close, volume, amount]``.
+    """
+    import akshare as ak
+
+    # stock_zh_a_daily expects prefix: sh for Shanghai, sz for Shenzhen
+    prefix = "sh" if code.startswith("6") else "sz"
+    symbol = f"{prefix}{code}"
+    df = ak.stock_zh_a_daily(symbol=symbol)
+
+    if df.empty or "date" not in df.columns:
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
+
+    # Select + rename to canonical schema
+    out = df.rename(columns=_SINA_FIELD_MAP)[list(_SINA_FIELD_MAP.values())].copy()
+    out.insert(0, "code", code)
+    # Ensure date is date type
+    out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
+    # Ensure numeric types
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out.dropna(subset=["open", "close"]).reset_index(drop=True)[
+        ["code", "date", "open", "high", "low", "close", "volume", "amount"]
+    ]
+
+
 # --------------------------------------------------------------------------- #
 # Normalization (pure)
 # --------------------------------------------------------------------------- #
@@ -148,9 +272,25 @@ class AStockDataProvider:
         return _eastmoney_stock_list()
 
     def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        # 1) Preferred: Eastmoney push2his K-line (raw, unadjusted)
+        df = _eastmoney_daily(code)
+        if not df.empty:
+            logger.debug("daily source=eastmoney code=%s", code)
+            mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+            return df[mask].reset_index(drop=True)
+
+        # 2) Fallback: Sina Finance (reliable through most proxies)
+        df = _sina_daily(code)
+        if not df.empty:
+            logger.warning("daily source=sina (eastmoney failed) code=%s", code)
+            mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+            return df[mask].reset_index(drop=True)
+
+        # 3) Fallback: Baidu K-line API
         raw = _baidu_kline(code)
         df = normalize_baidu_daily(raw, code)
         if df.empty:
+            logger.warning("daily source=NONE (all sources failed) code=%s", code)
             return df
         mask = (df["date"] >= start_date) & (df["date"] <= end_date)
         return df[mask].reset_index(drop=True)

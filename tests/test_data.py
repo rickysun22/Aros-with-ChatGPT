@@ -226,6 +226,22 @@ def _fake_baidu_response() -> dict:
     }
 
 
+def _fake_eastmoney_response() -> pd.DataFrame:
+    """Canonical 3-row daily frame (AROS schema) used to mock the provider."""
+    return pd.DataFrame(
+        {
+            "code": ["600000", "600000", "600000"],
+            "date": [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)],
+            "open": [10.0, 10.5, 10.6],
+            "high": [10.2, 10.6, 10.9],
+            "low": [9.8, 10.4, 10.5],
+            "close": [10.1, 10.55, 10.8],
+            "volume": [1000.0, 1100.0, 1200.0],
+            "amount": [10100.0, 11500.0, 12960.0],
+        }
+    )
+
+
 def test_normalize_baidu_daily() -> None:
     df = normalize_baidu_daily(_fake_baidu_response(), "600000")
     assert list(df.columns) == [
@@ -245,8 +261,8 @@ def test_normalize_baidu_daily() -> None:
 
 def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "data.providers.astockdata._baidu_kline",
-        lambda code, start_time="": _fake_baidu_response(),
+        "data.providers.astockdata._eastmoney_daily",
+        lambda code: _fake_eastmoney_response(),
     )
     df = AStockDataProvider().get_daily_bars("600000", date(2024, 1, 1), date(2024, 12, 31))
     assert len(df) == 3
@@ -270,8 +286,8 @@ def test_manager_selects_astockdata_source(
 
     monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path}/t.db")  # type: ignore[union-attr]
     monkeypatch.setattr(
-        "data.providers.astockdata._baidu_kline",
-        lambda code, start_time="": _fake_baidu_response(),
+        "data.providers.astockdata._eastmoney_daily",
+        lambda code: _fake_eastmoney_response(),
     )
     monkeypatch.setattr(
         "data.providers.astockdata._eastmoney_stock_list",
