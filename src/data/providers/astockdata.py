@@ -21,11 +21,42 @@ requires network access unless a real fetch is performed.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+def _clear_proxies() -> None:
+    """Remove ALL proxy env vars so requests/akshare connect directly.
+
+    On Windows, ``requests`` (via urllib3) reads proxy settings from the
+    **system registry** (``Internet Options → Connections → LAN Settings``)
+    *in addition to* environment variables.  Clearing env vars in a ``.bat``
+    file is not enough — we must also scrub them from ``os.environ`` inside
+    the running process, before any ``import requests`` or ``import akshare``
+    triggers a session creation.
+    """
+    for _key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "NO_PROXY",
+        "no_proxy",
+    ):
+        os.environ.pop(_key, None)
+    # Also set no-proxy wildcard for libraries that check it
+    os.environ["NO_PROXY"] = "*"
+    os.environ["no_proxy"] = "*"
+
+
+# Scrub once at module import time (covers all subsequent calls)
+_clear_proxies()
 
 # Baidu K-line field order -> canonical AROS field.
 _BAIDU_FIELD_MAP = {
@@ -188,6 +219,7 @@ def _eastmoney_daily(code: str) -> pd.DataFrame:
     }
     session = requests.Session()
     session.trust_env = False  # bypass any system proxy; Eastmoney was blocked by it
+    _clear_proxies()  # also scrub os.environ
     try:
         resp = session.get(_EASTMONEY_KLINE_URL, params=params, headers=headers, timeout=10)
         payload = resp.json()
@@ -238,6 +270,10 @@ def _sina_daily(code: str) -> pd.DataFrame:
     ``[code, date, open, high, low, close, volume, amount]``.
     """
     import akshare as ak
+
+    # Belt-and-suspenders: re-scrub proxy env vars in case something
+    # (akshare init, another import) re-injected them.
+    _clear_proxies()
 
     # stock_zh_a_daily expects prefix: sh for Shanghai, sz for Shenzhen
     prefix = "sh" if code.startswith("6") else "sz"
