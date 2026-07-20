@@ -55,9 +55,23 @@ class UniverseEngine:
         return list(pool.codes_json)
 
     def get_codes(self, name: str) -> list[str]:
-        """Return the sorted code list for pool *name* (empty if unknown)."""
+        """Return the sorted code list for pool *name* (empty if unknown).
+
+        ``all_a`` is special: it resolves the full A-share universe directly from
+        the persisted ``Stock`` table (populated by ``DataManager.sync_stock_list``)
+        instead of a named pool row, giving the true whole-market set (~5300 codes).
+        """
+        if name == "all_a":
+            return self._all_a_codes()
         pool = self.session.get(UniversePool, name)
         return list(pool.codes_json or []) if pool is not None else []
+
+    def _all_a_codes(self) -> list[str]:
+        """Resolve the full A-share universe from the ``Stock`` table."""
+        from data.models import Stock
+
+        rows = self.session.query(Stock.code).order_by(Stock.code).all()
+        return [str(r.code) for r in rows]
 
     def exists(self, name: str) -> bool:
         return self.session.get(UniversePool, name) is not None

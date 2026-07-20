@@ -338,7 +338,7 @@ class UniverseConfig(BaseModel):
     Watchlist / Custom providers. The CLI can override ``type`` at run time.
     """
 
-    type: Literal["csi800", "watchlist", "custom"] = "csi800"
+    type: Literal["csi800", "all_a", "watchlist", "custom"] = "csi800"
     watchlist_path: str | None = None  # used when type == "watchlist"
     custom_codes: list[str] | None = None  # used when type == "custom"
 

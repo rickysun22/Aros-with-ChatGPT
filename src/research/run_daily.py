@@ -192,15 +192,28 @@ def _sync_data(session: Session, deps: RunDeps, run_date: date) -> None:
     except Exception as exc:  # noqa: BLE001 - one source failure must not abort
         print(f"[run_daily] stock-list sync failed: {exc}")
     pool = deps.universe or "csi800"
-    try:
-        codes = ue.get_codes(pool)
-    except Exception:  # noqa: BLE001 - pool may not exist yet
-        codes = []
+    if pool == "all_a":
+        # The full A-share universe lives in the persisted ``Stock`` table (filled
+        # by sync_stock_list above), not in a named UniversePool row. Resolve it
+        # there so the daily incremental sync covers the whole market.
+        stock_df = dm.get_stock_list()
+        codes = [str(c) for c in stock_df["code"].tolist()] if "code" in stock_df.columns else []
+    else:
+        try:
+            codes = ue.get_codes(pool)
+        except Exception:  # noqa: BLE001 - pool may not exist yet
+            codes = []
     if deps.limit:
         codes = list(codes)[: deps.limit]
     for code in codes:
         try:
-            dm.sync_daily(code)
+            # Incremental: pick up where the last sync left off, capped at the
+            # run date. A first-ever sync (no SyncState) falls back to the
+            # config start_date for the full backfill; every later daily run only
+            # fetches the new trading days, so the scheduler stays cheap.
+            last = dm.last_sync_date(code)
+            start = (last + timedelta(days=1)) if last else None
+            dm.sync_daily(code, start_date=start, end_date=run_date)
         except Exception as exc:  # noqa: BLE001 - one bad code must not abort
             print(f"[run_daily] sync {code} failed: {exc}")
     try:

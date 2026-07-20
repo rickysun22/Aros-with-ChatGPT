@@ -1312,7 +1312,7 @@ def _print_consensus(results: list[Any]) -> None:
 
 @alpha_app.command("daily")
 def alpha_daily(
-    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    universe: str | None = typer.Option(None, "--universe", help="csi800/all_a/watchlist/custom"),
     date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
     limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
     regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
@@ -1922,7 +1922,7 @@ def _print_run_summary(s: dict[str, Any]) -> None:
 @alpha_app.command("run")
 def alpha_run(
     run_date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
-    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    universe: str | None = typer.Option(None, "--universe", help="csi800/all_a/watchlist/custom"),
     limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
     regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
     no_money_flow: bool = typer.Option(
@@ -1975,7 +1975,7 @@ def alpha_run(
 def alpha_catch_up(
     since: str = typer.Option(..., "--since", help="YYYY-MM-DD start (inclusive)"),
     until: str | None = typer.Option(None, "--until", help="YYYY-MM-DD end (default today)"),
-    universe: str | None = typer.Option(None, "--universe", help="csi800/watchlist/custom"),
+    universe: str | None = typer.Option(None, "--universe", help="csi800/all_a/watchlist/custom"),
     limit: int | None = typer.Option(None, "--limit", help="cap universe codes scanned"),
     regime: str | None = typer.Option(None, "--regime", help="force regime label (skip infer)"),
     no_money_flow: bool = typer.Option(False, "--no-money-flow", help="neutral money-flow"),

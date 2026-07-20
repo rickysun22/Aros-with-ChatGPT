@@ -6,6 +6,9 @@ is configured, without the caller knowing the mechanics:
 
 * ``CSI800Provider``   -- constituent codes of the CSI 800 index (000906),
   via :class:`~universe.engine.UniverseEngine` (seeded from AKShare).
+* ``AllAProvider``      -- the full A-share universe, resolved directly from the
+  persisted ``Stock`` table (populated by ``DataManager.sync_stock_list``). This
+  is the true whole-market set (~5300 codes), not an index subset.
 * ``WatchlistProvider`` -- an explicit code list passed inline, or read from a
   one-code-per-line text file (``--watchlist`` / ``universe.watchlist_path``).
 * ``CustomProvider``    -- a fixed custom code list (reserved for custom strong
@@ -85,6 +88,29 @@ class WatchlistProvider(UniverseProvider):
         raise ValueError("WatchlistProvider requires codes or a non-empty watchlist_path")
 
 
+class AllAProvider(UniverseProvider):
+    """Full A-share universe resolved from the persisted ``Stock`` table.
+
+    The ``Stock`` table is populated by ``DataManager.sync_stock_list()`` (which
+    pulls the entire listed-A-share list from AKShare). Reading it avoids any
+    per-run network call and yields the true whole-market candidate set
+    (~5300 codes). Returns an empty list (not an error) if the table is
+    unpopulated, so a run without a prior ``sync --list`` degrades gracefully.
+    """
+
+    def __init__(self, data_manager: Any | None = None) -> None:
+        self._dm = data_manager
+
+    def codes(self, as_of: Any | None = None) -> list[str]:
+        from data.manager import DataManager
+
+        dm = self._dm if self._dm is not None else DataManager()
+        df = dm.get_stock_list()
+        if df.empty or "code" not in df.columns:
+            return []
+        return sorted(set(str(c) for c in df["code"].tolist()))
+
+
 class CustomProvider(UniverseProvider):
     """A fixed custom code list (reserved for custom strong pools, design §5 4.0)."""
 
@@ -113,8 +139,10 @@ def get_universe_provider(
     utype: str = type or cfg.type
     if utype == "csi800":
         return CSI800Provider()
+    if utype == "all_a":
+        return AllAProvider()
     if utype == "watchlist":
         return WatchlistProvider(codes=codes, watchlist_path=watchlist_path or cfg.watchlist_path)
     if utype == "custom":
         return CustomProvider(codes or cfg.custom_codes)
-    raise ValueError(f"unknown universe type {utype!r} (expected csi800/watchlist/custom)")
+    raise ValueError(f"unknown universe type {utype!r} (expected csi800/all_a/watchlist/custom)")

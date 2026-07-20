@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.database import Base
+from data.models import Stock
 from universe.engine import UniverseEngine
 
 
@@ -69,3 +70,36 @@ def test_cli_universe_add_list():
     lst = runner.invoke(main.app, ["universe", "list"])
     assert lst.exit_code == 0, lst.output
     assert "demo" in lst.output
+
+
+def test_universe_all_a_reads_stock_table():
+    ue = make_engine()
+    ue.session.add(Stock(code="000001", name="平安银行"))
+    ue.session.add(Stock(code="600519", name="贵州茅台"))
+    ue.session.commit()
+    assert ue.get_codes("all_a") == ["000001", "600519"]
+
+
+def test_universe_all_a_empty_when_no_stock_rows():
+    ue = make_engine()
+    assert ue.get_codes("all_a") == []
+
+
+def test_all_a_provider_resolves_from_stock_list():
+    import pandas as pd
+
+    class _FakeDM:
+        def get_stock_list(self):
+            return pd.DataFrame([{"code": "000001"}, {"code": "600519"}])
+
+    from research.universe_provider import AllAProvider
+
+    prov = AllAProvider(data_manager=_FakeDM())
+    assert prov.codes() == ["000001", "600519"]
+
+
+def test_get_universe_provider_all_a():
+    from research.universe_provider import AllAProvider, get_universe_provider
+
+    prov = get_universe_provider("all_a")
+    assert isinstance(prov, AllAProvider)

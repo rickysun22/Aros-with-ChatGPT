@@ -40,6 +40,26 @@ All notable changes to AROS are documented by Sprint.
   cron.
 - `research alpha catch-up --since … [--until …]` backfills missing trading days.
 
+### Full A-share universe (`all_a`)
+- New universe type `all_a` = the **whole A-share market** (~5300 codes), resolved
+  from the persisted `Stock` table (populated by `DataManager.sync_stock_list()`)
+  rather than a curated index subset. Contrast with `csi800` (~688 constituents),
+  which is a CSI 800 index subset, not the full market.
+- `research/universe_provider.py`: new `AllAProvider` + `all_a` branch in
+  `get_universe_provider`, so the 4.2 consensus screen can target the whole market.
+- `universe/engine.py`: `UniverseEngine.get_codes("all_a")` special-cases to read the
+  `Stock` table, keeping `report` / `portfolio` / `universe show` commands consistent.
+- `research/run_daily.py`: `_sync_data` resolves the `all_a` sync list from the `Stock`
+  table (not the empty `UniversePool` row) so the daily incremental sync covers the
+  whole market.
+- `scripts/sync_universe.py`: `all_a` first refreshes the `Stock` table, then backfills
+  every code — the one-shot tool for the initial full-history load.
+- Windows automation: `scripts/aros_daily.bat` (daily `alpha run --universe all_a`),
+  `scripts/aros_backfill.bat` (one-time full history), `scripts/aros_install_task.bat`
+  (registers a weekday-18:30 Scheduled Task), and `scripts/WINDOWS_TASK.md` (setup
+  guide). Run on the user's own machine — the sandbox proxy blocks eastmoney, so the
+  full sync only works off-sandbox.
+
 ### Tests (+12)
 - `tests/test_cache.py` (6): DayCache round-trip / TTL / miss + cache throttles
   money-flow & price-provider calls.
