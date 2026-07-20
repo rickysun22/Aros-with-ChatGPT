@@ -2,6 +2,35 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.7 — Paper Trading / Exit Experiment (2026-07-20)
+
+Closes the loop opened by 4.6 (selection is valid) by answering the next causal
+question: once we hold AROS picks, what is the best *way to exit*? The experiment is
+split into two orthogonal axes so the result is attributable (no confounding).
+
+- `src/research/papertrade.py` (new): `simulate_day` runs one trading day for every
+  portfolio (T+1 entries then exits), strictly **no look-ahead**. Selection axis
+  (S1 ai / S2 human / S3 random) × Exit axis (E1 fixed / E2 trailing / E3 dynamic)
+  are data-isolated cells. Exit framework v1.0 four layers, all unit-tested:
+  hard stop-loss (`fixed` default, `atr` adaptive with graceful fallback to fixed
+  when `high`/`low` are absent), fixed take-profit (E1), trailing profit (E2/E3),
+  score decay (lightweight **proxy** score, `score_type="proxy"`; real Daily Exit
+  Intelligence lands in Phase 5), and time-stop = `min(strategy, rating, portfolio)`
+  holding cap. `portfolio_metrics` reports equity / return / max drawdown / win rate
+  / P&L ratio / avg holding + **Alpha indicators** (annualized, Sharpe, Calmar,
+  max consecutive losses), all checked against hand-computed small examples.
+  `generate_papertrade_report` renders Portfolio Performance Report (md/html/xlsx)
+  with a buy-&-hold benchmark comparison and a sample-size caveat.
+- `src/research/models.py`: new `Portfolio` + `SimulatedTrade` ORMs (account state is
+  *rebuilt* from the blotter + `PriceProvider`, never stored — no dual-write drift);
+  `StrategyRegistry.max_holding_days` supports the time-stop priority chain.
+- `ExitConfig` dataclass with `E1/E2/E3` presets, serialized as JSON on `Portfolio`.
+- `main.py`: `alpha papertrade init|run|report` sub-commands (reuses
+  `_bench_price_provider` / `_kb_session`).
+- 19 new offline tests (fake `PriceProvider`, in-memory sqlite) covering every exit
+  layer, ATR fallback, data isolation, Alpha indicators, and report generation.
+- All four CI gates green (ruff / black=100 / mypy / pytest).
+
 ## Sprint 4.6 — Rating Validation & Calibration (2026-07-20)
 
 Closes the loop opened by 4.2 (selection) + 4.5 (human feedback): proves the AROS

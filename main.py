@@ -1653,6 +1653,125 @@ def alpha_validate_calibrate(
         )
 
 
+alpha_papertrade_app = typer.Typer(help="Phase 4.7 Paper Trading (Exit Experiment)")
+
+
+@alpha_papertrade_app.command("init")
+def alpha_papertrade_init(
+    portfolio_id: str = typer.Option(..., "--id", help="组合ID, e.g. S1_E1"),
+    axis: str = typer.Option(..., "--axis", help="selection | exit"),
+    name: str | None = typer.Option(None, "--name", help="展示名"),
+    picker: str = typer.Option("ai", "--picker", help="ai | human | random"),
+    preset: str = typer.Option("E1", "--preset", help="退出预设 E1/E2/E3"),
+    exit_config: str | None = typer.Option(
+        None, "--exit-config", help="自定义 ExitConfig YAML/JSON 路径(覆盖 preset)"
+    ),
+    capital: float = typer.Option(100000.0, "--capital", help="初始资金"),
+    max_positions: int = typer.Option(5, "--max-positions", help="最大持仓数"),
+    position_fraction: float = typer.Option(0.2, "--position-fraction", help="单仓仓位比例"),
+    entry_mode: str = typer.Option(
+        "immediate", "--entry-mode", help="immediate|signal_confirmation|manual"
+    ),
+    max_holding: int | None = typer.Option(None, "--max-holding", help="组合级持有上限(交易日)"),
+) -> None:
+    """Create one paper-trading portfolio (one cell of the experiment)."""
+    setup_logging()
+    from research.papertrade import ExitConfig, exit_preset, init_portfolio
+
+    cfg = exit_preset(preset)
+    if exit_config is not None:
+        with open(exit_config, encoding="utf-8") as fh:
+            raw = fh.read()
+        cfg = (
+            ExitConfig.from_json(raw)
+            if raw.lstrip().startswith("{")
+            else ExitConfig.from_json(__import__("json").dumps(__import__("yaml").safe_load(raw)))
+        )
+    session = _kb_session()
+    p = init_portfolio(
+        session,
+        portfolio_id=portfolio_id,
+        axis=axis,
+        name=name,
+        picker=picker,
+        exit_config=cfg,
+        initial_capital=capital,
+        max_positions=max_positions,
+        position_fraction=position_fraction,
+        entry_mode=entry_mode,
+        max_holding_days=max_holding,
+    )
+    typer.echo(f"Created portfolio {p.id} (axis={p.axis}, picker={p.picker}, preset={preset})")
+
+
+@alpha_papertrade_app.command("run")
+def alpha_papertrade_run(
+    run_date: str = typer.Option(..., "--date", help="YYYY-MM-DD 交易日"),
+) -> None:
+    """Simulate one trading day for all portfolios (entries T+1 then exits)."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.papertrade import simulate_day
+
+    session = _kb_session()
+    dm = DataManager()
+
+    def _price(code: str, start: date, end: date) -> pd.DataFrame | None:
+        return dm.get_daily(code, start, end)
+
+    d = pd.Timestamp(run_date).date()
+    summary = simulate_day(session, d, _price)
+    typer.echo(f"{summary['date']}: entries={summary['entries']} exits={summary['exits']}")
+
+
+@alpha_papertrade_app.command("report")
+def alpha_papertrade_report(
+    as_of: str | None = typer.Option(None, "--as-of", help="YYYY-MM-DD, default today"),
+    portfolio_id: str | None = typer.Option(None, "--id", help="仅某组合"),
+    no_benchmark: bool = typer.Option(False, "--no-benchmark", help="跳过基准对比"),
+) -> None:
+    """Generate the Portfolio Performance Report (md + html + xlsx)."""
+    setup_logging()
+    import pandas as pd
+
+    from data.manager import DataManager
+    from research.papertrade import generate_papertrade_report
+
+    session = _kb_session()
+    run_date = pd.Timestamp(as_of).date() if as_of else date.today()
+
+    def _price(code: str, start: date, end: date) -> pd.DataFrame | None:
+        return DataManager().get_daily(code, start, end)
+
+    bench_provider = None
+    bench_code = None
+    if not no_benchmark:
+        try:
+            cfg = get_config()
+            dm = DataManager()
+            if cfg.benchmark.indices:
+                bench_code = next(iter(cfg.benchmark.indices.values()))
+                bench_provider = _bench_price_provider(dm)
+        except Exception as exc:  # noqa: BLE001 - degrade gracefully if no benchmark
+            typer.echo(f"(benchmark unavailable: {exc}; skipping baseline)", err=True)
+    ids = [portfolio_id] if portfolio_id else None
+    paths = generate_papertrade_report(
+        session,
+        out_dir="reports",
+        as_of=run_date,
+        price_provider=_price,
+        bench_price_provider=bench_provider,
+        bench_code=bench_code,
+        portfolio_ids=ids,
+    )
+    typer.echo(f"Report -> md : {paths['md']}")
+    typer.echo(f"         html: {paths['html']}")
+    typer.echo(f"         xlsx: {paths['xlsx']}")
+
+
+alpha_app.add_typer(alpha_papertrade_app, name="papertrade")
 alpha_app.add_typer(alpha_validate_app, name="validate")
 
 

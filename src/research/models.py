@@ -24,6 +24,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -140,6 +141,10 @@ class StrategyRegistry(Base):
     gate_passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # JSON list of Regime labels
     best_fit_regimes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional per-strategy max holding horizon (trading days). Used by the 4.7
+    # paper-trading time-exit priority chain (Strategy > Rating > Portfolio). Null
+    # = no strategy-level constraint (rating cap / portfolio limit still apply).
+    max_holding_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
 
@@ -345,3 +350,76 @@ class CandidatePerformance(Base):
     # success / fail / pending (pending = T+10 not yet available).
     status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     filled_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.7 -- Paper trading (exit experiment, anti-confounding dual axis)
+# --------------------------------------------------------------------------- #
+class Portfolio(Base):
+    """One paper-trading portfolio = one cell of the 4.7 dual-axis experiment.
+
+    The ``axis`` column marks whether the portfolio belongs to the *selection*
+    experiment (S1 ai / S2 human / S3 random) or the *exit* experiment
+    (E1 fixed / E2 trailing / E3 dynamic). Each portfolio holds its own trades
+    (FK ``simulated_trades.portfolio_id``), so the 6 combinations never share
+    data (design Part II §II.3). Account state is *not* stored — it is rebuilt
+    from the trade blotter + a ``PriceProvider`` on demand (no dual-write drift).
+    """
+
+    __tablename__ = "portfolios"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)  # e.g. "S1_E1"
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    # selection | exit
+    axis: Mapped[str] = mapped_column(String(8), nullable=False)
+    initial_capital: Mapped[float] = mapped_column(Float, default=100000.0)
+    max_positions: Mapped[int] = mapped_column(Integer, default=5)
+    position_fraction: Mapped[float] = mapped_column(Float, default=0.2)
+    # immediate | signal_confirmation | manual — Phase 4.8 Entry engine reserved.
+    entry_mode: Mapped[str] = mapped_column(String(16), default="immediate")
+    # ExitConfig (design §II.5) serialized as JSON; drives E1/E2/E3 behaviour.
+    exit_config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    # ai | human | random — which candidate pool feeds entries (design §II.3).
+    picker: Mapped[str] = mapped_column(String(8), default="ai")
+    # Portfolio-level risk limit on holding days (time-stop lowest priority).
+    max_holding_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
+class SimulatedTrade(Base):
+    """One hypothetical (non-executed) trade inside a paper-trading portfolio.
+
+    Purely a simulation record — AROS never places real orders (constitutional
+    red line: no broker connection, no auto-trading). ``entry_date`` is the first
+    trading day after the candidate's ``signal_date`` (T+1 fill, no look-ahead).
+    ``score_type`` / ``entry_score`` are reserved for Phase 5 (real Daily Exit
+    Intelligence); in 4.7 ``score_type`` is ``"proxy"`` only when a trade is
+    closed by Score Decay, otherwise ``None``.
+    """
+
+    __tablename__ = "simulated_trades"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    portfolio_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("portfolios.id"), index=True, nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    signal_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    entry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    entry_mode: Mapped[str] = mapped_column(String(16), default="immediate")
+    score_type: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    entry_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aros_score: Mapped[float] = mapped_column(Float, nullable=False)
+    rating: Mapped[str] = mapped_column(String(8), nullable=False)
+    hit_strategies_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Strategy-level max holding horizon captured at entry (time-stop priority).
+    strategy_max_holding: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    exit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # stop_loss | take_profit | trailing | score_decay | time_stop | manual
+    exit_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    pnl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pnl_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
