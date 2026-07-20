@@ -188,8 +188,14 @@ def _eastmoney_daily(code: str) -> pd.DataFrame:
     }
     session = requests.Session()
     session.trust_env = False  # bypass any system proxy; Eastmoney was blocked by it
-    resp = session.get(_EASTMONEY_KLINE_URL, params=params, headers=headers, timeout=10)
-    payload = resp.json()
+    try:
+        resp = session.get(_EASTMONEY_KLINE_URL, params=params, headers=headers, timeout=10)
+        payload = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("eastmoney daily FAILED for %s: %s", code, exc)
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
     klines = (payload.get("data") or {}).get("klines") or []
     if not klines:
         return pd.DataFrame(
@@ -236,7 +242,13 @@ def _sina_daily(code: str) -> pd.DataFrame:
     # stock_zh_a_daily expects prefix: sh for Shanghai, sz for Shenzhen
     prefix = "sh" if code.startswith("6") else "sz"
     symbol = f"{prefix}{code}"
-    df = ak.stock_zh_a_daily(symbol=symbol)
+    try:
+        df = ak.stock_zh_a_daily(symbol=symbol)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sina daily FAILED for %s: %s", code, exc)
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
 
     if df.empty or "date" not in df.columns:
         return pd.DataFrame(
