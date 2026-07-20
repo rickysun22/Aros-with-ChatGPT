@@ -29,6 +29,9 @@ if not exist "%PYTHON%" (
 
 cd /d "%REPO%"
 set "PYTHONPATH=%REPO%\src"
+REM Bypass system proxy (127.0.0.1:3067) for EastMoney -- it blocks their APIs
+set "NO_PROXY=push2.eastmoney.com,push2his.eastmoney.com,quote.eastmoney.com"
+set "no_proxy=%NO_PROXY%"
 
 echo [%date% %time%] Starting full A-share backfill (all_a, from 2024-01-01) ...
 "%PYTHON%" scripts/sync_universe.py all_a 2024-01-01

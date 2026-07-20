@@ -25,6 +25,9 @@ echo [INFO] Using python: %PYTHON%
 
 cd /d "%REPO%"
 set "PYTHONPATH=%REPO%\src"
+REM Bypass system proxy for EastMoney
+set "NO_PROXY=push2.eastmoney.com,push2his.eastmoney.com,quote.eastmoney.com"
+set "no_proxy=%NO_PROXY%"
 
 REM ---------- time guard: check unless --force ----------
 if not "%~1"=="--force" (
