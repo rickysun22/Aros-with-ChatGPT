@@ -226,6 +226,44 @@ def _fake_baidu_response() -> dict:
     }
 
 
+def _fake_sina_response() -> pd.DataFrame:
+    """Fake Sina daily bars matching canonical AROS schema."""
+    return pd.DataFrame(
+        [
+            {
+                "code": "600000",
+                "date": date(2024, 1, 2),
+                "open": 10.0,
+                "high": 10.2,
+                "low": 9.8,
+                "close": 10.1,
+                "volume": 1000.0,
+                "amount": 10100.0,
+            },
+            {
+                "code": "600000",
+                "date": date(2024, 1, 3),
+                "open": 10.5,
+                "high": 10.6,
+                "low": 10.4,
+                "close": 10.55,
+                "volume": 1100.0,
+                "amount": 11500.0,
+            },
+            {
+                "code": "600000",
+                "date": date(2024, 1, 4),
+                "open": 10.6,
+                "high": 10.9,
+                "low": 10.5,
+                "close": 10.8,
+                "volume": 1200.0,
+                "amount": 12960.0,
+            },
+        ]
+    )
+
+
 def _fake_eastmoney_response() -> pd.DataFrame:
     """Canonical 3-row daily frame (AROS schema) used to mock the provider."""
     return pd.DataFrame(
@@ -261,8 +299,8 @@ def test_normalize_baidu_daily() -> None:
 
 def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "data.providers.astockdata._eastmoney_daily",
-        lambda code: _fake_eastmoney_response(),
+        "data.providers.astockdata._sina_daily",
+        lambda code: _fake_sina_response(),
     )
     df = AStockDataProvider().get_daily_bars("600000", date(2024, 1, 1), date(2024, 12, 31))
     assert len(df) == 3
@@ -286,8 +324,8 @@ def test_manager_selects_astockdata_source(
 
     monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path}/t.db")  # type: ignore[union-attr]
     monkeypatch.setattr(
-        "data.providers.astockdata._eastmoney_daily",
-        lambda code: _fake_eastmoney_response(),
+        "data.providers.astockdata._sina_daily",
+        lambda code: _fake_sina_response(),
     )
     monkeypatch.setattr(
         "data.providers.astockdata._eastmoney_stock_list",

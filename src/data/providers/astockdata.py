@@ -7,11 +7,12 @@ data sources with built-in fallback and rate limiting.
 
 Implemented here (the parts AROS needs):
 
-* **Daily bars** -- Eastmoney push2his K-line (``push2his.eastmoney.com``) is
-  the **preferred** source: zero-auth HTTP, returns raw (unadjusted) OHLCV
-  reliably. Sina Finance (``akshare``) and Baidu 股市通 are fallbacks used only
-  when Eastmoney is unreachable (e.g. behind a proxy that blocks it).
-* **Stock list** -- Eastmoney clist (``push2.eastmoney.com``), zero-auth HTTP.
+* **Daily bars** -- Sina Finance (``akshare stock_zh_a_daily``) is the
+  **preferred** source because ``push2his.eastmoney.com`` is unreachable from
+  many networks (proxy / ISP / firewall). Eastmoney push2his and Baidu are
+  fallbacks used only when Sina fails.
+* **Stock list** -- Eastmoney clist (``push2.eastmoney.com``) with akshare
+  fallback; both sources return ``code``/``name`` pairs.
 
 ``requests`` is imported lazily so the module (and the test suite) never
 requires network access unless a real fetch is performed.
@@ -89,7 +90,11 @@ def _baidu_kline(code: str, start_time: str = "") -> dict:
 
 
 def _eastmoney_stock_list() -> pd.DataFrame:
-    """Return the full A-share list as a DataFrame with ``code``/``name``."""
+    """Return the full A-share list from Eastmoney clist API.
+
+    Falls back to ``akshare stock_info_a_code_name()`` when Eastmoney is
+    unreachable (same network issues that block push2his).
+    """
     import requests
 
     params = {
@@ -107,14 +112,42 @@ def _eastmoney_stock_list() -> pd.DataFrame:
         "User-Agent": "Mozilla/5.0",
         "Referer": "https://quote.eastmoney.com/",
     }
-    resp = requests.get(_EASTMONEY_LIST_URL, params=params, headers=headers, timeout=15)
-    payload = resp.json()
-    items = (payload.get("data") or {}).get("diff") or []
-    rows = [
-        {"code": str(it.get("f12", "")).strip(), "name": str(it.get("f14", "")).strip()}
-        for it in items
-    ]
-    return pd.DataFrame(rows, columns=["code", "name"])
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        resp = session.get(_EASTMONEY_LIST_URL, params=params, headers=headers, timeout=10)
+        payload = resp.json()
+        items = (payload.get("data") or {}).get("diff") or []
+        rows = [
+            {
+                "code": str(it.get("f12", "")).strip(),
+                "name": str(it.get("f14", "")).strip(),
+            }
+            for it in items
+        ]
+        return pd.DataFrame(rows, columns=["code", "name"])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("eastmoney_stock_list failed (%s), falling back to akshare", exc)
+        return _akshare_stock_list()
+
+
+def _akshare_stock_list() -> pd.DataFrame:
+    """Return the full A-share list via akshare (fallback for stock list)."""
+    import akshare as ak
+
+    try:
+        df = ak.stock_info_a_code_name()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("akshare stock_info_a_code_name failed: %s", exc)
+        return pd.DataFrame(columns=["code", "name"])
+
+    if df.empty:
+        return pd.DataFrame(columns=["code", "name"])
+    # akshare returns columns like ["code", "name"] already
+    out = df[["code", "name"]].copy()
+    out["code"] = out["code"].astype(str).str.strip()
+    out["name"] = out["name"].astype(str).str.strip()
+    return out.reset_index(drop=True)
 
 
 _EASTMONEY_KLINE_URL = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -134,12 +167,9 @@ def _secid(code: str) -> str:
 def _eastmoney_daily(code: str) -> pd.DataFrame:
     """Return daily bars from Eastmoney push2his K-line API (raw, unadjusted).
 
-    This is the **preferred** daily source: it is Eastmoney's canonical
-    endpoint, returns raw OHLCV reliably, and works once the system proxy
-    (which previously blocked ``push2his.eastmoney.com``) is disabled.
-
-    Returns a DataFrame with the canonical AROS schema
-    ``[code, date, open, high, low, close, volume, amount]``.
+    This is a **fallback** source; Sina Finance is preferred because Eastmoney
+    push2his is unreachable from many networks. Returns the canonical AROS
+    schema ``[code, date, open, high, low, close, volume, amount]``.
     """
     import requests
 
@@ -194,9 +224,9 @@ def _eastmoney_daily(code: str) -> pd.DataFrame:
 def _sina_daily(code: str) -> pd.DataFrame:
     """Return daily bars from Sina Finance (``stock_zh_a_daily``).
 
-    This is a **fallback** source, used only when Eastmoney push2his is
-    unreachable. Sina's endpoint tends to work through proxies/firewalls where
-    Eastmoney is blocked.
+    This is the **preferred** source because ``push2his.eastmoney.com`` is
+    unreachable from many networks (proxy / ISP / firewall). Sina's endpoint
+    works reliably through most environments.
 
     Returns a DataFrame with columns matching the canonical AROS schema:
     ``[code, date, open, high, low, close, volume, amount]``.
@@ -272,17 +302,16 @@ class AStockDataProvider:
         return _eastmoney_stock_list()
 
     def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
-        # 1) Preferred: Eastmoney push2his K-line (raw, unadjusted)
-        df = _eastmoney_daily(code)
+        # 1) Preferred: Sina Finance (works reliably through most networks)
+        df = _sina_daily(code)
         if not df.empty:
-            logger.debug("daily source=eastmoney code=%s", code)
             mask = (df["date"] >= start_date) & (df["date"] <= end_date)
             return df[mask].reset_index(drop=True)
 
-        # 2) Fallback: Sina Finance (reliable through most proxies)
-        df = _sina_daily(code)
+        # 2) Fallback: Eastmoney push2his K-line (raw, unadjusted)
+        df = _eastmoney_daily(code)
         if not df.empty:
-            logger.warning("daily source=sina (eastmoney failed) code=%s", code)
+            logger.warning("daily source=eastmoney (sina failed) code=%s", code)
             mask = (df["date"] >= start_date) & (df["date"] <= end_date)
             return df[mask].reset_index(drop=True)
 
