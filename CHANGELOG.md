@@ -2,11 +2,17 @@
 
 All notable changes to AROS are documented by Sprint.
 
-## Sprint 4.7 — Paper Trading / Exit Experiment (2026-07-20)
+## Sprint 4.7 — Paper Trading Validation Environment + Entry Intelligence (2026-07-20)
 
-Closes the loop opened by 4.6 (selection is valid) by answering the next causal
-question: once we hold AROS picks, what is the best *way to exit*? The experiment is
-split into two orthogonal axes so the result is attributable (no confounding).
+> Under the 2026-07-20 roadmap restructure, this sprint's `research/papertrade.py` is
+> now classified as the **Paper Trading validation environment** (not a phase), and 4.7
+> is redefined as **Entry Intelligence** ("when to buy"). The engine below exercises
+> both entry selection and the 4.8 exit framework.
+
+Closes the loop opened by 4.6 (selection is valid) by building an attributable,
+no-look-ahead harness: once we hold AROS picks, what is the best *way to enter and
+exit*? The experiment is split into two orthogonal axes so the result is attributable
+(no confounding).
 
 - `src/research/papertrade.py` (new): `simulate_day` runs one trading day for every
   portfolio (T+1 entries then exits), strictly **no look-ahead**. Selection axis
@@ -31,33 +37,35 @@ split into two orthogonal axes so the result is attributable (no confounding).
   layer, ATR fallback, data isolation, Alpha indicators, and report generation.
 - All four CI gates green (ruff / black=100 / mypy / pytest).
 
-## Sprint 4.8 — Execution Intelligence Design (占位 / Backlog, 不开发)
+## Roadmap Restructure — AROS → AI 辅助投资决策系统 (2026-07-20)
 
-> **Design-only sprint — no engine code shipped.** Records the contract that Phase 5
-> must implement so the 4.8 intent is not lost. Full backlog table in
-> `Phase4.6-4.8_Technical_Design.md` §III.7.
+> 战略重定位（非代码 sprint）：把能力建设顺序对齐真实交易时间轴，AROS 从"选股系统"
+> 重新定位为"AI 辅助投资决策系统"。无代码改动，四门 CI 不受影响。
 
-**4.8 should contain (frozen here, built in Phase 5):**
-- **Entry synthesis layer** — *not* following any collected strategy's raw `entry_rules`
-  (those are inputs only). Output a unified `Entry Signal + Entry Confidence Score`,
-  decoupled from the AROS Score. Synthesizes: (a) hit-strategy combo semantics,
-  (b) the stock's current state (price action / volume / position), (c) market
-  judgement (regime / sector flows). `EntryEngine.evaluate(code, date, market_state)
-  -> EntrySignal`.
-- **Entry model families** — trend breakout / pullback dip-buy / sentiment leader,
-  each with explainable triggers.
-- **Exit Intelligence** — upgrade 4.7's proxy score_decay to a real Daily Exit
-  Intelligence (re-run Consensus Engine for the live AROS Score); emit graded
-  Exit Alerts (High/Medium/Low) with explainable reasons; stays compatible with 4.7's
-  `fixed` / `trailing` / `score_decay` baselines.
-- **Position Management** — `position_fraction × current equity` sizing + Timing /
-  Rebalancing + 100-share (A-share) lots; `Portfolio.entry_mode` (immediate /
-  signal_confirmation / manual) takes effect.
-- **Interface contracts already landed in 4.7** (no Phase-5 schema migration):
-  `entry_mode`, `entry_score` / `score_type`, `ExitConfig`. Phase 5 only fills them
-  with real values.
-- Three engines frozen: **Alpha Selection** (done, 4.2) / **Alpha Execution** (won't
-  buy) / **Alpha Protection** (won't sell).
+**四大引擎（替代原三大引擎 Selection/Execution/Protection）**：
+- **Alpha Discovery Engine**（买什么）— 已完成（4.0–4.6）。
+- **Alpha Entry Engine**（何时买）— **Phase 4.7**：Entry Score 合成层。
+- **Alpha Management Engine**（持有怎么办）— 4.7/4.8 引擎内实现，5.5 组合层成熟。
+- **Alpha Exit Engine**（何时卖）— **Phase 4.8**：分级 Exit Signal。
+
+**Phase 重命名（原 4.7/4.8 重新定义）**：
+- 4.7 由"Paper Trading（退出实验）"改为 **Entry Intelligence（入场智能）**：主责"什么时候买"。
+  已实现的 `research/papertrade.py` 重新归类为**模拟交易验证环境**（不占 Phase 编号，贯穿 4.6–4.8）。
+- 4.8 由"Execution Intelligence 架构占位（不开发）"改为 **Exit Intelligence（真实交付）**：
+  退出框架 v1.0（四层 + 评级联动上限）已在验证环境实现并单测覆盖，作为 Exit Engine 基线；
+  剩余真实 Daily Exit Intelligence（proxy→真实 AROS Score + 分级 Exit Alert）。
+- **模拟交易（Paper Trading）= 验证环境，非能力模块、不占 Phase 编号**。
+
+**Phase 5 重新规划为 Intelligent Platform（5.1–5.5）**：Dashboard / AI Research Assistant /
+Strategy Discovery / Adaptive Weighting / Risk Management。详见新增 `Phase5_Intelligent_Platform.md`。
+
+**三大核心评分贯穿每日决策**：Alpha Score（值不值得研究）/ Entry Score（现在是否适合买）/
+Exit Score（是否应该离场）。
+
+文档更新：`Roadmap.md`（四大引擎前言 + 4.7/4.8 改名 + 验证环境说明 + Phase 5 小节）、
+`Phase4.6-4.8_Technical_Design.md`（§0 四大引擎 + 4.7=Entry / 4.8=Exit 重构 + 退出框架迁移至 4.8）、
+新增 `Phase5_Intelligent_Platform.md`。
+
 
 ## Sprint 4.6 — Rating Validation & Calibration (2026-07-20)
 

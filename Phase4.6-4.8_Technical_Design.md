@@ -1,27 +1,39 @@
-# AROS Phase 4.6–4.8 技术设计：试运行验证与执行智能（Pilot Validation & Execution Intelligence）
+# AROS Phase 4.6–4.8 技术设计：交易智能核心（入场智能 + 退出智能 + 评分校准）
 
-> 状态：**定稿（GPT + WorkBuddy 联合评审通过，待开发）**
-> 范围：Phase 4.6 评分校准 → Phase 4.7 模拟交易（退出实验）→ Phase 4.8 执行智能架构占位（不开发）
-> 文档性质：一份贯通 4.6–4.8 的设计契约，取代此前分散的 4.6 / 4.7 草稿用于统一评审。
+> 状态：**定稿（GPT + WorkBuddy 联合评审通过）**
+> 范围：Phase 4.6 评分校准 → Phase 4.7 入场智能（Entry Intelligence）→ Phase 4.8 退出智能（Exit Intelligence）；模拟交易（Paper Trading）为贯穿 4.6–4.8 的**验证环境**（非独立阶段）。Phase 5 平台化设计见 `Phase5_Intelligent_Platform.md`。
+> 文档性质：贯通 4.6–4.8 的设计契约（取代分散的 4.6/4.7 草稿）；本设计把 AROS 从"选股系统"重新定位为 **AI 辅助投资决策系统**。
 
 ---
 
-## 0. 设计背景与三大引擎定位
+## 0. 设计背景与四大引擎定位（对齐交易生命周期）
 
 AROS 在 4.0–4.5 已具备：策略知识库、策略验证、共识引擎（选股）、市场环境+资金流、每日 Alpha 报告、人工反馈闭环。
 
-本设计把系统从"研究工具"推进到"经真实市场验证的辅助决策系统"，并冻结**三大核心引擎**定义：
+本设计把系统从"研究工具 / 选股系统"推进到 **AI 辅助投资决策系统**，按真实交易时间轴组织四大核心能力（而非按"架构模块"切分，避免与用户视角的交易流程错位）：
 
-| 引擎 | 解决痛点 | 落地阶段 | 组成 |
-|---|---|---|---|
-| **Alpha Selection Engine** | 不会选（不知道买什么） | 已完成（4.2 共识引擎） | Strategy Consensus + 资金流 + 市场环境 |
-| **Alpha Execution Engine** | 不会买（何时进场） | Phase 4.8 设计 / Phase 5 实现 | Entry Signal + Entry Confidence Score + Position Sizing + Timing |
-| **Alpha Protection Engine** | 不会卖（何时离场） | 4.7 起实证验证 | Stop Loss + Take Profit + Trailing + Score Decay |
+```
+市场 → 发现股票 → 等待机会 → 买入 → 持有 → 退出 → 复盘
+```
 
-**核心方法论原则（贯穿 4.6–4.8）**：把"选股能力"与"卖出能力"**拆开验证**，避免变量混杂（Confounding Variable）。否则模拟盘盈亏无法归因——不知道是选股强、人工强、还是卖点强。
+| 引擎 | 对应交易环节 | 解决痛点 | 落地阶段 | 核心组成 |
+|---|---|---|---|---|
+| **Alpha Discovery Engine** | 发现 | 买什么？ | 已完成（4.0–4.6：知识库→验证→共识→市场/资金→报告→反馈→评分校准） | 策略共识 + 资金流 + 市场环境 + 每日候选 |
+| **Alpha Entry Engine** | 买入 | 什么时候买？ | Phase 4.7 | Entry Signal + Entry Score（独立于 AROS Score）+ 仓位 / Timing |
+| **Alpha Management Engine** | 持有 | 买了以后怎么办？ | 4.7/4.8 引擎内实现，Phase 5.5 组合层成熟 | 仓位公式 + 移动止盈 + Rebalancing + 100 股整数倍（A 股） |
+| **Alpha Exit Engine** | 卖出 | 什么时候卖？ | Phase 4.8（v1 框架已在模拟环境验证） | 固定止损 / 趋势破坏 / 资金撤退 / Score 衰减 / 移动止盈 → 分级 Exit Signal |
+
+> **三大核心评分（贯穿每日决策）**：
+> 1. **Alpha Score**（股票质量）——"值不值得研究？"= 现有 AROS Score。
+> 2. **Entry Score**（买入时机）——"现在是否适合买？"。
+> 3. **Exit Score / Exit Risk**（持仓风险）——"是否应该离场？"。
+>
+> 最终每日可能输出形如：`XX科技  Alpha 92⭐⭐⭐⭐⭐ / Entry 86 / Exit Risk Low → 关注买入`；或 `Alpha 95（持仓） Exit Risk High → 减仓/退出`。
+
+**核心方法论原则（贯穿 4.6–4.8）**：把"选股能力 / 买入时机 / 卖出时机"**拆开验证**，避免变量混杂（Confounding Variable）。否则模拟盘盈亏无法归因——不知道是选股强、买点强、还是卖点强。
 
 **入场信号的特别说明（针对 StrategySpec.entry_rules 的澄清）**：
-`src/research/strategy_spec.py` 中每个策略自带的 `entry_rules: list[str]` 是**收集来的策略原文买入规则**，属于参考资料（inputs），**不等于** AROS 自己的进场信号。AROS 的 Entry 引擎（Phase 4.8）是一个**合成层**：结合（a）命中策略组合、（b）标的当期实况（价格行为/量/位置）、（c）市场判断（regime/资金流），产出统一的 **Entry Signal + Entry Confidence Score**。"集百家之所长"，而非直接 follow 任一原始策略规则。
+`src/research/strategy_spec.py` 中每个策略自带的 `entry_rules: list[str]` 是**收集来的策略原文买入规则**，属于参考资料（inputs），**不等于** AROS 自己的进场信号。AROS 的 Entry 引擎（Phase 4.7）是一个**合成层**：结合（a）命中策略组合、（b）标的当期实况（价格行为/量/位置）、（c）市场判断（regime/资金流），产出统一的 **Entry Signal + Entry Score**。"集百家之所长"，而非直接 follow 任一原始策略规则。
 
 ---
 
@@ -31,17 +43,21 @@ AROS 在 4.0–4.5 已具备：策略知识库、策略验证、共识引擎（�
 Phase4.5  Human Feedback Loop
     │
     ↓
-Phase4.6  Rating Validation & Calibration      ← 证明评分体系有效
+Phase4.6  Rating Calibration          ← 证明评分体系有效（S>A>B>C）
     │
     ↓
-Phase4.7  Paper Trading (Exit Experiment)      ← 验证"卖法"，隔离执行价值
+Phase4.7  Entry Intelligence           ← 解决"什么时候买"（Entry Score 合成层）
+    │
+    ↓  ───── Paper Trading 验证环境（贯穿 4.6–4.8，非独立阶段）─────
     │
     ↓
-Phase4.8  Execution Intelligence Design         ← 架构占位（Entry/Exit/Position）
+Phase4.8  Exit Intelligence            ← 解决"什么时候卖"（分级 Exit Signal）
     │
     ↓
-Phase5     Execution Engine                      ← 真正实现 Entry/Exit Intelligence
+Phase5    Intelligent Platform         ← 产品化 / 自动化 / 智能增强（5.1–5.5）
 ```
+
+> **模拟交易（Paper Trading）不是能力模块，而是验证环境**：它不占 Phase 编号，贯穿 4.6–4.8，用于在无券商、无下单的前提下验证"评分是否有效 / 买点是否有效 / 卖点是否有效"。已实现的 `research/papertrade.py` 即此验证环境（双轴正交、无前视）。
 
 ---
 
@@ -133,11 +149,13 @@ class CandidatePerformance(Base):
 
 ---
 
-# Part II — Phase 4.7：模拟交易盘（退出实验，Paper Trading / Exit Experiment）
+# Part II — Phase 4.7：入场智能（Entry Intelligence）+ 模拟交易验证环境
 
-## II.1 目标
+## II.1 目标与定位
 
-验证**执行后的组合收益**，重点是**找到 AROS 最佳卖法**。Stage 与 4.6 因果分离：4.6 证"选股有效"，4.7 证"卖法有效"。
+- **4.7 的主责是"什么时候买"**：把 AROS 从"给出候选"推进到"给出可执行的买入时机"。核心交付是 **Entry Score 合成层**（综合策略组合 + 标的当期实况 + 市场判断，独立于 AROS Score）。
+- **模拟交易盘（Paper Trading）在本设计中降级为验证环境，不占 Phase 编号**：它贯穿 4.6–4.8，用于在"无券商、不下单"前提下验证评分/买点/卖点。已实现的 `research/papertrade.py`（双轴正交、无前视）即此环境——它既跑 4.7 的入场选择，也跑 4.8 的退出框架，二者共享同一套成交簿与账户重建机制。
+- 4.7 与 4.6 因果分离：4.6 证"选股有效"，4.7 证"买点有效"。
 
 ## II.2 红线（宪法）
 
@@ -166,36 +184,11 @@ class CandidatePerformance(Base):
 **只跑退出实验、固定 Selection = S1**：即 **S1+E1 / S1+E2 / S1+E3**，先找到 AROS 最佳卖法；S2/S3 后续再开（人工增强本身是独立实验）。
 > 理论上有 3×3=9 组合，但第一阶段不全部跑，避免数据量与维护复杂度爆炸。
 
-## II.4 退出框架 v1.0（三层 + 时间）
+## II.4 退出框架 v1.0（属 4.8 Exit Intelligence 基线，此处仅被验证环境执行）
 
-**Layer 1 — 硬风控（必须有）**
-- 止损模式可配置：`stop_loss.mode ∈ {fixed, atr}`。
-  - `fixed`: `fixed_percent = 8`（默认，先建 baseline）。
-  - `atr`: `period=14, multiplier=2` → `Stop = Entry - ATR×N`。不同波动股票自适应（v1 默认 fixed，ATR 作为可选模式纳入）。
+> 退出逻辑的实现与单测已在 `research/papertrade.py`（模拟交易验证环境）完成，是 **4.8 Exit Intelligence 的 v1 基线**。其完整定义（四层 + 评级联动上限表）见 **Part III §III.3**。本环境只负责"跑通并验证"，不重复定义退出规则。
 
-**Layer 2 — 盈利保护（移动止盈）**
-- 启动条件：盈利 ≥ +15%。
-- 退出：自峰值回撤 ≥ 8%（如买 100→120，跌到 110.4 卖）。抓趋势、防卖飞。
-
-**Layer 3 — 信号衰减（Score Decay）**
-- 触发：连续 N 天（默认 5）代理评分 < 阈值（默认 70）。
-- **v1 采用 Lightweight Proxy Score**（不假装真实 AROS）：用当前价格 + 板块状态 + 资金变化等简化因子合成 `proxy_score`，字段标记 `score_type = "proxy"`。Phase 5 再做真实 Daily Exit Intelligence（每日重跑 Consensus Engine）。
-
-**Layer 4 — 时间退出（实际持有期 = min 取小）**
-```
-actual_holding_days = min(strategy_max_holding, rating_cap, portfolio_risk_limit)
-```
-**优先级（拍板）**：`Strategy Exit Rule`（最高）> `Rating Risk Limit` > `Portfolio Risk Limit`。
-- 例 A：情绪策略 `max_holding=5`、评级 S(60天) → 取 **5 天**（策略生命周期优先）。
-- 例 B：趋势策略 `max_holding=60`、评级 B(15天) → 取 **15 天**（评级风控上限）。
-
-**评级联动上限表（rating_cap）：**
-| 评级 | 最大持有 | 止损 |
-|---|---|---|
-| S | 60 天 | −10% |
-| A | 30 天 | −8% |
-| B | 15 天 | −5% |
-| C | 不进入模拟盘 | — |
+**本验证环境如何驱动退出**：`simulate_day` 在每个交易日对持仓按 `ExitConfig`（E1/E2/E3 预设）依次评估 —— 硬止损（fixed/atr）→ 固定止盈 → 移动止盈 → 评分衰减（proxy）→ 时间退出（min 优先级），命中即平仓并记录 `exit_reason`。详见 Part III。
 
 ## II.5 数据模型
 
@@ -209,7 +202,7 @@ class Portfolio(Base):
     max_positions: Mapped[int] = 5
     position_fraction: Mapped[float] = 0.2
     entry_mode: Mapped[str] = mapped_column(default="immediate")
-        # immediate | signal_confirmation | manual  （Phase4.8 Entry 引擎预留接口）
+        # immediate | signal_confirmation | manual  （Phase 4.7 Entry 引擎接口）
     exit_config_json: Mapped[str]           # ExitConfig 序列化（见下）
     picker: Mapped[str] = mapped_column(default="ai")   # ai | human | random
 
@@ -287,36 +280,34 @@ time_stop:
 
 ## II.9 Done 标准（Phase 4.7）
 
-1. 6 组合 schema 就绪，第一阶段 S1+E1/E2/E3 可独立运行、数据隔离。
-2. 退出框架三层 + 时间（min 优先级）均被单测覆盖，且**不引用未来价格**。
-3. `entry_mode` 字段入 schema（接口预留，引擎不开发）。
-4. Alpha 指标计算正确（手算小样例对照）。
-5. Portfolio Performance Report 可生成；附带基线对比（样本不足标注）。
+1. 入场选择机制就绪：候选经 `picker`（ai/human/random）按评级（S/A/B 入、C 不入）入场，`entry_mode`（immediate/signal_confirmation/manual）入 schema 并已接线。
+2. **模拟交易验证环境**就绪：双轴正交（S1/S2/S3 × E1/E2/E3）可独立运行、数据隔离；Alpha 指标（年化/Sharpe/Calmar/最大连亏）计算正确（手算小样例对照）；Portfolio Performance Report 可生成并附基线对比（样本不足标注）。
+3. 退出框架 v1.0 在验证环境中被单测覆盖、无未来函数（实现细节见 Part III §III.3）。
+4. **（待建）Entry Score 合成层**：综合策略组合 + 标的当期实况 + 市场判断产出 Entry Score，与 AROS Score 解耦——这是 4.7 作为"入场智能"的核心交付，详见 Part III §III.2 契约与 Phase 4.7 实施计划。
 
 ---
 
-# Part III — Phase 4.8：执行智能架构占位（Execution Intelligence Design，不开发）
+# Part III — Phase 4.8：退出智能（Exit Intelligence）
 
-> 本阶段**只做架构设计，不写引擎代码**。目的：冻结接口契约，使 Phase 5 实现时不需大规模迁移（尤其 `entry_mode` 已在 4.7 入 schema）。
+> 4.8 是**真实交付阶段**，不再是架构占位。v1 退出框架（四层 + 评级联动上限）已在 4.7 的模拟交易验证环境中实现并单测覆盖，本阶段将其确立为 **Exit Engine 基线**，并补齐**真实 Daily Exit Intelligence**（proxy → 真实 AROS Score 驱动 score_decay，输出分级 Exit Alert）。
 
 ## III.1 路线图位置
 
 ```
-Phase4.6 Calibration → Phase4.7 Paper Trading → Phase4.8 Execution Intelligence Design → Phase5 Execution Engine
+Phase4.6 Calibration → Phase4.7 Entry Intelligence → [Paper Trading 验证环境] → Phase4.8 Exit Intelligence → Phase5 Intelligent Platform
 ```
 
-## III.2 三大引擎冻结定义（来自本设计 §0）
+## III.2 四大引擎（来自本设计 §0）
 
-1. **Alpha Selection Engine**（已完成，4.2 共识）：解决"不知道买什么"。
-2. **Alpha Execution Engine**（Phase 5）：解决"不会买"。
-   - Entry Signal（进场信号）
-   - Entry Confidence Score（独立于 AROS Score）
-   - Position Size / Timing
-3. **Alpha Protection Engine**（4.7 起验证，Phase 5 成熟）：解决"不会卖"。
-   - Stop Loss / Take Profit / Trailing / Score Decay
-   - 输出 **Exit Signal（带等级）**，非二元"卖"。
+对齐交易时间轴，四大引擎为：**Discovery（买什么）/ Entry（何时买）/ Management（持有怎么办）/ Exit（何时卖）**。4.8 是其中的 **Alpha Exit Engine**：
 
-## III.3 Entry Engine 设计（重点：合成层，非 follow 原始规则）
+- 输入：持仓 + 实时 AROS Score（每日重跑 Consensus Engine）+ 价格 / 资金流。
+- 输出：**分级 Exit Signal**（High / Medium / Low），非二元"卖"；原因可解释（逻辑衰减 / 资金转弱 / 跌破趋势 / 触达止损）。
+- 与 4.7 的 Entry Engine 解耦，但共用同一套成交簿与账户重建机制（验证环境）。
+
+## III.3 Entry 合成层契约（实现在 Phase 4.7）
+
+> Entry 引擎（"什么时候买"）的实现归属 **4.7**，此处仅冻结契约，避免 Phase 5 迁移。
 
 **原则（针对 StrategySpec.entry_rules 的澄清）**：
 - 收集的策略自带 `entry_rules` 是**参考资料（inputs）**，不是 AROS 的进场指令。
@@ -324,55 +315,73 @@ Phase4.6 Calibration → Phase4.7 Paper Trading → Phase4.8 Execution Intellige
   1. **策略组合信号**：命中策略的 entry 语义（突破 / 回踩 / 情绪分歧转一致等）；
   2. **标的当期实况**：价格行为、成交量、相对位置、是否涨停附近（避免追高）；
   3. **市场判断**：regime（Trending/Oscillating/Bear）、板块资金、暗盘派发风险。
-- 输出统一的 **Entry Signal + Entry Confidence Score**（"现在是不是适合买？"），与 AROS Score（"值不值得关注？"）解耦。
+- 输出统一的 **Entry Signal + Entry Score**（"现在是不是适合买？"），与 AROS Score（"值不值得关注？"）解耦。
 
-**Entry Confidence Score 示例**：
+**Entry Score 示例**：
 - 股票质量 AROS Score = 92（值得研究），但 Entry Score = 60（当前买点一般，等待）。
 - 次日价格回踩、量能配合 → Entry Score = 88（条件满足，可模拟进入）。
 
-**按策略族的 Entry Model（Phase 5 实现，4.8 仅占位）**：
+**按策略族的 Entry Model（4.7 实现）**：
 - 趋势突破：突破有效 + 放量 + 板块支持 + 环境允许 → 突破确认日。
 - 回调低吸：上涨趋势保持 + 回踩支撑 + 缩量 + 重新放量。
 - 情绪龙头：分歧转一致（高开承接 + 换手充分 + 板块回流）。
 
-## III.4 Exit Intelligence Engine 设计
+## III.4 退出框架 v1.0（= 4.8 Exit Engine 基线，已在模拟环境实现）
 
-- 从 4.7 实证升级为 **Daily Exit Intelligence**：每日重跑 Consensus Engine 得真实 AROS Score，替代 4.7 的 proxy。
-- 输出 **Exit Alert（等级 High/Medium/Low）**，原因可解释（逻辑衰减 / 资金转弱 / 跌破趋势）。
-- 与 4.7 ExitConfig 兼容：4.7 的 fixed/trailing/score_decay 成为 v1 基线，Phase 5 用真实分驱动 score_decay。
+四层退出规则，按评估顺序排列；命中即平仓并记录 `exit_reason`。已在 `research/papertrade.py` 实现并被单测覆盖（无未来函数）。
 
-## III.5 Position Management 设计
+**Layer 1 — 硬风控（必须有）**
+- 止损模式可配置：`stop_loss.mode ∈ {fixed, atr}`。
+  - `fixed`: `fixed_percent = 8`（默认 baseline）。
+  - `atr`: `period=14, multiplier=2` → `Stop = Entry − ATR×N`。不同波动股票自适应（v1 默认 fixed，ATR 作为可选模式）。
+
+**Layer 2 — 盈利保护（移动止盈）**
+- 启动：盈利 ≥ +15%；退出：自峰值回撤 ≥ 8%（如 100→120，跌到 110.4 卖）。抓趋势、防卖飞。
+
+**Layer 3 — 信号衰减（Score Decay）**
+- 触发：连续 N 天（默认 5）代理评分 < 阈值（默认 70）。
+- **v1 采用 Lightweight Proxy Score**（不假装真实 AROS）：用当前价格 + 板块状态 + 资金变化等简化因子合成 `proxy_score`，字段标记 `score_type = "proxy"`。Phase 4.8 升级为真实分（见 III.5）。
+
+**Layer 4 — 时间退出（实际持有期 = min 取小）**
+```
+actual_holding_days = min(strategy_max_holding, rating_cap, portfolio_risk_limit)
+```
+**优先级**：`Strategy Exit Rule`（最高）> `Rating Risk Limit` > `Portfolio Risk Limit`（例：情绪策略 `max_holding=5`+评级 S(60天)→取 5 天；趋势策略 `max_holding=60`+评级 B(15天)→取 15 天）。
+
+**评级联动上限表（rating_cap）：**
+| 评级 | 最大持有 | 止损 |
+|---|---|---|
+| S | 60 天 | −10% |
+| A | 30 天 | −8% |
+| B | 15 天 | −5% |
+| C | 不进入模拟盘 | — |
+
+## III.5 真实 Daily Exit Intelligence（v1 → 真实分升级）
+
+- 从 III.4 的 proxy 升级为 **真实 Daily Exit Intelligence**：每日重跑 Consensus Engine 得真实 **AROS Score**，驱动 `score_decay` 与分级 Exit Alert。
+- 输出 **Exit Alert（等级 High / Medium / Low）**，原因可解释：**逻辑衰减**（Score 由 92→65，逻辑消失）/ **资金转弱**（主力净流出、DDE 转负）/ **跌破趋势**（趋势破坏、关键支撑失守）/ **触达止损**。
+- 与 III.4 的 `fixed` / `trailing` / `score_decay` 完全兼容：v1 基线不动，仅把 `score_decay` 的驱动源从 proxy 换成真实分。
+
+## III.6 Position Management（Alpha Management Engine 的一部分）
 
 - 仓位公式：`position_fraction × 当前净值`，留现金缓冲。
-- Timing / Rebalancing / 100 股整数倍约束（A 股）—— Phase 5 实现。
+- Timing / Rebalancing / **100 股整数倍约束（A 股）** —— 在 4.7 验证环境中已实现 `entry_mode`（immediate / signal_confirmation / manual）+ 100 股取整；组合层风险管理（行业集中、风险预算、相关性）在 **Phase 5.5** 成熟。
 
-## III.6 接口契约（已在 4.7 预留 / 待 Phase 5 落地）
+## III.7 接口契约（已在 4.7 入 schema，4.7/4.8 填真实值）
 
-- `Portfolio.entry_mode: immediate | signal_confirmation | manual`（4.7 已落）。
-- `SimulatedTrade.entry_score / score_type`（4.7 已落，Phase 5 填真实分）。
-- `ExitConfig`（4.7 已落，Phase 5 接真实 score_decay）。
-- Phase 5 新增：`EntryEngine.evaluate(code, date, market_state) -> EntrySignal`。
+- `Portfolio.entry_mode: immediate | signal_confirmation | manual`（4.7 已落，4.7 Entry 引擎生效）。
+- `SimulatedTrade.entry_score / score_type`（4.7 已落；4.7 填 Entry Score、4.8 填 Exit Score，`score_type` 区分 proxy / real）。
+- `ExitConfig`（4.7 已落；4.8 接真实 `score_decay`）。
+- 4.7 新增：`EntryEngine.evaluate(code, date, market_state) -> EntrySignal`。
+- 4.8 新增：`ExitEngine.evaluate(code, date, position_state) -> ExitSignal`。
 
-## III.7 4.8 应交付内容（Backlog — 冻结契约，Phase 5 实现）
+## III.8 4.8 Done 标准（真实交付阶段）
 
-> **本表即 4.8 的"应含清单"**。4.8 本身只做架构占位、不写引擎代码；下表每一项都是 Phase 5 实现时必须落地、且本设计已冻结契约的内容。立项 Phase 5 时以此表为验收基线，避免遗漏 4.8 的设计意图。
-
-| 模块 | 4.8 必须冻结 / Phase 5 必须交付 | 接口 / 字段（已预留） | 验收标准（不可妥协） |
-|---|---|---|---|
-| **Entry 合成层** | 综合「策略组合信号 + 标的当期实况 + 市场判断」产出统一 Entry Signal + Entry Confidence Score，与 AROS Score 解耦 | `EntryEngine.evaluate(code, date, market_state) -> EntrySignal` | ① 不复用任一原始策略 `entry_rules`（仅作 inputs）；② 输出含 confidence + 等级；③ 与 AROS Score（值不值得关注）明确分离 |
-| **Entry 模型族** | 按策略族实现 Entry Model：趋势突破 / 回调低吸 / 情绪龙头 | — | 每族有可解释触发条件；单测覆盖各族触发/不触发 |
-| **Exit Intelligence** | 4.7 proxy → 真实 Daily Exit Intelligence：每日重跑 Consensus Engine 得真实 AROS Score 驱动 score_decay；输出带等级 Exit Alert（High/Medium/Low） | `ExitConfig.score_decay` 接真实分 | ① 与 4.7 fixed/trailing 兼容；② 退出原因可解释（逻辑衰减 / 资金转弱 / 跌破趋势） |
-| **Position Management** | 仓位公式 `position_fraction × 当前净值` + Timing / Rebalancing + 100 股整数倍（A 股） | `Portfolio.entry_mode`（immediate / signal_confirmation / manual）生效 | ① 留现金缓冲；② 满足 A 股手数约束；③ 回测可复现 |
-| **接口契约落地** | `entry_mode` / `entry_score` / `score_type` / `ExitConfig` 全部填真实值，无 schema 迁移 | 全部已在 4.7 入 schema | Phase 5 不改动 4.7 已落字段结构 |
-| **防前视 / 数据隔离** | 沿用 4.6–4.7 约束（无未来函数、配置驱动、离线可测、三个数据域不串） | — | 通过既有四道 CI 门（ruff/black/mypy/pytest） |
-
-**4.8 自身 Done 标准（占位阶段即满足）**：
-- 三大引擎定义冻结（§III.2）；
-- Entry 合成层原则写清（§III.3，非 follow 原始规则）；
-- Exit / Position 设计写清（§III.4 / §III.5）；
-- 接口契约列清（§III.6）且字段已在 4.7 落地；
-- 本 §III.7 Backlog 评审通过。
-- 引擎代码**不在 4.8 写**，统一在 **Phase 5** 实现。
+- 退出框架 v1.0 四层在模拟交易验证环境中实现并单测覆盖（无未来函数）。
+- **真实 Daily Exit Intelligence**上线：proxy → 真实 AROS Score 驱动 `score_decay`；输出分级 Exit Alert（High/Medium/Low）且原因可解释。
+- `ExitConfig.score_decay` 接真实分，与 v1 fixed/trailing 基线兼容、无行为回归。
+- 接口契约全部落地、字段已在 4.7 schema、`score_type` 区分 proxy/real。
+- 通过既有四道 CI 门（ruff/black/mypy/pytest）。
 
 ---
 
@@ -381,23 +390,25 @@ Phase4.6 Calibration → Phase4.7 Paper Trading → Phase4.8 Execution Intellige
 - **Anti-Lookahead（无前视）**：所有后验/退出只用决策时已发生的数据；价格取当日收盘，禁用未来高低点择时。
 - **配置驱动**：阈值、退出模式、持有期优先级全部可配置，不写死。
 - **离线可测**：所有网络（akshare）调用 lazy + guarded，测试注入 fake PriceProvider。
-- **数据隔离**：4.6 全量复盘 / 4.7 六组合 / 4.8 不开发，各自数据域不串。
+- **数据隔离**：4.6 全量复盘 / 4.7 入场+验证环境 / 4.8 退出，各自数据域不串；模拟交易验证环境（`research/papertrade.py`）贯穿三者、不占独立 Phase 编号。
 
 ## 统一 Done 标准汇总
 
 | 阶段 | 核心交付 | 硬性判定 |
 |---|---|---|
 | 4.6 | 评分有效性 + 校准 | CandidatePerformance≥95%；S>A>B>C 严格单调；p<0.05；首校≥60交易日 |
-| 4.7 | 退出实验 | S1+E1/E2/E3 可跑且隔离；三层退出+min时间单测覆盖无未来函数；entry_mode 入 schema；Alpha 指标正确 |
-| 4.8 | 架构占位 | 三大引擎冻结；Entry 合成层定义；接口契约写清；不写引擎代码 |
+| 4.7 | 入场智能（Entry Intelligence）+ 验证环境 | 入场选择（picker+entry_mode）就绪；模拟交易验证环境双轴可跑且隔离；Alpha 指标正确；退出框架 v1.0 单测覆盖无未来函数；**Entry Score 合成层待建** |
+| 4.8 | 退出智能（Exit Intelligence，真实交付） | 退出框架 v1.0 四层已实现并单测；真实 Daily Exit Intelligence 上线（proxy→真实 AROS Score）；分级 Exit Alert + 可解释原因；接口契约落地 |
 
 ## 待拍板 / 已冻结假设
 
-- ✅ 双轴分离、6 组合、第一阶段只跑 S1+E1/E2/E3。
+- ✅ 模拟交易（Paper Trading）降级为**验证环境**，不占 Phase 编号，贯穿 4.6–4.8。
+- ✅ 四大引擎对齐交易时间轴：Discovery（买什么）/ Entry（何时买）/ Management（持有怎么办）/ Exit（何时卖）。
+- ✅ 双轴分离、6 组合（S1/S2/S3 × E1/E2/E3），第一阶段只跑 S1+E1/E2/E3。
 - ✅ ATR 作为可选退出模式，v1 默认 fixed。
 - ✅ 持有期优先级 Strategy > Rating > Portfolio（取 min）。
-- ✅ Score Decay v1 用 proxy（标记 score_type），Phase 5 上真实分。
-- ✅ entry_mode 预留（immediate/signal_confirmation/manual）。
-- ✅ Alpha 指标（年化/Sharpe/Calmar/最大连亏）纳入 4.7。
-- ✅ 4.8 仅架构占位，Entry 为合成层而非 follow 原始策略规则。
-- 开发顺序：先 4.6 → 再 4.7 → 4.8 文档随 4.7 一并评审 → Phase 5 实现。
+- ✅ Score Decay v1 用 proxy（标记 score_type），4.8 上真实分。
+- ✅ entry_mode 已落（immediate/signal_confirmation/manual），4.7 Entry 引擎生效。
+- ✅ Alpha 指标（年化/Sharpe/Calmar/最大连亏）纳入 4.7 验证环境。
+- ✅ Entry 为合成层而非 follow 原始策略规则；4.8 为真实退出引擎（非占位）。
+- 开发顺序：4.0–4.6 研究闭环 → 4.7 入场智能 → 4.8 退出智能 → Phase 5 智能平台（5.1–5.5）。

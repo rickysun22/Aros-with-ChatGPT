@@ -11,6 +11,25 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 
 `data → indicators → factors → strategies → backtest → ranking → report → watchlist → backtest-cache → universe → html-report → scheduler → portfolio-backtest`
 
+## Capability Architecture（四大引擎，对齐交易时间轴）
+
+> **战略重定位**：AROS 从"选股系统"升级为 **AI 辅助投资决策系统**。能力建设顺序严格对齐真实交易时间轴（发现 → 买入 → 持有 → 卖出 → 复盘），而非按架构模块切分。
+
+```
+市场 → 发现股票 → 等待机会 → 买入 → 持有 → 退出 → 复盘
+```
+
+| 引擎 | 交易环节 | 解决痛点 | 落地阶段 |
+|---|---|---|---|
+| **Alpha Discovery Engine** | 发现 | 买什么？ | 已完成（4.0–4.6：知识库→验证→共识→市场/资金→报告→反馈→评分校准） |
+| **Alpha Entry Engine** | 买入 | 什么时候买？ | Phase 4.7（Entry Score 合成层） |
+| **Alpha Management Engine** | 持有 | 买了以后怎么办？ | 4.7/4.8 引擎内实现，Phase 5.5 组合层成熟 |
+| **Alpha Exit Engine** | 卖出 | 什么时候卖？ | Phase 4.8（分级 Exit Signal） |
+
+**三大核心评分（贯穿每日决策）**：① **Alpha Score**（股票质量，"值不值得研究？"）② **Entry Score**（买入时机，"现在是否适合买？"）③ **Exit Score / Exit Risk**（持仓风险，"是否应该离场？"）。
+
+> **模拟交易（Paper Trading）= 验证环境，不占 Phase 编号**：贯穿 4.6–4.8，在无券商、不下单前提下验证"评分/买点/卖点"是否有效。已实现 `research/papertrade.py`（双轴正交、无前视）。
+
 ## Sprints
 
 | Sprint | Scope | Status | Notes |
@@ -51,8 +70,14 @@ each sprint passes review (ChatGPT PASS) and CI is green.
 | **4.4** | Daily Alpha Report | completed | `report/daily_alpha.py`：每日 Top-N 候选渲染为三格式并按 `reports/<date>/` 归档——`daily_alpha.xlsx`（Sheet1 候选表 + Sheet2 决策跟踪模板，系统列预填·人工列留空）、`daily_alpha.html`（自包含离线页 + AROS SVG 柱状图）、`daily_alpha.md`（AI/知识库友好）；`query_candidates(session,run_date)` 经 DailyScreening.run_date 取数，全链路可追溯；纯离线渲染无网络/无打分；`alpha daily` 自动产出报告；`openpyxl` 入 `requirements.txt`；6 新测试；四门禁全绿 |
 | **4.5** | Human Feedback Loop | completed | `research/feedback.py` + 2 张新 ORM（`decision_tracking`/`personal_trades`）+ `alpha decide`/`review`/`trades-add`/`trades-list` 子命令；`post_hoc(code,signal_date,price_provider)` 纯函数算 1/3/5/10 日结果+最大浮盈浮亏+最终收益（entry=T+1，无未来函数，无数据降级 None）；`review` 自动补后验、人工填 verified_system/复盘总结；`personal_trades` 仅 schema+录入不推导；`alpha daily` 报告 Sheet2 经 `query_decisions` 回填人工列（无决定则留空，4.4 行为保留）；11 新测试；四门禁全绿 |
 | **4.6** | Rating Validation & Calibration | completed | `research/calibration.py` + 新 ORM `candidate_performance`（每位候选自动后验 T+1/3/5/10/20+浮盈浮亏+目标命中日，增量填充）；`post_hoc` 扩展 T+20 与目标命中；评级改名 `A+ → S`（历史一次性迁移 `migrate`，幂等）；`rating_distribution`/`significance_test`（bootstrap 95% CI + 手写 Mann-Whitney，无 scipy）验证 S>A>B>C 单调与显著；`baseline_excess`/`strategy_contribution`/`human_vs_ai` 归因；`propose_calibration` 两阶段（≥60 交易日才可校准，否则仅观察）；`generate_validation_reports` 输出 md/html/xlsx；`alpha validate migrate|fill|report|calibrate` 子命令；14 新测试；四门禁全绿 |
-| **4.7** | Paper Trading Simulation（退出实验）| completed | `research/papertrade.py` + 新 ORM `portfolio`/`simulated_trades`（账户状态由成交簿重建，无双写漂移）；`ExitConfig` dataclass（E1/E2/E3 预设，JSON 序列化）+ `exit_preset`；`simulate_day` 双轴隔离（选择轴 S1/S2/S3 × 退出轴 E1/E2/E3，各组合数据域独立）入口 T+1、无前视；退出框架 v1.0 四层均实现且单测覆盖：硬止损（`fixed`/`atr` 自适应，缺 high/low 优雅降级 fixed）、固定止盈（E1）、移动止盈（E2/E3）、评分衰减（Lightweight Proxy，标记 `score_type=proxy`）、时间退出 `min(Strategy,Rating,Portfolio)` 优先级；`portfolio_metrics` 含净值/收益/回撤/胜率/盈亏比/平均持仓 + **Alpha 指标**（年化/Sharpe/Calmar/最大连亏，手算小样例对照）；`generate_papertrade_report`（md/html/xlsx + 基准买入持有对比，样本不足标注）；`alpha papertrade init|run|report` 子命令；`StrategyRegistry.max_holding_days` 支持时间退出优先级；19 新测试（各退出层 + 数据隔离 + ATR 降级 + Alpha 指标 + 报告）；四门禁全绿 |
-| **4.8** | Execution Intelligence Engine（架构占位，不开发）| pending | **设计占位，不写引擎代码，仅冻结契约，待 Phase 5 实现**。应含（详见 `Phase4.6-4.8_Technical_Design.md` §III.7 Backlog）：① Entry 合成层——综合「策略组合信号+标的当期实况+市场判断」产出 Entry Signal + Entry Confidence Score（独立于 AROS Score，**不复用**任一原始 `entry_rules`，仅作 inputs）；② Entry 模型族（趋势突破/回调低吸/情绪龙头）；③ Exit Intelligence——4.7 proxy 升真实 Daily Exit Intelligence（`ExitConfig.score_decay` 接真实分，输出 High/Med/Low 等级、原因可解释）；④ Position Management（仓位公式+Timing+100股整数倍，`entry_mode` 已落）；⑤ 接口契约落地（`entry_mode`/`entry_score`/`score_type`/`ExitConfig` 全已在 4.7 入 schema，Phase 5 无迁移）。三大引擎冻结：Selection(已完成)/Execution(不会买)/Protection(不会卖)。 |
+| **4.7** | Entry Intelligence（入场智能）| in_progress | 主责"什么时候买"：**Entry Score 合成层**（策略组合+标的当期实况+市场判断，独立于 AROS Score）。入场选择机制（`picker` S/A/B 入、C 不入 + `entry_mode`）已落；**模拟交易验证环境** `research/papertrade.py`（双轴正交、无前视、Alpha 指标）已落，用于验证买点/卖点；退出框架 v1.0 在该环境中已单测覆盖。剩余：**真实 Entry Score 引擎**（合成层，非 follow 原始 `entry_rules`）。详见 `Phase4.6-4.8_Technical_Design.md` Part II |
+| **—** | Paper Trading（验证环境，非阶段）| completed | 不是能力模块，是贯穿 4.6–4.8 的验证环境：`research/papertrade.py` 双轴正交（S1/S2/S3 × E1/E2/E3）、无前视、账户由成交簿重建、Alpha 指标（年化/Sharpe/Calmar/最大连亏）。4.7 验证买点、4.8 验证卖点 |
+| **4.8** | Exit Intelligence（退出智能）| in_progress | 主责"什么时候卖"：退出框架 v1.0 四层（硬止损 fixed/atr、固定止盈、移动止盈、评分衰减 proxy、时间退出 min 优先级）已在验证环境实现并单测覆盖；剩余：**真实 Daily Exit Intelligence**（proxy→真实 AROS Score 驱动 score_decay）+ 分级 Exit Alert（High/Med/Low，原因可解释）。`ExitConfig`/`entry_mode`/`entry_score`/`score_type` 已在 4.7 入 schema，无迁移。详见 `Phase4.6-4.8_Technical_Design.md` Part III |
+| **5.1** | Dashboard | pending | 把现有 Excel/HTML 升级为 Web Dashboard：每日市场状态、候选股票、策略命中、Entry 状态、Exit 状态、模拟盘一览 |
+| **5.2** | AI Research Assistant | pending | 让 AI 成为"研究员"：自然语言问答（如"近三月 S 级股票表现？出现次数/胜率/最大收益/失败原因"），基于 4.5 反馈库 + 4.6 校准库 |
+| **5.3** | Strategy Discovery Engine | pending | AI 主动扫描研报/论坛/公开策略/学术论文，提取策略规则 → 进入 4.1 验证 → 形成自动进化策略库 |
+| **5.4** | Adaptive Weighting | pending | 动态调策略权重（如趋势策略贡献 70%，市场转震荡则降趋势、提套利/低波）|
+| **5.5** | Risk Management | pending | 组合层：仓位 / 行业集中 / 风险预算 / 相关性（Alpha Management Engine 组合层成熟）|
 
 ## Principles (non-negotiable)
 
@@ -114,7 +139,9 @@ Design Approved（ChatGPT PASS，含 D6 幸存者偏差 / D7 股票池冻结 / D
 - **Phase 4 — 实盘/调度**：把 3.2 真实数据 + 3.3–3.5 选股/组合/市场状态接入定时调度，
   产出可执行的每日/每周研究简报（无券商下单接口，仍止步于「信号可复现产出」）。
 
-## Phase 4 — Research Integrity / 知识库（4.0 + 4.1 + 4.2 + 4.3 + 4.4 已完成 ✅）
+## Phase 4 — AROS Trading Intelligence Core（4.0–4.8，交易智能核心）
+
+> **战略重定位（2026-07-20）**：Phase 4 从"研究完整性 / 知识库"重新定义为 **AROS Trading Intelligence Core**——覆盖真实交易全闭环（发现→买入→持有→卖出→复盘）。四大引擎（Discovery/Entry/Management/Exit）对齐交易时间轴；模拟交易降级为贯穿 4.6–4.8 的**验证环境**（不占 Phase 编号）。Phase 5 另作智能化平台阶段（见下）。
 
 Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 **4.0 知识库 + 4.1 研究诚信框架**，
 作为 4.2–4.5 的依赖根。4.0 + 4.1 + 4.2 + 4.3 + 4.4 均已提交 `main`，四门禁全绿。
@@ -156,3 +183,15 @@ Phase 4 设计 `Phase4_Technical_Design_v2.1.md` §9「建议首切」：先落 
   `personal_trades` 仅 schema + 录入接口，系统不自动推导（对应「上线后自选标的自行记录充实数据库」）。CLI：`alpha decide`
   /`alpha review`/`alpha trades-add`/`alpha trades-list`。`alpha daily` 报告经 `query_decisions` 回填 Sheet2 人工列
   （无决定则留空，4.4 行为不变）。11 新测试；四门禁全绿。
+
+## Phase 5 — AROS Intelligent Platform（智能化平台阶段）
+
+> Phase 4 已完成"从发现到退出的研究闭环"。Phase 5 不再开发交易逻辑，而是把核心能力**产品化 / 自动化 / 智能增强**，把 AROS 真正做成"AI 辅助投资决策系统"。详见 `Phase5_Intelligent_Platform.md`。
+
+- **5.1 Dashboard** — 现有 Excel/HTML 升级为 Web Dashboard：每日市场状态、候选股票、策略命中、Entry 状态、Exit 状态、模拟盘一览。
+- **5.2 AI Research Assistant** — 让 AI 成为"研究员"：自然语言问答（如"近三月 S 级股票表现？出现次数 / 胜率 / 最大收益 / 失败原因"），基于 4.5 反馈库 + 4.6 校准库。
+- **5.3 Strategy Discovery Engine** — AI 主动扫描研报 / 论坛 / 公开策略 / 学术论文，提取策略规则 → 进入 4.1 验证 → 形成自动进化策略库。
+- **5.4 Adaptive Weighting** — 动态调策略权重（如趋势策略贡献 70%，市场转震荡则降趋势、提套利 / 低波）。
+- **5.5 Risk Management** — 组合层：仓位 / 行业集中 / 风险预算 / 相关性（Alpha Management Engine 组合层成熟）。
+
+**三大核心评分贯穿 Phase 5 每日输出**：Alpha Score（值不值得研究）/ Entry Score（现在是否适合买）/ Exit Risk（是否应该离场）。
