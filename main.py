@@ -1775,6 +1775,158 @@ alpha_app.add_typer(alpha_papertrade_app, name="papertrade")
 alpha_app.add_typer(alpha_validate_app, name="validate")
 
 
+# --------------------------------------------------------------------------- #
+# Phase 4.7 -- Entry Intelligence (Alpha Entry Engine)
+# --------------------------------------------------------------------------- #
+alpha_entry_app = typer.Typer(help="Phase 4.7 Entry Intelligence (买点评估)")
+
+
+@alpha_entry_app.command("eval")
+def alpha_entry_eval(
+    code: str = typer.Option(..., "--code", help="股票代码"),
+    as_of: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
+    signal_date: str | None = typer.Option(
+        None, "--signal-date", help="候选信号日(取 AROS/评级); 默认取该代码最近一条"
+    ),
+) -> None:
+    """评估某标的当前买点：Entry Score + 动作(strong_buy/buy/wait/avoid)。
+
+    综合策略组合(命中类别) + 标的当期价格行为/量/位置 + 市场判断(regime)，
+    与 AROS Score 解耦地给出"现在是否适合买"。
+    """
+    setup_logging()
+    import pandas as pd
+
+    from research.entry import EntryEngine, MarketState, resolve_categories
+    from research.models import DailyAlphaCandidate, DailyScreening
+
+    session = _kb_session()
+    d = pd.Timestamp(as_of).date() if as_of else date.today()
+
+    q = session.query(DailyAlphaCandidate).filter_by(code=code)
+    if signal_date:
+        q = q.join(DailyScreening, DailyAlphaCandidate.screening_id == DailyScreening.id).filter(
+            DailyScreening.run_date == pd.Timestamp(signal_date).date()
+        )
+    cand = q.order_by(DailyAlphaCandidate.id.desc()).first()
+    aros = cand.aros_score if cand else 50.0
+    rating = cand.rating if cand else "C"
+    hit = json.loads(cand.hit_strategies_json) if cand and cand.hit_strategies_json else []
+    cats = resolve_categories(session, hit) if cand else []
+    regime = cand.regime_label if cand else "Neutral"
+    mkt = MarketState(regime=regime)
+
+    dm = DataManager()
+
+    def _price(c: str, s: date, e: date) -> Any:
+        return dm.get_daily(c, s, e)
+
+    sig = EntryEngine().evaluate(
+        code, d, _price, aros_score=aros, rating=rating, categories=cats, market=mkt
+    )
+    typer.echo(
+        f"{code} @ {d}  Entry Score={sig.entry_score:.1f}  "
+        f"动作={sig.action}  置信={sig.confidence:.2f}"
+    )
+    typer.echo(f"  AROS={sig.aros_score:.1f} 评级={sig.rating} 主导模型={sig.dominant_family}")
+    typer.echo(f"  组件={sig.components}")
+    typer.echo(f"  理由: {sig.reason}")
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4.8 -- Exit Intelligence (Alpha Exit Engine)
+# --------------------------------------------------------------------------- #
+alpha_exit_app = typer.Typer(help="Phase 4.8 Exit Intelligence (卖点评估)")
+
+
+def _consensus_score_provider(session: Any) -> Any:
+    """ScoreProvider wired to the system's real daily screening output.
+
+    Returns the latest ``DailyAlphaCandidate`` AROS Score (+ money-flow) for the
+    code on/before ``as_of`` — the honest "real AROS Score" source for the 4.8
+    Daily Exit Intelligence. Returns ``None`` when no candidate exists (so the
+    engine never fabricates a decay signal).
+    """
+    from research.exit import ExitScoreInput
+    from research.models import DailyAlphaCandidate, DailyScreening
+
+    def _p(code: str, as_of: date) -> ExitScoreInput | None:
+        c = (
+            session.query(DailyAlphaCandidate)
+            .filter_by(code=code)
+            .join(DailyScreening, DailyAlphaCandidate.screening_id == DailyScreening.id)
+            .filter(DailyScreening.run_date <= as_of)
+            .order_by(DailyScreening.run_date.desc())
+            .first()
+        )
+        if c is None:
+            return None
+        return ExitScoreInput(
+            aros_score=c.aros_score,
+            entry_aros_score=c.aros_score,
+            public_money_score=c.public_money_score,
+            hidden_flow_score=c.hidden_flow_score,
+            sector_score=c.sector_score,
+        )
+
+    return _p
+
+
+@alpha_exit_app.command("eval")
+def alpha_exit_eval(
+    trade_id: str = typer.Option(..., "--trade-id", help="持仓模拟交易ID"),
+    as_of: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default today"),
+) -> None:
+    """评估某持仓当前是否应离场：分级 Exit Signal(High/Medium/Low) + 可解释原因。
+
+    真实 AROS Score 经 ScoreProvider(系统每日筛选产出) 驱动逻辑衰减；同时检查
+    资金转弱 / 趋势破坏 / 硬止损。
+    """
+    setup_logging()
+    import pandas as pd
+
+    from research.exit import ExitEngine
+    from research.models import SimulatedTrade
+
+    session = _kb_session()
+    d = pd.Timestamp(as_of).date() if as_of else date.today()
+    t = session.get(SimulatedTrade, trade_id)
+    if t is None:
+        typer.echo(f"trade {trade_id} not found", err=True)
+        raise typer.Exit(1)
+    if t.exit_date is not None:
+        typer.echo(f"trade {trade_id} already closed on {t.exit_date}", err=True)
+        raise typer.Exit(1)
+
+    dm = DataManager()
+
+    def _price(c: str, s: date, e: date) -> Any:
+        return dm.get_daily(c, s, e)
+
+    provider = _consensus_score_provider(session)
+    sig = ExitEngine().evaluate(
+        t.code,
+        d,
+        t.entry_price,
+        _price,
+        provider,
+        entry_date=t.entry_date,
+        entry_aros_score=t.aros_score,
+        rating=t.rating,
+    )
+    typer.echo(f"{t.code} @ {d}  退出等级={sig.level}  建议离场={sig.should_exit}")
+    typer.echo(f"  AROS={sig.aros_score} 衰减={sig.score_drop}")
+    if sig.reasons:
+        for r in sig.reasons:
+            typer.echo(f"  - {r}")
+    else:
+        typer.echo("  - 无显著离场信号")
+
+
+alpha_app.add_typer(alpha_entry_app, name="entry")
+alpha_app.add_typer(alpha_exit_app, name="exit")
+
+
 research_app.add_typer(kb_app, name="kb")
 research_app.add_typer(validate_app, name="validate")
 research_app.add_typer(alpha_app, name="alpha")

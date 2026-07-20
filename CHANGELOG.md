@@ -2,6 +2,49 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Phase 4 Completion — Entry Intelligence Engine (4.7) + Exit Intelligence Engine (4.8) (2026-07-20)
+
+> Closes Phase 4. 4.6 (calibration) was already complete; this sprint builds the
+> two remaining real engines so the Discovery → Entry → Exit loop is fully
+> implemented (Paper Trading stays the validation environment, not a phase).
+
+### 4.7 — Entry Intelligence (`src/research/entry.py`, new)
+- The **Entry Score synthesis layer** ("when to buy"), independent of the AROS
+  Score ("whether worth researching"). `EntryEngine.evaluate(code, date, price_provider,
+  *, aros_score, rating, categories, market)` blends three evidence families:
+  - **Strategy combo** — dominant hit category (trend / strong / emotion) selects
+    the timing model (breakout / pullback-dip / emotion-leader), per design §III.3.
+  - **Current stock reality** — price action, volume expansion, relative position,
+    plus a **near-limit-up guard** so we never chase the 涨停.
+  - **Market judgement** — regime friendliness + money-flow read.
+- Output: `Entry Score` (0-100) + discrete `action` (strong_buy / buy / wait /
+  avoid) + `confidence` + explainable `reason`. Hard guard rails cap the score in
+  Bear regimes and downtrends.
+- Wired into `simulate_day`: `entry_mode=signal_confirmation` gates auto-entry on
+  the Entry Score (records `entry_score` on `SimulatedTrade`); `manual` never
+  auto-enters; `immediate` is unchanged. `resolve_categories` maps hit strategies
+  to categories via `research.kb`.
+
+### 4.8 — Exit Intelligence (`src/research/exit.py`, new)
+- The **real Daily Exit Intelligence** (design §III.5): upgrades the validation
+  environment's proxy score-decay to drive off the **real AROS Score** via an
+  injectable `ScoreProvider`.
+- `ExitEngine.evaluate(...)` produces a **graded Exit Signal** (High / Medium /
+  Low / None) with explainable reasons: **logic decay** (score dropped below
+  threshold or materially vs entry), **money weakening** (public/hidden flow
+  turned negative), **trend break** (price below key MA), **stop hit**.
+- `ExitConfig.score_decay.score_source = "real"` (default `proxy`) makes
+  `simulate_day` use the real score; closed trades are tagged `score_type="real"`.
+- CLI: `alpha exit eval --trade-id …` reports the graded signal + reasons;
+  `alpha entry eval --code …` reports the Entry Score + action.
+
+### Quality gates
+- 13 new offline tests (`tests/test_entry.py`, `tests/test_exit.py`) covering
+  breakout / limit-up-guard / bear-guard / downtrend / no-data, every exit branch,
+  and the `score_source="real"` wiring (records `score_type="real"`).
+- All four CI gates green (ruff / black=100 / mypy / pytest). No behavioural
+  regression to the 4.7 proxy baseline.
+
 ## Sprint 4.7 — Paper Trading Validation Environment + Entry Intelligence (2026-07-20)
 
 > Under the 2026-07-20 roadmap restructure, this sprint's `research/papertrade.py` is
@@ -20,11 +63,13 @@ exit*? The experiment is split into two orthogonal axes so the result is attribu
   are data-isolated cells. Exit framework v1.0 four layers, all unit-tested:
   hard stop-loss (`fixed` default, `atr` adaptive with graceful fallback to fixed
   when `high`/`low` are absent), fixed take-profit (E1), trailing profit (E2/E3),
-  score decay (lightweight **proxy** score, `score_type="proxy"`; real Daily Exit
-  Intelligence lands in Phase 5), and time-stop = `min(strategy, rating, portfolio)`
-  holding cap. `portfolio_metrics` reports equity / return / max drawdown / win rate
-  / P&L ratio / avg holding + **Alpha indicators** (annualized, Sharpe, Calmar,
-  max consecutive losses), all checked against hand-computed small examples.
+  score decay (lightweight **proxy** score, `score_type="proxy"`; when
+  `score_decay.score_source="real"` a real AROS Score drives the decay — the
+  Phase 4.8 Daily Exit Intelligence from `research/exit.py`), and time-stop =
+  `min(strategy, rating, portfolio)` holding cap. `portfolio_metrics` reports
+  equity / return / max drawdown / win rate / P&L ratio / avg holding + **Alpha
+  indicators** (annualized, Sharpe, Calmar, max consecutive losses), all checked
+  against hand-computed small examples.
   `generate_papertrade_report` renders Portfolio Performance Report (md/html/xlsx)
   with a buy-&-hold benchmark comparison and a sample-size caveat.
 - `src/research/models.py`: new `Portfolio` + `SimulatedTrade` ORMs (account state is

@@ -283,7 +283,7 @@ time_stop:
 1. 入场选择机制就绪：候选经 `picker`（ai/human/random）按评级（S/A/B 入、C 不入）入场，`entry_mode`（immediate/signal_confirmation/manual）入 schema 并已接线。
 2. **模拟交易验证环境**就绪：双轴正交（S1/S2/S3 × E1/E2/E3）可独立运行、数据隔离；Alpha 指标（年化/Sharpe/Calmar/最大连亏）计算正确（手算小样例对照）；Portfolio Performance Report 可生成并附基线对比（样本不足标注）。
 3. 退出框架 v1.0 在验证环境中被单测覆盖、无未来函数（实现细节见 Part III §III.3）。
-4. **（待建）Entry Score 合成层**：综合策略组合 + 标的当期实况 + 市场判断产出 Entry Score，与 AROS Score 解耦——这是 4.7 作为"入场智能"的核心交付，详见 Part III §III.2 契约与 Phase 4.7 实施计划。
+4. **Entry Score 合成层（已建，`research/entry.py`）**：综合策略组合（命中类别）+ 标的当期实况（价格行为/量/位置，含逼近涨停护栏）+ 市场判断（regime 友好度 + 资金流）产出 Entry Score（0-100）与动作（strong_buy/buy/wait/avoid），与 AROS Score 解耦——4.7 核心交付已落地，并接入 `simulate_day` 的 `entry_mode=signal_confirmation` 入场闸门。详见 Part III §III.2 契约。
 
 ---
 
@@ -377,6 +377,8 @@ actual_holding_days = min(strategy_max_holding, rating_cap, portfolio_risk_limit
 
 ## III.8 4.8 Done 标准（真实交付阶段）
 
+> 全部已落地（实现于 `research/exit.py`，接 `simulate_day` 的 `score_source="real"`，并暴露 `alpha exit eval` CLI）。
+
 - 退出框架 v1.0 四层在模拟交易验证环境中实现并单测覆盖（无未来函数）。
 - **真实 Daily Exit Intelligence**上线：proxy → 真实 AROS Score 驱动 `score_decay`；输出分级 Exit Alert（High/Medium/Low）且原因可解释。
 - `ExitConfig.score_decay` 接真实分，与 v1 fixed/trailing 基线兼容、无行为回归。
@@ -397,7 +399,7 @@ actual_holding_days = min(strategy_max_holding, rating_cap, portfolio_risk_limit
 | 阶段 | 核心交付 | 硬性判定 |
 |---|---|---|
 | 4.6 | 评分有效性 + 校准 | CandidatePerformance≥95%；S>A>B>C 严格单调；p<0.05；首校≥60交易日 |
-| 4.7 | 入场智能（Entry Intelligence）+ 验证环境 | 入场选择（picker+entry_mode）就绪；模拟交易验证环境双轴可跑且隔离；Alpha 指标正确；退出框架 v1.0 单测覆盖无未来函数；**Entry Score 合成层待建** |
+| 4.7 | 入场智能（Entry Intelligence）+ 验证环境 | 入场选择（picker+entry_mode）就绪；模拟交易验证环境双轴可跑且隔离；Alpha 指标正确；退出框架 v1.0 单测覆盖无未来函数；**Entry Score 合成层已建**（`research/entry.py`，接 `signal_confirmation` 入场闸门） |
 | 4.8 | 退出智能（Exit Intelligence，真实交付） | 退出框架 v1.0 四层已实现并单测；真实 Daily Exit Intelligence 上线（proxy→真实 AROS Score）；分级 Exit Alert + 可解释原因；接口契约落地 |
 
 ## 待拍板 / 已冻结假设

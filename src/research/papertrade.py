@@ -21,7 +21,10 @@ Three exit engines verified by unit tests:
   when ``high``/``low`` columns are unavailable).
 * **Profit protection** -- fixed take-profit (E1) or trailing stop (E2/E3).
 * **Score decay** -- lightweight *proxy* score (price momentum mapped to 0-100);
-  marked ``score_type="proxy"``. The real Daily Exit Intelligence lands in Phase 5.
+  marked ``score_type="proxy"``. When ``score_decay.score_source == "real"`` a
+  real AROS Score (from :mod:`research.exit`'s ``ScoreProvider``) drives the
+  decay instead — this is the Phase 4.8 Daily Exit Intelligence, implemented in
+  ``research/exit.py`` and wired in here.
 * **Time stop** -- ``min(strategy, rating, portfolio)`` holding cap (design §II.4).
 
 Everything network-bound is injected as a ``PriceProvider`` (mirrors
@@ -42,6 +45,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from research.exit import ScoreProvider
 from research.feedback import PriceProvider
 from research.models import (
     DailyAlphaCandidate,
@@ -93,6 +97,10 @@ class ScoreDecayConfig:
     enabled: bool = False
     window: int = 5
     threshold: float = 70.0
+    # "proxy" (lightweight momentum stand-in, default) or "real" (4.8 Daily Exit
+    # Intelligence: the real AROS Score supplied by a ScoreProvider). When "real"
+    # but no score_provider is wired in, the environment falls back to proxy.
+    score_source: str = "proxy"
 
 
 @dataclass
@@ -134,6 +142,7 @@ class ExitConfig:
                     "enabled": self.score_decay.enabled,
                     "window": self.score_decay.window,
                     "threshold": self.score_decay.threshold,
+                    "score_source": self.score_decay.score_source,
                 },
                 "time_stop": {"from_rating": self.time_stop.from_rating},
             },
@@ -169,6 +178,7 @@ class ExitConfig:
                 enabled=bool(sd.get("enabled", False)),
                 window=int(sd.get("window", 5)),
                 threshold=float(sd.get("threshold", 70.0)),
+                score_source=sd.get("score_source", "proxy"),
             ),
             time_stop=TimeStopConfig(from_rating=bool(ts.get("from_rating", True))),
         )
@@ -385,8 +395,14 @@ def _evaluate_exit(
     pp: PriceProvider,
     cfg: ExitConfig,
     portfolio_mh: int | None,
+    score_provider: ScoreProvider | None = None,
 ) -> tuple[float, str, str | None] | None:
-    """Return (exit_price, exit_reason, score_type) or None. Uses only data <= run_date."""
+    """Return (exit_price, exit_reason, score_type) or None. Uses only data <= run_date.
+
+    ``score_provider`` supplies the *real* AROS Score (4.8 Daily Exit
+    Intelligence) when ``score_decay.score_source == "real"``; otherwise the
+    lightweight proxy stands in (default, no network needed).
+    """
     win = _price_window(trade.code, trade.entry_date, run_date, pp)
     if win is None or win.empty:
         return None
@@ -416,21 +432,40 @@ def _evaluate_exit(
             if close_i <= trail_exit:
                 return (trail_exit, "trailing", None)
 
-    # Layer 3 — score decay (proxy). Need `window` consecutive weak-score days.
+    # Layer 3 — score decay.
     if cfg.score_decay.enabled:
         w = cfg.score_decay.window
-        scores: list[float] = []
-        closes = [float(x) for x in win["close"].to_numpy()]
-        for j in range(w, i + 1):
-            scores.append(_proxy_score(closes[j], closes[max(0, j - w)]))
-        consec = 0
-        for s in reversed(scores):
-            if s < cfg.score_decay.threshold:
-                consec += 1
-            else:
-                break
-        if consec >= w:
-            return (close_i, "score_decay", "proxy")
+        if cfg.score_decay.score_source == "real" and score_provider is not None:
+            # Real AROS Score series: last `w` days, each score <= run_date.
+            recent = dates[max(0, i - w + 1) : i + 1]
+            real_scores: list[float] = []
+            for d in recent:
+                sin = score_provider(trade.code, d)
+                if sin is not None:
+                    real_scores.append(sin.aros_score)
+            if len(real_scores) >= w:
+                consec = 0
+                for s in reversed(real_scores):
+                    if s < cfg.score_decay.threshold:
+                        consec += 1
+                    else:
+                        break
+                if consec >= w:
+                    return (close_i, "score_decay", "real")
+        else:
+            # Proxy (default): `window`-day momentum mapped to 0-100.
+            scores: list[float] = []
+            closes = [float(x) for x in win["close"].to_numpy()]
+            for j in range(w, i + 1):
+                scores.append(_proxy_score(closes[j], closes[max(0, j - w)]))
+            consec = 0
+            for s in reversed(scores):
+                if s < cfg.score_decay.threshold:
+                    consec += 1
+                else:
+                    break
+            if consec >= w:
+                return (close_i, "score_decay", "proxy")
 
     # Layer 4 — time stop (min priority).
     limit = _holding_limit_days(
@@ -446,11 +481,52 @@ def _evaluate_exit(
 # --------------------------------------------------------------------------- #
 # Daily simulation step
 # --------------------------------------------------------------------------- #
-def simulate_day(session: Session, run_date: date, pp: PriceProvider) -> dict[str, object]:
+# Gate for entry_mode == "signal_confirmation": require the Entry Score to reach
+# at least EntryConfig.buy_min before auto-entering (design §III.3).
+_ENTRY_CONFIRM_MIN = 65.0
+
+
+def _entry_confirm_score(
+    session: Session, cand: DailyAlphaCandidate, run_date: date, pp: PriceProvider
+) -> float | None:
+    """Entry Score for a candidate via the 4.7 Entry Engine (or None on failure)."""
+    from research.entry import EntryEngine, MarketState, resolve_categories
+
+    try:
+        hit = json.loads(cand.hit_strategies_json) if cand.hit_strategies_json else []
+    except (json.JSONDecodeError, TypeError):
+        hit = []
+    cats = resolve_categories(session, hit)
+    mkt = MarketState(regime=cand.regime_label)
+    try:
+        sig = EntryEngine().evaluate(
+            cand.code,
+            run_date,
+            pp,
+            aros_score=cand.aros_score,
+            rating=cand.rating,
+            categories=cats,
+            market=mkt,
+        )
+    except Exception:
+        return None
+    return sig.entry_score
+
+
+def simulate_day(
+    session: Session,
+    run_date: date,
+    pp: PriceProvider,
+    score_provider: ScoreProvider | None = None,
+) -> dict[str, object]:
     """Run one trading day for every portfolio: entries (T+1) then exits.
 
     Returns ``{"date", "entries", "exits"}``. Account state is never stored — it
     is rebuilt on demand by :func:`account_state`.
+
+    ``score_provider`` supplies the *real* AROS Score for the 4.8 Daily Exit
+    Intelligence; when wired in, ``score_decay.score_source == "real"`` portfolios
+    use it instead of the proxy.
     """
     portfolios = session.query(Portfolio).all()
     prev_bday = _prev_business_day(run_date)
@@ -476,6 +552,14 @@ def simulate_day(session: Session, run_date: date, pp: PriceProvider) -> dict[st
                 )
                 if exists is not None:
                     continue  # already entered this candidate once
+                # Entry-mode gating (4.7 Entry Intelligence).
+                entry_score: float | None = None
+                if p.entry_mode == "manual":
+                    continue  # manual portfolios are filled by a human, never auto
+                if p.entry_mode == "signal_confirmation":
+                    entry_score = _entry_confirm_score(session, cand, run_date, pp)
+                    if entry_score is None or entry_score < _ENTRY_CONFIRM_MIN:
+                        continue  # timing not yet confirmed -> wait
                 if open_count >= p.max_positions:
                     break
                 state = account_state(session, p, run_date, pp)
@@ -499,6 +583,7 @@ def simulate_day(session: Session, run_date: date, pp: PriceProvider) -> dict[st
                     entry_price=entry_px,
                     quantity=float(qty),
                     entry_mode=p.entry_mode,
+                    entry_score=entry_score,
                     aros_score=cand.aros_score,
                     rating=cand.rating,
                     hit_strategies_json=cand.hit_strategies_json,
@@ -512,7 +597,7 @@ def simulate_day(session: Session, run_date: date, pp: PriceProvider) -> dict[st
             session.query(SimulatedTrade).filter_by(portfolio_id=p.id, exit_date=None).all()
         )
         for t in open_trades:
-            res = _evaluate_exit(t, run_date, pp, cfg, p.max_holding_days)
+            res = _evaluate_exit(t, run_date, pp, cfg, p.max_holding_days, score_provider)
             if res is None:
                 continue
             exit_px, reason, score_type = res
