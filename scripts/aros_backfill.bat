@@ -10,7 +10,14 @@ REM 若中途失败, 重跑即可 —— 写入是幂等 upsert, 已拉取的不
 REM =====================================================================
 setlocal
 set "REPO=%~dp0.."
-set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+REM Try project .venv first, fall back to managed environment
+if exist "%REPO%\.venv\Scripts\python.exe" (
+    set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+) else (
+    set "PYTHON=C:\Users\ricky.sun\.workbuddy\binaries\python\envs\default\Scripts\python.exe"
+)
+
+echo [INFO] Using python: %PYTHON%
 
 if not exist "%PYTHON%" (
     echo [ERROR] 未找到 python: %PYTHON%

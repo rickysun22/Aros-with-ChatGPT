@@ -13,14 +13,14 @@ REM =====================================================================
 
 setlocal
 set "REPO=%~dp0.."
-set "PYTHON=%REPO%\.venv\Scripts\python.exe"
-
-if not exist "%PYTHON%" (
-    echo [ERROR] 未找到 python: %PYTHON%
-    echo         请编辑本文件, 把 PYTHON 指向你的解释器(建议 venv)。
-    pause
-    exit /b 1
+REM Try project .venv first, fall back to managed environment
+if exist "%REPO%\.venv\Scripts\python.exe" (
+    set "PYTHON=%REPO%\.venv\Scripts\python.exe"
+) else (
+    set "PYTHON=C:\Users\ricky.sun\.workbuddy\binaries\python\envs\default\Scripts\python.exe"
 )
+
+echo [INFO] Using python: %PYTHON%
 
 cd /d "%REPO%"
 set "PYTHONPATH=%REPO%\src"
