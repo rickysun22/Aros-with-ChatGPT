@@ -308,7 +308,7 @@ def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_astockdata_provider_stock_list(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "data.providers.astockdata._eastmoney_stock_list",
+        "data.providers.astockdata._akshare_stock_list",
         lambda: pd.DataFrame(
             [{"code": "600000", "name": "浦发银行"}, {"code": "000001", "name": "平安银行"}]
         ),
@@ -328,7 +328,7 @@ def test_manager_selects_astockdata_source(
         lambda code: _fake_sina_response(),
     )
     monkeypatch.setattr(
-        "data.providers.astockdata._eastmoney_stock_list",
+        "data.providers.astockdata._akshare_stock_list",
         lambda: pd.DataFrame([{"code": "600000", "name": "浦发银行"}]),
     )
     cfg = AppConfig()

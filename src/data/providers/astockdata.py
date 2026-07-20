@@ -347,6 +347,12 @@ class AStockDataProvider:
     """``a-stock-data`` backed :class:`DataProvider` (direct HTTP, akshare-free)."""
 
     def get_stock_list(self) -> pd.DataFrame:
+        # Preferred: akshare (works on user's machine, confirmed by net_test)
+        df = _akshare_stock_list()
+        if not df.empty:
+            return df
+        # Fallback: Eastmoney clist
+        logger.warning("stock_list: akshare empty, trying eastmoney")
         return _eastmoney_stock_list()
 
     def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
