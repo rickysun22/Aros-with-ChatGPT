@@ -36,6 +36,17 @@ _BAIDU_FIELD_MAP = {
 _BAIDU_URL = "https://finance.pae.baidu.com/selfselect/getstockquotation"
 _EASTMONEY_LIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
 
+# Sina field order -> canonical AROS field.
+_SINA_FIELD_MAP = {
+    "date": "date",
+    "open": "open",
+    "high": "high",
+    "low": "low",
+    "close": "close",
+    "volume": "volume",
+    "amount": "amount",
+}
+
 
 # --------------------------------------------------------------------------- #
 # Raw fetchers (lazy network)
@@ -102,6 +113,42 @@ def _eastmoney_stock_list() -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["code", "name"])
 
 
+def _sina_daily(code: str) -> pd.DataFrame:
+    """Return daily bars from Sina Finance (``stock_zh_a_daily``).
+
+    This is the **preferred** source because:
+    * ``push2his.eastmoney.com`` is blocked on many corporate / proxy networks.
+    * Baidu's K-line API is fragile (empty keys in some environments).
+    * Sina's endpoint works reliably through most proxies and firewalls.
+
+    Returns a DataFrame with columns matching the canonical AROS schema:
+    ``[code, date, open, high, low, close, volume, amount]``.
+    """
+    import akshare as ak
+
+    # stock_zh_a_daily expects prefix: sh for Shanghai, sz for Shenzhen
+    prefix = "sh" if code.startswith("6") else "sz"
+    symbol = f"{prefix}{code}"
+    df = ak.stock_zh_a_daily(symbol=symbol)
+
+    if df.empty or "date" not in df.columns:
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
+
+    # Select + rename to canonical schema
+    out = df.rename(columns=_SINA_FIELD_MAP)[list(_SINA_FIELD_MAP.values())].copy()
+    out.insert(0, "code", code)
+    # Ensure date is date type
+    out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
+    # Ensure numeric types
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out.dropna(subset=["open", "close"]).reset_index(drop=True)[
+        ["code", "date", "open", "high", "low", "close", "volume", "amount"]
+    ]
+
+
 # --------------------------------------------------------------------------- #
 # Normalization (pure)
 # --------------------------------------------------------------------------- #
@@ -148,6 +195,13 @@ class AStockDataProvider:
         return _eastmoney_stock_list()
 
     def get_daily_bars(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
+        # Primary source: Sina Finance (reliable through most proxies)
+        df = _sina_daily(code)
+        if not df.empty:
+            mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+            return df[mask].reset_index(drop=True)
+
+        # Fallback: Baidu K-line API
         raw = _baidu_kline(code)
         df = normalize_baidu_daily(raw, code)
         if df.empty:

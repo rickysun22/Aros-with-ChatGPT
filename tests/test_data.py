@@ -244,12 +244,25 @@ def test_normalize_baidu_daily() -> None:
 
 
 def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
+    # New primary source is Sina; mock it to keep test hermetic.
     monkeypatch.setattr(
-        "data.providers.astockdata._baidu_kline",
-        lambda code, start_time="": _fake_baidu_response(),
+        "data.providers.astockdata._sina_daily",
+        lambda code: pd.DataFrame(
+            {
+                "code": [code] * 3,
+                "date": [date(2024, m, d) for m, d in [(1, 2), (1, 3), (1, 4)]],
+                "open": [8.0, 8.1, 8.2],
+                "high": [8.3, 8.4, 8.5],
+                "low": [7.9, 8.0, 8.1],
+                "close": [8.2, 8.3, 8.4],
+                "volume": [1000000.0, 2000000.0, 3000000.0],
+                "amount": [8000000.0, 16000000.0, 24000000.0],
+            }
+        ),
     )
     df = AStockDataProvider().get_daily_bars("600000", date(2024, 1, 1), date(2024, 12, 31))
     assert len(df) == 3
+    assert df.iloc[0]["date"] == date(2024, 1, 2)
 
 
 def test_astockdata_provider_stock_list(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,8 +283,19 @@ def test_manager_selects_astockdata_source(
 
     monkeypatch.setenv("AROS_DATABASE_URL", f"sqlite:///{tmp_path}/t.db")  # type: ignore[union-attr]
     monkeypatch.setattr(
-        "data.providers.astockdata._baidu_kline",
-        lambda code, start_time="": _fake_baidu_response(),
+        "data.providers.astockdata._sina_daily",
+        lambda code: pd.DataFrame(
+            {
+                "code": [code] * 3,
+                "date": [date(2024, m, d) for m, d in [(1, 2), (1, 3), (1, 4)]],
+                "open": [8.0, 8.1, 8.2],
+                "high": [8.3, 8.4, 8.5],
+                "low": [7.9, 8.0, 8.1],
+                "close": [8.2, 8.3, 8.4],
+                "volume": [1000000.0, 2000000.0, 3000000.0],
+                "amount": [8000000.0, 16000000.0, 24000000.0],
+            }
+        ),
     )
     monkeypatch.setattr(
         "data.providers.astockdata._eastmoney_stock_list",
