@@ -530,6 +530,17 @@ class ConsensusEngine:
         for code in codes:
             df = dm.get_daily(code, start, end)
             if df is not None and not df.empty:
+                # Strategy contract: entry_signals() indexes its boolean Series by
+                # date, so _signal_at() can locate the trigger on `sdate`. DataManager
+                # returns a `date` *column* with a RangeIndex, which breaks that
+                # lookup (Timestamp not found in an integer index -> every signal
+                # filtered out -> zero candidates). Normalize to a DatetimeIndex here,
+                # the single chokepoint feeding all strategies.
+                if not isinstance(df.index, pd.DatetimeIndex):
+                    if "date" in df.columns:
+                        df = df.copy()
+                        df["date"] = pd.to_datetime(df["date"])
+                        df = df.set_index("date")
                 out[code] = df
         return out
 
