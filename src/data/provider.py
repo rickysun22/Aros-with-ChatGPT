@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import date
 from typing import Protocol, runtime_checkable
 
@@ -172,10 +173,33 @@ class AkShareProvider:
     `akshare` is imported lazily inside each method so the package is only
     required when live data is actually fetched (tests use a fake provider and
     never trigger the import).
+
+    Rate-limiting: each call sleeps briefly (``_base_delay``) before hitting
+    the network so we don't trigger Sina's anti-scraping throttle.  When a
+    request fails the sleep is increased exponentially (``_backoff_factor``)
+    up to ``_max_delay``; after a success it resets to ``_base_delay``.
     """
+
+    _base_delay = 0.15  # seconds between requests (~7 stocks/s)
+    _backoff_factor = 2.0
+    _max_delay = 5.0
 
     def __init__(self, adjust: str = "qfq") -> None:
         self.adjust = adjust
+        self._delay = self._base_delay
+
+    def _throttle(self) -> None:
+        """Sleep for the current rate-limit interval."""
+        if self._delay > 0:
+            time.sleep(self._delay)
+
+    def _record_success(self) -> None:
+        """Reset delay to base after a successful fetch."""
+        self._delay = self._base_delay
+
+    def _record_failure(self) -> None:
+        """Increase delay after a failure (exponential backoff)."""
+        self._delay = min(self._delay * self._backoff_factor, self._max_delay)
 
     def get_stock_list(self) -> pd.DataFrame:
         import akshare as ak
@@ -187,20 +211,35 @@ class AkShareProvider:
         import akshare as ak
 
         _clear_proxies()
-        try:
-            raw = ak.stock_zh_a_hist(
-                symbol=code,
-                period="daily",
-                start_date=start_date.strftime("%Y%m%d"),
-                end_date=end_date.strftime("%Y%m%d"),
-                adjust=self.adjust,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("akshare daily FAILED for %s: %s", code, exc)
-            return pd.DataFrame(
-                columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
-            )
-        return normalize_daily(raw, code)
+        self._throttle()
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                raw = ak.stock_zh_a_hist(
+                    symbol=code,
+                    period="daily",
+                    start_date=start_date.strftime("%Y%m%d"),
+                    end_date=end_date.strftime("%Y%m%d"),
+                    adjust=self.adjust,
+                )
+                self._record_success()
+                return normalize_daily(raw, code)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "akshare daily FAILED for %s (attempt %d/%d): %s",
+                    code,
+                    attempt,
+                    max_retries,
+                    exc,
+                )
+                if attempt < max_retries:
+                    self._record_failure()
+                    self._throttle()  # wait with increased backoff before retry
+        # All retries exhausted — return empty so batch continues.
+        self._record_failure()
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
 
     def get_index_daily(self, code: str, start_date: date, end_date: date) -> pd.DataFrame:
         # Frozen decision (Sprint 2.0 §7 Q1): use index_zh_a_hist for native
