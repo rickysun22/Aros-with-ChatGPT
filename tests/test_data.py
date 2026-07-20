@@ -393,7 +393,7 @@ def test_provider_nukes_proxy_and_catches_connectionerror(
     def _boom(*_a: object, **_k: object) -> object:
         raise ConnectionError("RemoteDisconnected('Remote end closed connection without response')")
 
-    monkeypatch.setattr(ak, "stock_zh_a_hist", _boom)
+    monkeypatch.setattr(ak, "stock_zh_a_daily", _boom)
 
     # 5) get_daily_bars must NOT raise — it returns an empty frame so the
     #    backfill batch keeps going instead of aborting.

@@ -180,16 +180,27 @@ class AkShareProvider:
     up to ``_max_delay``; after a success it resets to ``_base_delay``.
     """
 
-    _base_delay = 0.15  # seconds between requests (~7 stocks/s)
+    _base_delay = 0.3  # seconds between requests (~3 stocks/s — conservative)
     _backoff_factor = 2.0
-    _max_delay = 5.0
+    _max_delay = 10.0
+    _initial_cooldown = 5.0  # seconds to wait before first request
 
     def __init__(self, adjust: str = "qfq") -> None:
         self.adjust = adjust
         self._delay = self._base_delay
+        self._first_call = True
 
     def _throttle(self) -> None:
         """Sleep for the current rate-limit interval."""
+        if self._first_call:
+            # Initial cooldown: if the IP was temporarily blocked by Sina
+            # (e.g. from a prior burst), give it time to reset before we
+            # start hammering it again.
+            logger.info(
+                "Initial cooldown %ds before first request ...", int(self._initial_cooldown)
+            )
+            time.sleep(self._initial_cooldown)
+            self._first_call = False
         if self._delay > 0:
             time.sleep(self._delay)
 
@@ -215,15 +226,21 @@ class AkShareProvider:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
-                raw = ak.stock_zh_a_hist(
-                    symbol=code,
-                    period="daily",
-                    start_date=start_date.strftime("%Y%m%d"),
-                    end_date=end_date.strftime("%Y%m%d"),
-                    adjust=self.adjust,
-                )
+                # Use stock_zh_a_daily instead of stock_zh_a_hist:
+                #   - Confirmed working on user's machine via aros_net_test.bat
+                #     (6349 rows for sh600000, latest 2026-07-20).
+                #   - stock_zh_a_hist hits a different Sina endpoint that was
+                #     blocked after ~1300 requests (IP-level RST).
+                #
+                # stock_zh_a_daily requires prefix (sh/sz) and returns the
+                # full history; we slice to [start_date, end_date] afterwards.
+                prefix = "sh" if code.startswith("6") else "sz"
+                raw = ak.stock_zh_a_daily(symbol=f"{prefix}{code}")
                 self._record_success()
-                return normalize_daily(raw, code)
+                # Slice to requested window
+                df = normalize_daily(raw, code)
+                mask = (df["date"] >= start_date) & (df["date"] <= end_date)
+                return df[mask].reset_index(drop=True)
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "akshare daily FAILED for %s (attempt %d/%d): %s",
