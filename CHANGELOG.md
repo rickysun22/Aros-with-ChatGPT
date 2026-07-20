@@ -2,6 +2,27 @@
 
 All notable changes to AROS are documented by Sprint.
 
+## Sprint 4.4 — Daily Alpha Report (2026-07-20)
+
+Renders each day's ranked Alpha candidates (produced + persisted by the 4.2
+`ConsensusEngine`) into three interchangeable, date-archived formats:
+
+- `report/daily_alpha.py` — `DailyAlphaReport.generate(candidates, run_date, out_dir)`
+  writes `reports/<date>/daily_alpha.{xlsx,html,md}`:
+  - **xlsx** (data asset): Sheet1 = candidate table (design §7 / v2 Sheet1);
+    Sheet2 = decision-tracking template with system columns pre-filled and the
+    human columns left blank (the human loop lands in 4.5).
+  - **html** (daily view): self-contained offline page + AROS SVG bar chart +
+    per-candidate detail (advantages/risks/thesis/system_suggestion).
+  - **md** (AI / knowledge-base friendly): mirrors the HTML content.
+- `query_candidates(session, run_date)` joins `daily_alpha_candidates` to
+  `daily_screenings` on `run_date` and returns rows ordered by AROS — keeping
+  the full traceability chain.
+- The renderer is pure: no network, no scoring math, fully offline-testable.
+- `research alpha daily` now auto-emits the report after each screening.
+- `openpyxl` added to `requirements.txt`; 6 new tests; all four CI gates green
+  (ruff / black / mypy / pytest 358 passed, 1 network skip).
+
 ## Sprint 4.3 — Market Context & Money Flow (2026-07-20)
 
 Replaces the 4.2 neutral money-flow defaults with real, akshare-backed

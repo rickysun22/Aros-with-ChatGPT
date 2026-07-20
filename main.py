@@ -1369,6 +1369,19 @@ def alpha_daily(
         f"\nPersisted {min(len(results), top)} candidates (Top-{top}) to daily_alpha_candidates."
     )
 
+    # Sprint 4.4 — render the three-format daily Alpha report (Excel + HTML + MD),
+    # archived under reports/<run_date>/. Mirrors engine.daily's run_date logic.
+    from datetime import date as _date
+
+    from report.daily_alpha import DailyAlphaReport, query_candidates
+
+    run_date = pd.Timestamp(date).date() if date else _date.today()
+    candidates = query_candidates(session, run_date)
+    paths = DailyAlphaReport().generate(candidates, run_date, out_dir="reports")
+    typer.echo(f"Report -> xlsx: {paths['xlsx']}")
+    typer.echo(f"         html: {paths['html']}")
+    typer.echo(f"         md  : {paths['md']}")
+
 
 research_app.add_typer(kb_app, name="kb")
 research_app.add_typer(validate_app, name="validate")

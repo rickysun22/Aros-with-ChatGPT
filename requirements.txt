@@ -8,6 +8,7 @@ loguru
 typer
 python-dotenv
 requests
+openpyxl>=3.1
 pytest==9.1.1
 black==26.5.1
 ruff==0.15.21
