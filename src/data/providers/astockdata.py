@@ -322,6 +322,42 @@ def _sina_daily(code: str) -> pd.DataFrame:
     ]
 
 
+def _sina_daily(code: str) -> pd.DataFrame:
+    """Return daily bars from Sina Finance (``stock_zh_a_daily``).
+
+    This is the **preferred** source because:
+    * ``push2his.eastmoney.com`` is blocked on many corporate / proxy networks.
+    * Baidu's K-line API is fragile (empty keys in some environments).
+    * Sina's endpoint works reliably through most proxies and firewalls.
+
+    Returns a DataFrame with columns matching the canonical AROS schema:
+    ``[code, date, open, high, low, close, volume, amount]``.
+    """
+    import akshare as ak
+
+    # stock_zh_a_daily expects prefix: sh for Shanghai, sz for Shenzhen
+    prefix = "sh" if code.startswith("6") else "sz"
+    symbol = f"{prefix}{code}"
+    df = ak.stock_zh_a_daily(symbol=symbol)
+
+    if df.empty or "date" not in df.columns:
+        return pd.DataFrame(
+            columns=["code", "date", "open", "high", "low", "close", "volume", "amount"]
+        )
+
+    # Select + rename to canonical schema
+    out = df.rename(columns=_SINA_FIELD_MAP)[list(_SINA_FIELD_MAP.values())].copy()
+    out.insert(0, "code", code)
+    # Ensure date is date type
+    out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.date
+    # Ensure numeric types
+    for col in ("open", "high", "low", "close", "volume", "amount"):
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    return out.dropna(subset=["open", "close"]).reset_index(drop=True)[
+        ["code", "date", "open", "high", "low", "close", "volume", "amount"]
+    ]
+
+
 # --------------------------------------------------------------------------- #
 # Normalization (pure)
 # --------------------------------------------------------------------------- #

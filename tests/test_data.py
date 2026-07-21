@@ -298,12 +298,14 @@ def test_normalize_baidu_daily() -> None:
 
 
 def test_astockdata_provider_daily(monkeypatch: pytest.MonkeyPatch) -> None:
+    # New primary source is Sina; mock it to keep test hermetic.
     monkeypatch.setattr(
         "data.providers.astockdata._sina_daily",
         lambda code: _fake_sina_response(),
     )
     df = AStockDataProvider().get_daily_bars("600000", date(2024, 1, 1), date(2024, 12, 31))
     assert len(df) == 3
+    assert df.iloc[0]["date"] == date(2024, 1, 2)
 
 
 def test_astockdata_provider_stock_list(monkeypatch: pytest.MonkeyPatch) -> None:
