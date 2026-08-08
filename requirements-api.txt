@@ -1,0 +1,11 @@
+# AROS API 桥接服务依赖(不含 akshare —— 仅读取/计算已落库数据,无需抓取)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pandas>=2.0
+numpy>=1.24
+sqlalchemy>=2.0
+pydantic>=2.0
+pyyaml
+python-dotenv
+loguru
+typer

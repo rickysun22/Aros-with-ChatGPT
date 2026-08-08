@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AROS · Dashboard (Kimi-style)</title>
+<style>
+  :root{
+    --bg:#0A0D13;
+    --panel:#11151F;
+    --panel-2:#151A26;
+    --panel-hover:#1C2333;
+    --border:rgba(255,255,255,.06);
+    --border-strong:rgba(255,255,255,.12);
+    --text:#E8EBF2;
+    --text-2:#98A2B5;
+    --text-3:#5B6478;
+    --up:#EF4444;      /* A股 涨 = 红 */
+    --down:#22C55E;    /* A股 跌 = 绿 */
+    --accent:#3B82F6;
+    --accent-soft:rgba(59,130,246,.16);
+    --mono:'JetBrains Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+    --sans:'Inter',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+    --r:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:212px 1fr;height:100vh;overflow:hidden}
+
+  /* 侧栏 */
+  .sidebar{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+  .brand .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#EF4444,#3B82F6);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+  .brand b{font-size:16px;letter-spacing:.5px}
+  .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+  .nav-group{font-size:10px;color:var(--text-3);letter-spacing:1.5px;margin:14px 10px 4px}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--text-2);
+    cursor:pointer;font-size:13.5px;transition:.15s}
+  .nav-item:hover{background:var(--panel-hover);color:var(--text)}
+  .nav-item.active{background:var(--accent-soft);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+  .nav-item .ico{width:18px;text-align:center;opacity:.85}
+  .sb-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;background:var(--panel);border:1px solid var(--border)}
+  .sb-foot .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#22C55E,#0EA5E9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06231a}
+  .sb-foot small{display:block;color:var(--text-3);font-size:11px}
+
+  /* 顶栏 */
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .topbar h1{font-size:17px;font-weight:700}
+  .idx{display:flex;gap:18px;margin-left:18px}
+  .idx .i{font-family:var(--mono);font-size:13px}
+  .idx .i small{color:var(--text-3);margin-right:6px;font-family:var(--sans)}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--down);background:rgba(34,197,94,.12);
+    padding:5px 11px;border-radius:999px;border:1px solid rgba(34,197,94,.3);font-family:var(--mono)}
+  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--down)}
+  .icon-btn{width:36px;height:36px;border-radius:10px;background:var(--panel);border:1px solid var(--border);color:var(--text-2);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+  .icon-btn:hover{color:var(--text);background:var(--panel-hover)}
+  .av2{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#22C55E,#0EA5E9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06231a;cursor:pointer}
+
+  /* 内容 */
+  .content{padding:20px 24px;overflow:auto;display:flex;flex-direction:column;gap:18px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:15px 17px}
+  .kpi .lbl{color:var(--text-3);font-size:12px}
+  .kpi .val{font-family:var(--mono);font-size:23px;font-weight:700;margin-top:7px}
+  .kpi .sub{font-size:11.5px;color:var(--text-2);margin-top:3px;font-family:var(--mono)}
+
+  .grid{display:grid;grid-template-columns:1.75fr 1fr;gap:18px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:10px;padding:13px 17px;border-bottom:1px solid var(--border)}
+  .card-h h3{font-size:14px;font-weight:700}
+  .card-h .tag{font-size:10px;color:var(--text-2);background:var(--panel-hover);border:1px solid var(--border);padding:2px 8px;border-radius:999px;margin-left:auto;font-family:var(--mono)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;color:var(--text-3);font-weight:600;font-size:11px;letter-spacing:.4px;
+    padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase}
+  thead th.num{text-align:right}
+  tbody td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:12.5px}
+  tbody tr:hover{background:var(--panel-hover)}
+  .sym b{font-family:var(--sans);font-size:13px;color:var(--text)}
+  .sym small{font-family:var(--mono);color:var(--text-3);font-size:11px;display:block}
+  td.num{text-align:right}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .badge-sector{font-size:10.5px;padding:2px 8px;border-radius:6px;background:var(--panel-hover);color:var(--text-2);font-family:var(--mono)}
+
+  .sec{display:flex;flex-direction:column;gap:13px;padding:15px 17px}
+  .sec .row{display:flex;align-items:center;gap:10px}
+  .sec .name{font-size:12.5px;width:78px;color:var(--text-2)}
+  .sec .track{flex:1;height:8px;background:var(--panel-hover);border-radius:999px;overflow:hidden}
+  .sec .track > i{display:block;height:100%;border-radius:999px}
+  .sec .pct{font-family:var(--mono);font-size:11.5px;width:54px;text-align:right}
+
+  .alerts{padding:6px 0}
+  .alert{display:flex;gap:11px;padding:11px 17px;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
+  .alert:last-child{border-bottom:none}
+  .alert .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+  .alert .ic.r{background:rgba(239,68,68,.16);color:var(--up)}
+  .alert .ic.g{background:rgba(34,197,94,.16);color:var(--down)}
+  .alert .ic.b{background:rgba(59,130,246,.16);color:var(--accent)}
+  .alert p{font-size:12.5px;color:var(--text-2);line-height:1.5}
+  .alert p b{color:var(--text)}
+  .alert small{color:var(--text-3);font-family:var(--mono);font-size:10.5px}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--panel-hover);border-radius:999px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">A</div><b>AROS</b></div>
+    <div class="nav">
+      <div class="nav-group">主菜单</div>
+      <div class="nav-item active"><span class="ico">▦</span> Dashboard</div>
+      <div class="nav-item"><span class="ico">◴</span> Market</div>
+      <div class="nav-item"><span class="ico">◎</span> Factors</div>
+      <div class="nav-item"><span class="ico">⚗</span> Backtest</div>
+      <div class="nav-item"><span class="ico">⌑</span> Ranking</div>
+      <div class="nav-item"><span class="ico">⚙</span> Strategy</div>
+    </div>
+    <div class="sb-foot">
+      <div class="av">R</div>
+      <div><b style="font-size:13px">Ricky</b><small>已连接</small></div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <header class="topbar">
+      <h1>Dashboard Overview</h1>
+      <div class="idx">
+        <span class="i"><small>上证</small>3,285.6 <span class="up">+0.82%</span></span>
+        <span class="i"><small>深证</small>10,942.3 <span class="up">+1.14%</span></span>
+      </div>
+      <div class="spacer"></div>
+      <div class="status"><span class="dot"></span> 市场开放</div>
+      <div class="icon-btn">🔔</div>
+      <div class="av2">R</div>
+    </header>
+
+    <div class="content">
+      <!-- KPI -->
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">上证综指</div><div class="val">3,285.6</div><div class="sub up">+0.82% · +26.7</div></div>
+        <div class="kpi"><div class="lbl">深证成指</div><div class="val">10,942.3</div><div class="sub up">+1.14% · +123.4</div></div>
+        <div class="kpi"><div class="lbl">两市成交额</div><div class="val">¥9,840亿</div><div class="sub up">+12.3% 放量</div></div>
+        <div class="kpi"><div class="lbl">活跃策略</div><div class="val">14</div><div class="sub">今日触发 6</div></div>
+      </div>
+
+      <div class="grid">
+        <!-- Watchlist -->
+        <div class="card">
+          <div class="card-h"><h3>自选股 · Market Watchlist</h3><span class="tag">实时</span></div>
+          <table>
+            <thead>
+              <tr>
+                <th>代码 / 名称</th><th class="num">最新价</th><th class="num">涨跌</th>
+                <th class="num">涨跌幅</th><th class="num">成交量</th><th class="num">市值</th><th class="num">PE</th>
+              </tr>
+            </thead>
+            <tbody id="wl"></tbody>
+          </table>
+        </div>
+
+        <!-- 右侧 -->
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="card">
+            <div class="card-h"><h3>板块表现</h3><span class="tag">今日</span></div>
+            <div class="sec" id="sectors"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>实时告警</h3><span class="tag">Alerts</span></div>
+            <div class="alerts" id="alerts"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const wl=[
+  {c:"600519",n:"贵州茅台",p:"1,842.00",d:"+28.50",pc:"+1.57%",v:"3.2M",cap:"2.31万亿",pe:"28.4",up:true},
+  {c:"300750",n:"宁德时代",p:"218.60",d:"+8.90",pc:"+4.25%",v:"18.6M",cap:"9,610亿",pe:"22.1",up:true},
+  {c:"601318",n:"中国平安",p:"48.20",d:"-0.55",pc:"-1.13%",v:"12.1M",cap:"8,790亿",pe:"8.6",up:false},
+  {c:"000858",n:"五粮液",p:"152.30",d:"+1.30",pc:"+0.86%",v:"6.4M",cap:"5,910亿",pe:"19.2",up:true},
+  {c:"600036",n:"招商银行",p:"38.10",d:"+0.42",pc:"+1.11%",v:"9.8M",cap:"9,610亿",pe:"6.1",up:true},
+  {c:"002415",n:"海康威视",p:"31.05",d:"-0.62",pc:"-1.96%",v:"7.3M",cap:"2,870亿",pe:"18.9",up:false},
+  {c:"600276",n:"恒瑞医药",p:"52.40",d:"+0.95",pc:"+1.85%",v:"5.1M",cap:"3,340亿",pe:"45.3",up:true},
+  {c:"000001",n:"平安银行",p:"11.20",d:"-0.18",pc:"-1.58%",v:"14.2M",cap:"2,180亿",pe:"4.7",up:false},
+];
+const wlBody=document.getElementById("wl");
+wlBody.innerHTML=wl.map(x=>`
+  <tr>
+    <td><div class="sym"><b>${x.n}</b><small>${x.c}</small></div></td>
+    <td class="num">${x.p}</td>
+    <td class="num ${x.up?'up':'down'}">${x.d}</td>
+    <td class="num ${x.up?'up':'down'}">${x.pc}</td>
+    <td class="num">${x.v}</td>
+    <td class="num">${x.cap}</td>
+    <td class="num">${x.pe}</td>
+  </tr>`).join("");
+
+const sectors=[
+  {n:"半导体",p:4.8,up:true},{n:"新能源",p:3.2,up:true},{n:"白酒",p:1.6,up:true},
+  {n:"银行",p:0.9,up:true},{n:"医药",p:-0.7,up:false},{n:"地产",p:-2.1,up:false},
+  {n:"钢铁",p:-1.4,up:false},{n:"传媒",p:0.4,up:true},
+];
+document.getElementById("sectors").innerHTML=sectors.map(s=>{
+  const w=Math.min(Math.abs(s.p)*9,100);
+  const col=s.up?'var(--up)':'var(--down)';
+  return `<div class="row">
+    <span class="name">${s.n}</span>
+    <div class="track"><i style="width:${w}%;background:${col}"></i></div>
+    <span class="pct ${s.up?'up':'down'}">${s.up?'+':''}${s.p}%</span>
+  </div>`;
+}).join("");
+
+const alerts=[
+  {t:"r",h:"<b>宁德时代</b> 触发突破信号",s:"量比 3.2 · 站上 20 日均线",time:"09:41"},
+  {t:"g",h:"<b>五粮液</b> 资金流入转正",s:"主力净流入 ¥4.2亿",time:"10:07"},
+  {t:"b",h:"<b>中国平安</b> 估值进入低位",s:"PE 低于行业 1σ",time:"10:33"},
+  {t:"r",h:"<b>海康威视</b> 跌破支撑",s:"收盘低于 ¥31.50",time:"11:02"},
+  {t:"b",h:"策略 <b>#动量轮动</b> 触发",s:"持仓切换至半导体 ETF",time:"13:15"},
+];
+document.getElementById("alerts").innerHTML=alerts.map(a=>`
+  <div class="alert">
+    <div class="ic ${a.t}">${a.t==='r'?'▲':a.t==='g'?'●':'◆'}</div>
+    <div><p><b>${a.h.replace(/<b>|<\/b>/g,'')}</b> ${a.h.replace(/<b>.*?<\/b>\s*/,'')}</p>
+      <p>${a.s}</p><small>${a.time}</small></div>
+  </div>`).join("");
+
+document.querySelectorAll(".nav-item").forEach(el=>{
+  el.addEventListener("click",()=>{
+    document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+    el.classList.add("active");
+  });
+});
+</script>
+</body>
+</html>

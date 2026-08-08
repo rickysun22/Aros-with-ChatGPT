@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AROS · Dashboard (ChatGPT-style)</title>
+<style>
+  :root{
+    --bg:#0B0E14;
+    --bg-2:#0E121B;
+    --panel:#131722;
+    --panel-2:#161B26;
+    --panel-hover:#1B2230;
+    --border:rgba(255,255,255,.07);
+    --border-strong:rgba(255,255,255,.12);
+    --text:#E6E9EF;
+    --text-2:#9AA3B5;
+    --text-3:#5E6675;
+    --up:#EF4444;      /* A股 涨 = 红 */
+    --down:#22C55E;    /* A股 跌 = 绿 */
+    --accent:#6366F1;
+    --accent-2:#3B82F6;
+    --warn:#F59E0B;
+    --mono:'JetBrains Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+    --sans:'Inter',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 80% -10%,rgba(99,102,241,.10),transparent 60%),var(--bg);
+    color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+
+  /* ---------- 左侧导航 ---------- */
+  .sidebar{background:linear-gradient(180deg,var(--bg-2),var(--bg));border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:18px 14px;gap:6px}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .brand .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.45)}
+  .brand b{font-size:16px;letter-spacing:.5px}
+  .brand span{display:block;font-size:10px;color:var(--text-3);letter-spacing:2px}
+  .nav-group{font-size:10px;color:var(--text-3);letter-spacing:1.5px;margin:14px 10px 6px;text-transform:uppercase}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:10px;color:var(--text-2);
+    cursor:pointer;font-size:13.5px;transition:.15s;border:1px solid transparent}
+  .nav-item:hover{background:var(--panel-hover);color:var(--text)}
+  .nav-item.active{background:linear-gradient(90deg,rgba(99,102,241,.18),rgba(99,102,241,.04));color:#fff;border-color:rgba(99,102,241,.35)}
+  .nav-item .ico{width:18px;text-align:center;opacity:.9}
+  .nav-item .badge{margin-left:auto;font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:999px;font-family:var(--mono)}
+  .sb-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--panel);border:1px solid var(--border)}
+  .sb-foot .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#22C55E,#0EA5E9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06231a}
+  .sb-foot small{display:block;color:var(--text-3);font-size:11px}
+
+  /* ---------- 顶栏 ---------- */
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:18px;padding:16px 26px;border-bottom:1px solid var(--border);background:rgba(11,14,20,.6);backdrop-filter:blur(8px)}
+  .greet h1{font-size:19px;font-weight:700}
+  .greet p{color:var(--text-3);font-size:12px;margin-top:2px}
+  .search{flex:1;max-width:440px;margin-left:8px;display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);
+    border-radius:11px;padding:9px 13px;color:var(--text-2)}
+  .search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px}
+  .search .kbd{font-family:var(--mono);font-size:10px;color:var(--text-3);border:1px solid var(--border-strong);padding:1px 6px;border-radius:6px}
+  .btn{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border:none;border-radius:11px;padding:9px 15px;
+    font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 14px rgba(99,102,241,.35)}
+  .btn:hover{filter:brightness(1.08)}
+  .icon-btn{width:38px;height:38px;border-radius:11px;background:var(--panel);border:1px solid var(--border);color:var(--text-2);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+  .icon-btn:hover{color:var(--text);background:var(--panel-hover)}
+
+  /* ---------- 内容 ---------- */
+  .content{padding:22px 26px;overflow:auto;display:flex;flex-direction:column;gap:18px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .kpi{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;right:-20px;top:-20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.18),transparent 70%)}
+  .kpi .lbl{color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:7px}
+  .kpi .val{font-family:var(--mono);font-size:26px;font-weight:700;margin-top:8px}
+  .kpi .sub{font-size:11.5px;color:var(--text-3);margin-top:4px;font-family:var(--mono)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.g{background:var(--down)} .dot.r{background:var(--up)} .dot.w{background:var(--warn)} .dot.b{background:var(--accent-2)}
+
+  .grid{display:grid;grid-template-columns:1.7fr 1fr;gap:18px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .card-h h3{font-size:14px;font-weight:700}
+  .card-h .tag{font-size:10px;color:var(--text-2);background:var(--panel-hover);border:1px solid var(--border);padding:2px 8px;border-radius:999px;margin-left:auto;font-family:var(--mono)}
+  .card-b{padding:6px 4px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;color:var(--text-3);font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase;
+    padding:10px 14px;border-bottom:1px solid var(--border)}
+  tbody td{padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono)}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--panel-hover)}
+  .sym{display:flex;flex-direction:column}
+  .sym b{font-family:var(--sans);font-size:13px;color:var(--text)}
+  .sym small{font-family:var(--mono);color:var(--text-3);font-size:11px}
+  .rank{font-family:var(--mono);color:var(--text-2)}
+  .pill{font-size:10.5px;padding:2px 9px;border-radius:999px;font-family:var(--mono);font-weight:600}
+  .pill.buy{background:rgba(239,68,68,.16);color:var(--up);border:1px solid rgba(239,68,68,.4)}
+  .pill.hold{background:rgba(245,158,11,.14);color:var(--warn);border:1px solid rgba(245,158,11,.35)}
+  .pill.watch{background:rgba(99,102,241,.14);color:#a5b4fc;border:1px solid rgba(99,102,241,.35)}
+  .bar{height:6px;border-radius:999px;background:var(--panel-hover);overflow:hidden;min-width:60px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:999px}
+  .up{color:var(--up)} .down{color:var(--down)}
+
+  .insight{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+  .insight .ai{display:flex;gap:11px;align-items:flex-start}
+  .insight .ai .av{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#a855f7,#6366f1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .insight p{font-size:13px;color:var(--text-2);line-height:1.65}
+  .insight p b{color:var(--text)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:999px;background:var(--panel-hover);border:1px solid var(--border);color:var(--text-2)}
+
+  .pfrow{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .pfrow:last-child{border-bottom:none}
+  .pfrow .nm{font-size:13px} .pfrow .nm small{color:var(--text-3);font-family:var(--mono);font-size:11px;display:block}
+  .pfrow .v{font-family:var(--mono);text-align:right}
+  .pf-foot{display:flex;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--border);font-family:var(--mono);font-size:13px}
+  .pf-foot b{font-size:16px}
+
+  .bottom{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .stat{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .stat:last-child{border-bottom:none}
+  .stat .k{color:var(--text-3);font-size:12px;width:90px}
+  .stat .v{font-family:var(--mono);font-size:13px;margin-left:auto}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--panel-hover);border-radius:999px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 左侧导航 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div><b>AROS</b><span>RESEARCH OS</span></div>
+    </div>
+    <div class="nav-group">分析</div>
+    <div class="nav-item active"><span class="ico">▦</span> Dashboard</div>
+    <div class="nav-item"><span class="ico">◴</span> Market Overview</div>
+    <div class="nav-item"><span class="ico">◎</span> Alpha Radar <span class="badge">8</span></div>
+    <div class="nav-item"><span class="ico">⌕</span> Stock Intelligence</div>
+    <div class="nav-item"><span class="ico">⚗</span> Strategy Lab</div>
+    <div class="nav-group">组合</div>
+    <div class="nav-item"><span class="ico">◫</span> Portfolio</div>
+    <div class="nav-item"><span class="ico">⊞</span> Paper Trading</div>
+    <div class="nav-item"><span class="ico">⛨</span> Risk Monitor</div>
+    <div class="nav-group">其它</div>
+    <div class="nav-item"><span class="ico">✶</span> AI Research</div>
+    <div class="nav-item"><span class="ico">▤</span> Calendar</div>
+    <div class="nav-item"><span class="ico">⎙</span> Reports</div>
+    <div class="nav-item"><span class="ico">⚙</span> Settings</div>
+    <div class="sb-foot">
+      <div class="av">R</div>
+      <div><b style="font-size:13px">Ricky Sun</b><small>Pro · 已连接</small></div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <header class="topbar">
+      <div class="greet">
+        <h1>晚上好，Ricky</h1>
+        <p id="clock">市场开放中 · 实时数据已同步</p>
+      </div>
+      <div class="search">
+        <span>⌕</span>
+        <input placeholder="搜索股票、因子、策略…" />
+        <span class="kbd">⌘K</span>
+      </div>
+      <button class="btn">＋ Add Widget</button>
+      <div class="icon-btn">🔔</div>
+      <div class="icon-btn">◐</div>
+    </header>
+
+    <div class="content">
+      <!-- KPI -->
+      <div class="kpis">
+        <div class="kpi">
+          <div class="lbl"><span class="dot b"></span> 市场情绪</div>
+          <div class="val">68<span style="font-size:14px;color:var(--text-3)">/100</span></div>
+          <div class="sub">偏多 · 较昨日 +5</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl"><span class="dot g"></span> 资金流向</div>
+          <div class="val up">+¥452亿</div>
+          <div class="sub">主力净流入</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl"><span class="dot w"></span> 风险等级</div>
+          <div class="val" style="color:var(--warn)">中</div>
+          <div class="sub">波动放大 · 注意仓位</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl"><span class="dot r"></span> 活跃信号</div>
+          <div class="val">23</div>
+          <div class="sub">金叉 9 · 突破 6 · 背离 8</div>
+        </div>
+      </div>
+
+      <!-- 主网格 -->
+      <div class="grid">
+        <!-- Alpha Radar 表 -->
+        <div class="card">
+          <div class="card-h">
+            <h3>Alpha Radar</h3>
+            <span class="tag">实时 · 因子评分</span>
+          </div>
+          <div class="card-b">
+            <table>
+              <thead>
+                <tr><th>#</th><th>标的</th><th>Alpha</th><th>入场</th><th>策略命中</th><th>市况</th><th>动作</th></tr>
+              </thead>
+              <tbody id="radar"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 右侧列 -->
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="card">
+            <div class="card-h"><h3>AI Market Insight</h3><span class="tag">GPT-4o</span></div>
+            <div class="insight">
+              <div class="ai">
+                <div class="av">✦</div>
+                <p>今日 <b>半导体</b> 与 <b>新能源</b> 板块资金共振，<b>宁德时代</b>、<b>北方华创</b> 出现周线级 <b style="color:var(--up)">放量突破</b>。
+                北向资金连续 3 日净流入，短线情绪偏多；但沪深 300 接近前高，建议<b>控制仓位、逢高减仓</b>。</p>
+              </div>
+              <div class="chips">
+                <span class="chip">#半导体</span><span class="chip">#北向流入</span>
+                <span class="chip">#周线突破</span><span class="chip">#风险中性</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>Paper Portfolio</h3><span class="tag">模拟</span></div>
+            <div id="pf"></div>
+            <div class="pf-foot"><span>总收益</span><b class="up">+13.58%</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部 -->
+      <div class="bottom">
+        <div class="card">
+          <div class="card-h"><h3>系统状态</h3><span class="tag">Aros-core</span></div>
+          <div class="stat"><span class="k">数据引擎</span><span class="v up">在线</span></div>
+          <div class="stat"><span class="k">因子库</span><span class="v">142 项</span></div>
+          <div class="stat"><span class="k">今日计算</span><span class="v">1.2M 指标</span></div>
+          <div class="stat"><span class="k">延迟</span><span class="v">38 ms</span></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>日历 / 事件</h3><span class="tag">本周</span></div>
+          <div class="stat"><span class="k">08-08</span><span class="v">CPI 数据公布</span></div>
+          <div class="stat"><span class="k">08-09</span><span class="v down">宁德时代 解禁 12亿</span></div>
+          <div class="stat"><span class="k">08-11</span><span class="v">央行 MLF 续作</span></div>
+          <div class="stat"><span class="k">08-12</span><span class="v up">茅台 中报披露</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const radar = [
+  {r:1,s:"600519",n:"贵州茅台",a:92,e:88,h:"9/10",m:"放量突破",act:"buy"},
+  {r:2,s:"300750",n:"宁德时代",a:89,e:84,h:"8/10",m:"资金共振",act:"buy"},
+  {r:3,s:"601318",n:"中国平安",a:81,e:79,h:"7/10",m:"估值修复",act:"hold"},
+  {r:4,s:"000858",n:"五粮液",a:77,e:72,h:"7/10",m:"横盘整理",act:"hold"},
+  {r:5,s:"600036",n:"招商银行",a:74,e:70,h:"6/10",m:"防御配置",act:"watch"},
+  {r:6,s:"002415",n:"海康威视",a:71,e:68,h:"6/10",m:"弱势震荡",act:"watch"},
+  {r:7,s:"600276",n:"恒瑞医药",a:69,e:66,h:"5/10",m:"底部背离",act:"watch"},
+  {r:8,s:"000001",n:"平安银行",a:64,e:61,h:"5/10",m:"量能萎缩",act:"watch"},
+];
+const actMap={buy:["buy","买入"],hold:["hold","持有"],watch:["watch","观察"]};
+const radarBody=document.getElementById("radar");
+radarBody.innerHTML=radar.map(x=>{
+  const[a,al]=actMap[x.act];
+  return `<tr>
+    <td class="rank">${x.r}</td>
+    <td><div class="sym"><b>${x.n}</b><small>${x.s}</small></div></td>
+    <td><div style="display:flex;align-items:center;gap:8px"><span>${x.a}</span><div class="bar"><i style="width:${x.a}%"></i></div></div></td>
+    <td>${x.e}</td>
+    <td>${x.h}</td>
+    <td style="color:var(--text-2)">${x.m}</td>
+    <td><span class="pill ${a}">${al}</span></td>
+  </tr>`;
+}).join("");
+
+const pf=[
+  {n:"贵州茅台",s:"600519",v:"¥1,842.00",c:"+2.31%",up:true},
+  {n:"宁德时代",s:"300750",v:"¥218.60",c:"+4.05%",up:true},
+  {n:"中国平安",s:"601318",v:"¥48.20",c:"-1.12%",up:false},
+  {n:"五粮液",s:"000858",v:"¥152.30",c:"+0.86%",up:true},
+];
+document.getElementById("pf").innerHTML=pf.map(x=>`
+  <div class="pfrow">
+    <div class="nm">${x.n}<small>${x.s}</small></div>
+    <div class="v"><div>${x.v}</div><div class="${x.up?'up':'down'}">${x.c}</div></div>
+  </div>`).join("");
+
+// 导航高亮
+document.querySelectorAll(".nav-item").forEach(el=>{
+  el.addEventListener("click",()=>{
+    document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+    el.classList.add("active");
+  });
+});
+</script>
+</body>
+</html>
