@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AROS - Design System Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-background: #020617;
+    --color-primary: #0F172A;
+    --color-secondary: #1E293B;
+    --color-accent: #22C55E;
+    --color-foreground: #F8FAFC;
+    --color-muted: #1A1E2F;
+    --color-border: #334155;
+    --color-destructive: #EF4444;
+    --color-bullish: #26A69A;
+    --color-bearish: #EF5350;
+    --color-blue: #2962FF;
+    --color-orange: #FF9800;
+    --sidebar-width: 220px;
+    --header-height: 52px;
+    --blur-amount: 12px;
+    --glass-bg: rgba(15, 23, 42, 0.6);
+    --glass-border: rgba(51, 65, 85, 0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Fira Sans', sans-serif;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* --- TOP BAR --- */
+  .topbar {
+    height: var(--header-height);
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(var(--blur-amount));
+    -webkit-backdrop-filter: blur(var(--blur-amount));
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 24px;
+    position: relative;
+    z-index: 100;
+  }
+  .topbar .logo {
+    font-family: 'Fira Code', monospace;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--color-accent);
+    letter-spacing: 1px;
+  }
+  .topbar .search-box {
+    flex: 1;
+    max-width: 480px;
+    height: 34px;
+    background: var(--color-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    color: #64748B;
+    font-size: 13px;
+  }
+  .topbar .search-box kbd {
+    background: var(--color-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: #94A3B8;
+  }
+  .topbar .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #94A3B8;
+  }
+  .topbar .status .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .topbar .actions {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
+  }
+  .topbar .actions .icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--color-muted);
+    border: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .topbar .actions .icon-btn:hover {
+    background: var(--color-secondary);
+    border-color: var(--color-accent);
+  }
+
+  /* --- MAIN LAYOUT --- */
+  .main {
+    display: flex;
+    height: calc(100vh - var(--header-height));
+  }
+
+  /* --- SIDEBAR --- */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-amount));
+    -webkit-backdrop-filter: blur(var(--blur-amount));
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    padding: 12px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar .nav-group {
+    padding: 0 12px;
+    margin-bottom: 16px;
+  }
+  .sidebar .nav-group .group-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+  .sidebar .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #94A3B8;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 2px;
+  }
+  .sidebar .nav-item:hover {
+    background: rgba(34, 197, 94, 0.08);
+    color: var(--color-foreground);
+  }
+  .sidebar .nav-item.active {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+  .sidebar .nav-item .nav-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .sidebar .nav-item .badge {
+    margin-left: auto;
+    background: var(--color-accent);
+    color: var(--color-background);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  /* --- CONTENT --- */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* --- TICKER INFO BAR --- */
+  .ticker-bar {
+    height: 40px;
+    background: var(--color-primary);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+  .ticker-bar .ticker-symbol {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .ticker-bar .ticker-price {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--color-bearish);
+  }
+  .ticker-bar .ticker-change {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--color-bearish);
+  }
+  .ticker-bar .ticker-meta {
+    font-size: 11px;
+    color: #64748B;
+    display: flex;
+    gap: 4px;
+  }
+  .ticker-bar .ticker-meta span {
+    color: var(--color-foreground);
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+  }
+  .ticker-bar .ticker-tabs {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+  }
+  .ticker-bar .ticker-tabs .tab {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #64748B;
+    transition: all 0.2s;
+  }
+  .ticker-bar .ticker-tabs .tab.active {
+    background: var(--color-secondary);
+    color: var(--color-foreground);
+  }
+
+  /* --- CHART AREA --- */
+  .chart-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .chart-main {
+    flex: 1;
+    background: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    min-height: 300px;
+  }
+  .chart-main .chart-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .chart-main .chart-header .indicator-tags {
+    display: flex;
+    gap: 6px;
+  }
+  .chart-main .chart-header .indicator-tags .tag {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Fira Code', monospace;
+    background: var(--color-muted);
+    border: 1px solid var(--color-border);
+    color: #94A3B8;
+  }
+  .chart-main .chart-header .indicator-tags .tag.active {
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+  }
+  /* SVG Candlestick Chart */
+  .candlestick-chart {
+    width: 100%;
+    height: 220px;
+  }
+  /* Volume bars */
+  .volume-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+  }
+  .volume-label {
+    font-size: 11px;
+    color: #64748B;
+    margin-bottom: 6px;
+    font-family: 'Fira Code', monospace;
+  }
+
+  /* --- BOTTOM PANELS --- */
+  .bottom-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    height: 200px;
+  }
+  .panel {
+    background: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 14px;
+    overflow: hidden;
+  }
+  .panel .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .panel .panel-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .panel .panel-header .panel-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .panel .panel-header .panel-actions .mini-btn {
+    padding: 2px 8px;
+    font-size: 10px;
+    border-radius: 4px;
+    background: var(--color-muted);
+    border: 1px solid var(--color-border);
+    color: #94A3B8;
+    cursor: pointer;
+  }
+  .panel .panel-header .panel-actions .mini-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  /* Watchlist Table */
+  .watchlist-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .watchlist-table th {
+    text-align: left;
+    font-size: 10px;
+    color: #475569;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--color-border);
+    font-weight: 500;
+  }
+  .watchlist-table td {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+  }
+  .watchlist-table tr:hover td {
+    background: rgba(34, 197, 94, 0.05);
+  }
+  .watchlist-table .up { color: var(--color-bullish); }
+  .watchlist-table .down { color: var(--color-bearish); }
+
+  /* Factor Rankings */
+  .factor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .factor-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .factor-item .factor-name {
+    font-size: 12px;
+    width: 90px;
+    color: #94A3B8;
+    font-family: 'Fira Code', monospace;
+  }
+  .factor-item .factor-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--color-muted);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .factor-item .factor-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .factor-item .factor-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    width: 36px;
+    text-align: right;
+  }
+
+  /* --- SCROLLBAR --- */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+  /* --- LABEL --- */
+  .preview-label {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid var(--color-accent);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--color-accent);
+    font-family: 'Fira Code', monospace;
+    z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">AROS</div>
+  <div class="search-box">
+    <span>🔍</span>
+    <span>搜索股票代码 / 指标 / 策略...</span>
+    <kbd>⌘K</kbd>
+  </div>
+  <div class="status">
+    <div class="dot"></div>
+    <span>数据已同步 2026-08-08</span>
+  </div>
+  <div class="actions">
+    <div class="icon-btn">🔔</div>
+    <div class="icon-btn">⚙️</div>
+    <div class="icon-btn">👤</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="nav-group">
+      <div class="group-title">研究</div>
+      <div class="nav-item"><span class="nav-icon">📊</span>数据总览</div>
+      <div class="nav-item active"><span class="nav-icon">📈</span>行情分析</div>
+      <div class="nav-item"><span class="nav-icon">🧮</span>因子计算</div>
+      <div class="nav-item"><span class="nav-icon">🔬</span>指标引擎</div>
+    </div>
+    <div class="nav-group">
+      <div class="group-title">策略</div>
+      <div class="nav-item"><span class="nav-icon">🎯</span>策略研究</div>
+      <div class="nav-item"><span class="nav-icon">📉</span>回测系统</div>
+      <div class="nav-item"><span class="nav-icon">🏆</span>股票排名 <span class="badge">5</span></div>
+    </div>
+    <div class="nav-group">
+      <div class="group-title">报告</div>
+      <div class="nav-item"><span class="nav-icon">📄</span>日报</div>
+      <div class="nav-item"><span class="nav-icon">📋</span>策略报告</div>
+      <div class="nav-item"><span class="nav-icon">💼</span>组合分析</div>
+    </div>
+    <div class="nav-group">
+      <div class="group-title">系统</div>
+      <div class="nav-item"><span class="nav-icon">⚙️</span>配置管理</div>
+      <div class="nav-item"><span class="nav-icon">📝</span>日志</div>
+      <div class="nav-item"><span class="nav-icon">🔄</span>数据同步</div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- TICKER BAR -->
+    <div class="ticker-bar">
+      <div class="ticker-symbol">贵州茅台</div>
+      <div class="ticker-price">¥1,688.00</div>
+      <div class="ticker-change">-2.34%</div>
+      <div class="ticker-meta">开: <span>1,728.50</span></div>
+      <div class="ticker-meta">高: <span>1,735.00</span></div>
+      <div class="ticker-meta">低: <span>1,680.00</span></div>
+      <div class="ticker-meta">量: <span>3.2M</span></div>
+      <div class="ticker-tabs">
+        <div class="tab">1m</div>
+        <div class="tab">5m</div>
+        <div class="tab">15m</div>
+        <div class="tab">1H</div>
+        <div class="tab active">1D</div>
+        <div class="tab">1W</div>
+        <div class="tab">1M</div>
+      </div>
+    </div>
+
+    <!-- CHART AREA -->
+    <div class="chart-area">
+      <div class="chart-main">
+        <div class="chart-header">
+          <span style="font-weight:600; font-size:13px;">K 线图</span>
+          <div class="indicator-tags">
+            <div class="tag active">MA</div>
+            <div class="tag active">EMA</div>
+            <div class="tag">MACD</div>
+            <div class="tag active">BOLL</div>
+            <div class="tag">KDJ</div>
+            <div class="tag">RSI</div>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <span style="font-size:11px; color:#64748B;">⬆ MA5: 1,702.34</span>
+            <span style="font-size:11px; color:#64748B;">⬆ MA10: 1,695.21</span>
+            <span style="font-size:11px; color:#64748B;">⬇ MA20: 1,710.55</span>
+          </div>
+        </div>
+        
+        <!-- Candlestick SVG Chart -->
+        <svg class="candlestick-chart" viewBox="0 0 800 220" preserveAspectRatio="none">
+          <!-- Grid lines -->
+          <line x1="0" y1="44" x2="800" y2="44" stroke="#1E293B" stroke-width="0.5"/>
+          <line x1="0" y1="88" x2="800" y2="88" stroke="#1E293B" stroke-width="0.5"/>
+          <line x1="0" y1="132" x2="800" y2="132" stroke="#1E293B" stroke-width="0.5"/>
+          <line x1="0" y1="176" x2="800" y2="176" stroke="#1E293B" stroke-width="0.5"/>
+          
+          <!-- Y-axis labels -->
+          <text x="5" y="48" fill="#475569" font-size="9" font-family="Fira Code">1740</text>
+          <text x="5" y="92" fill="#475569" font-size="9" font-family="Fira Code">1720</text>
+          <text x="5" y="136" fill="#475569" font-size="9" font-family="Fira Code">1700</text>
+          <text x="5" y="180" fill="#475569" font-size="9" font-family="Fira Code">1680</text>
+
+          <!-- Candlesticks (sample data) -->
+          <!-- Bullish candles -->
+          <rect x="20" y="70" width="8" height="20" fill="#26A69A" rx="1"/>
+          <line x1="24" y1="65" x2="24" y2="95" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="40" y="60" width="8" height="25" fill="#26A69A" rx="1"/>
+          <line x1="44" y1="55" x2="44" y2="90" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="60" y="75" width="8" height="15" fill="#26A69A" rx="1"/>
+          <line x1="64" y1="70" x2="64" y2="95" stroke="#26A69A" stroke-width="1"/>
+          
+          <!-- Bearish candles -->
+          <rect x="80" y="80" width="8" height="18" fill="#EF5350" rx="1"/>
+          <line x1="84" y1="75" x2="84" y2="103" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="100" y="85" width="8" height="22" fill="#EF5350" rx="1"/>
+          <line x1="104" y1="80" x2="104" y2="112" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="120" y="72" width="8" height="12" fill="#26A69A" rx="1"/>
+          <line x1="124" y1="68" x2="124" y2="88" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="140" y="90" width="8" height="28" fill="#EF5350" rx="1"/>
+          <line x1="144" y1="85" x2="144" y2="123" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="160" y="95" width="8" height="20" fill="#EF5350" rx="1"/>
+          <line x1="164" y1="90" x2="164" y2="120" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="180" y="88" width="8" height="10" fill="#26A69A" rx="1"/>
+          <line x1="184" y1="83" x2="184" y2="103" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="200" y="100" width="8" height="25" fill="#EF5350" rx="1"/>
+          <line x1="204" y1="95" x2="204" y2="130" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="220" y="108" width="8" height="15" fill="#EF5350" rx="1"/>
+          <line x1="224" y1="103" x2="224" y2="128" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="240" y="95" width="8" height="18" fill="#26A69A" rx="1"/>
+          <line x1="244" y1="90" x2="244" y2="118" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="260" y="110" width="8" height="22" fill="#EF5350" rx="1"/>
+          <line x1="264" y1="105" x2="264" y2="137" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="280" y="118" width="8" height="12" fill="#EF5350" rx="1"/>
+          <line x1="284" y1="113" x2="284" y2="135" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="300" y="105" width="8" height="20" fill="#26A69A" rx="1"/>
+          <line x1="304" y1="100" x2="304" y2="130" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="320" y="120" width="8" height="18" fill="#EF5350" rx="1"/>
+          <line x1="324" y1="115" x2="324" y2="143" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="340" y="125" width="8" height="10" fill="#26A69A" rx="1"/>
+          <line x1="344" y1="120" x2="344" y2="140" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="360" y="115" width="8" height="15" fill="#EF5350" rx="1"/>
+          <line x1="364" y1="110" x2="364" y2="135" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="380" y="130" width="8" height="20" fill="#EF5350" rx="1"/>
+          <line x1="384" y1="125" x2="384" y2="155" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="400" y="135" width="8" height="12" fill="#EF5350" rx="1"/>
+          <line x1="404" y1="130" x2="404" y2="152" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="420" y="128" width="8" height="10" fill="#26A69A" rx="1"/>
+          <line x1="424" y1="123" x2="424" y2="143" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="440" y="140" width="8" height="18" fill="#EF5350" rx="1"/>
+          <line x1="444" y1="135" x2="444" y2="163" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="460" y="145" width="8" height="8" fill="#26A69A" rx="1"/>
+          <line x1="464" y1="140" x2="464" y2="158" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="480" y="138" width="8" height="12" fill="#EF5350" rx="1"/>
+          <line x1="484" y1="133" x2="484" y2="155" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="500" y="150" width="8" height="15" fill="#EF5350" rx="1"/>
+          <line x1="504" y1="145" x2="504" y2="170" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="520" y="155" width="8" height="10" fill="#EF5350" rx="1"/>
+          <line x1="524" y1="150" x2="524" y2="170" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="540" y="148" width="8" height="12" fill="#26A69A" rx="1"/>
+          <line x1="544" y1="143" x2="544" y2="165" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="560" y="160" width="8" height="15" fill="#EF5350" rx="1"/>
+          <line x1="564" y1="155" x2="564" y2="180" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="580" y="165" width="8" height="8" fill="#26A69A" rx="1"/>
+          <line x1="584" y1="160" x2="584" y2="178" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="600" y="158" width="8" height="12" fill="#EF5350" rx="1"/>
+          <line x1="604" y1="153" x2="604" y2="175" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="620" y="170" width="8" height="10" fill="#EF5350" rx="1"/>
+          <line x1="624" y1="165" x2="624" y2="185" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="640" y="175" width="8" height="8" fill="#EF5350" rx="1"/>
+          <line x1="644" y1="170" x2="644" y2="188" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="660" y="168" width="8" height="10" fill="#26A69A" rx="1"/>
+          <line x1="664" y1="163" x2="664" y2="183" stroke="#26A69A" stroke-width="1"/>
+          
+          <rect x="680" y="178" width="8" height="12" fill="#EF5350" rx="1"/>
+          <line x1="684" y1="173" x2="684" y2="195" stroke="#EF5350" stroke-width="1"/>
+          
+          <rect x="700" y="182" width="8" height="8" fill="#EF5350" rx="1"/>
+          <line x1="704" y1="177" x2="704" y2="195" stroke="#EF5350" stroke-width="1"/>
+          
+          <!-- MA line -->
+          <polyline fill="none" stroke="#2962FF" stroke-width="1.5" opacity="0.8"
+            points="24,72 44,62 64,77 84,82 104,87 124,74 144,92 164,97 184,90 204,102 224,110 244,97 264,112 284,120 304,107 324,122 344,127 364,117 384,132 404,137 424,130 444,142 464,147 484,140 504,152 524,157 544,150 564,162 584,167 604,160 624,172 644,177 664,170 684,180 704,184"/>
+          
+          <!-- MA20 line -->
+          <polyline fill="none" stroke="#FF9800" stroke-width="1.5" opacity="0.6" stroke-dasharray="4,3"
+            points="24,68 44,65 64,70 84,78 104,83 124,78 144,88 164,92 184,94 204,97 224,100 244,102 264,105 284,108 304,110 324,113 344,115 364,117 384,120 404,122 424,125 444,127 464,130 484,132 504,135 524,137 544,140 564,142 584,145 604,147 624,150 644,152 664,155 684,157 704,160"/>
+        </svg>
+
+        <!-- Volume bars -->
+        <div class="volume-section">
+          <div class="volume-label">VOLUME</div>
+          <svg width="100%" height="36" viewBox="0 0 800 36" preserveAspectRatio="none">
+            <rect x="20" y="18" width="8" height="18" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="40" y="12" width="8" height="24" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="60" y="20" width="8" height="16" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="80" y="15" width="8" height="21" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="100" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="120" y="22" width="8" height="14" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="140" y="8" width="8" height="28" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="160" y="12" width="8" height="24" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="180" y="20" width="8" height="16" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="200" y="6" width="8" height="30" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="220" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="240" y="16" width="8" height="20" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="260" y="8" width="8" height="28" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="280" y="12" width="8" height="24" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="300" y="14" width="8" height="22" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="320" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="340" y="18" width="8" height="18" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="360" y="12" width="8" height="24" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="380" y="6" width="8" height="30" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="400" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="420" y="16" width="8" height="20" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="440" y="8" width="8" height="28" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="460" y="18" width="8" height="18" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="480" y="14" width="8" height="22" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="500" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="520" y="14" width="8" height="22" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="540" y="16" width="8" height="20" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="560" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="580" y="16" width="8" height="20" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="600" y="14" width="8" height="22" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="620" y="12" width="8" height="24" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="640" y="14" width="8" height="22" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="660" y="16" width="8" height="20" fill="#26A69A" opacity="0.4" rx="1"/>
+            <rect x="680" y="10" width="8" height="26" fill="#EF5350" opacity="0.4" rx="1"/>
+            <rect x="700" y="14" width="8" height="22" fill="#EF5350" opacity="0.4" rx="1"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Bottom Panels -->
+      <div class="bottom-panels">
+        <!-- Watchlist -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>📋 Watchlist</h3>
+            <div class="panel-actions">
+              <div class="mini-btn">+</div>
+              <div class="mini-btn">筛选</div>
+            </div>
+          </div>
+          <table class="watchlist-table">
+            <thead>
+              <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th>价格</th>
+                <th>涨跌幅</th>
+                <th>成交量</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>600000</td>
+                <td>浦发银行</td>
+                <td class="up">8.92</td>
+                <td class="up">+2.34%</td>
+                <td>1.2M</td>
+              </tr>
+              <tr>
+                <td>000001</td>
+                <td>平安银行</td>
+                <td class="down">12.45</td>
+                <td class="down">-1.08%</td>
+                <td>890K</td>
+              </tr>
+              <tr>
+                <td>600519</td>
+                <td>贵州茅台</td>
+                <td class="down">1688.00</td>
+                <td class="down">-2.34%</td>
+                <td>3.2M</td>
+              </tr>
+              <tr>
+                <td>000858</td>
+                <td>五粮液</td>
+                <td class="up">156.78</td>
+                <td class="up">+0.89%</td>
+                <td>567K</td>
+              </tr>
+              <tr>
+                <td>601318</td>
+                <td>中国平安</td>
+                <td class="up">48.23</td>
+                <td class="up">+1.56%</td>
+                <td>2.1M</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Factor Rankings -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>🧮 因子排名 (Top 5)</h3>
+            <div class="panel-actions">
+              <div class="mini-btn">详情</div>
+            </div>
+          </div>
+          <div class="factor-list">
+            <div class="factor-item">
+              <div class="factor-name">MA_Dist</div>
+              <div class="factor-bar-bg">
+                <div class="factor-bar" style="width:92%; background: linear-gradient(90deg, #22C55E, #26A69A);"></div>
+              </div>
+              <div class="factor-val" style="color:#26A69A">0.92</div>
+            </div>
+            <div class="factor-item">
+              <div class="factor-name">RSI_Ovr</div>
+              <div class="factor-bar-bg">
+                <div class="factor-bar" style="width:78%; background: linear-gradient(90deg, #2962FF, #22C55E);"></div>
+              </div>
+              <div class="factor-val" style="color:#2962FF">0.78</div>
+            </div>
+            <div class="factor-item">
+              <div class="factor-name">MACD_Sig</div>
+              <div class="factor-bar-bg">
+                <div class="factor-bar" style="width:65%; background: linear-gradient(90deg, #FF9800, #2962FF);"></div>
+              </div>
+              <div class="factor-val" style="color:#FF9800">0.65</div>
+            </div>
+            <div class="factor-item">
+              <div class="factor-name">VOL_Ratio</div>
+              <div class="factor-bar-bg">
+                <div class="factor-bar" style="width:54%; background: linear-gradient(90deg, #EF5350, #FF9800);"></div>
+              </div>
+              <div class="factor-val" style="color:#EF5350">0.54</div>
+            </div>
+            <div class="factor-item">
+              <div class="factor-name">KDJ_Cross</div>
+              <div class="factor-bar-bg">
+                <div class="factor-bar" style="width:41%; background: #EF5350;"></div>
+              </div>
+              <div class="factor-val" style="color:#EF5350">0.41</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="preview-label">AROS Design System v1.0 — Preview</div>
+
+</body>
+</html>
