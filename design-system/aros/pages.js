@@ -153,26 +153,6 @@
         ] }
       ]
     },
-    analysis: {
-      icon: '📈', title: '行情分析', sub: '中际旭创 300308 · 日 K + 技术指标',
-      blocks: [
-        { t: 'kpis', d: [
-          { t: '最新价', v: '93.15', d: '+2.19 (+2.41%)', cls: 'up', icon: '💰' },
-          { t: '成交量', v: '4.86 万手', d: '量比 1.18', cls: '', icon: '📊' },
-          { t: '换手率', v: '3.21%', d: '自由流通市值 2,898 亿', cls: '', icon: '🔄' },
-          { t: '振幅', v: '3.86%', d: '区间:90.06 ~ 93.55', cls: '', icon: '📉' }
-        ] },
-        { t: 'spark', d: { title: '60 分钟分时', pts: [78, 79.2, 80.5, 79.8, 82, 83.5, 82.8, 85, 84.2, 86.5, 87.8, 87.2, 89, 90.2, 89.6, 91, 92.3, 93.15], color: '#FF4D4F' } },
-        { t: 'grid', d: [
-          { icon: '📐', t: 'MA 均线', sub: 'MA5 90.12 / MA20 85.44 / MA60 78.93 · 多头排列', tag: '偏多', cls: 'up' },
-          { icon: '📏', t: 'MACD', sub: 'DIF 3.21 / DEA 2.48,红柱放大', tag: '金叉', cls: 'up' },
-          { icon: '🌡️', t: 'RSI(14)', sub: 'RSI 68.2,接近超买但未钝化', tag: '强势', cls: 'warn' },
-          { icon: '🎯', t: '布林带', sub: '股价贴上轨 92.88,开口向上', tag: '强势', cls: 'up' },
-          { icon: '💧', t: 'KDJ', sub: 'K 82 / D 74 / J 98,高位钝化', tag: '过热', cls: 'down' },
-          { icon: '⚖️', t: 'OBV', sub: '能量潮创新高,量价配合良好', tag: '健康', cls: 'up' }
-        ] }
-      ]
-    },
     factors: {
       icon: '🧮', title: '因子计算', sub: 'A 股因子库 · 覆盖 5,800+ 标的 · 最新截面 08-08',
       blocks: [
@@ -194,20 +174,9 @@
       ]
     },
     lab: {
-      icon: '🎯', title: '策略实验室', sub: '已保存策略 5 个 · 支持回测与实盘信号',
+      icon: '🎯', title: '策略实验室', sub: '回测工作台 · 选择策略与标的,模拟回测检验历史表现',
       blocks: [
-        { t: 'grid', d: [
-          { icon: '🚀', t: '动量突破 T+5', sub: '20日新高 + 量比>1.5,持有 5 日', tag: '年化 +42%', cls: 'up' },
-          { icon: '💎', t: '低估值修复', sub: 'PE 分位 <20% + 营收加速', tag: '年化 +28%', cls: 'up' },
-          { icon: '🤖', t: 'AI 情绪共振', sub: '研报情绪 + 资金流 + 事件日历', tag: '年化 +35%', cls: 'up' },
-          { icon: '🧊', t: '红利防守', sub: '股息率 >5% + 低波动', tag: '年化 +15%', cls: 'blue' },
-          { icon: '⚡', t: '事件驱动套利', sub: '并购重组 / 定增折价 / 解禁错杀', tag: '年化 +51%', cls: 'up' }
-        ] },
-        { t: 'table', d: { head: ['策略', '最近信号', '持有收益', '胜率', '回撤'], rows: [
-          ['动量突破 T+5', '中际旭创 08-05', '+6.2%', '78%', '-8.4%'],
-          ['AI 情绪共振', '新易盛 08-03', '+4.8%', '74%', '-11.2%'],
-          ['事件驱动套利', '寒武纪 07-28', '+12.1%', '66%', '-15.6%']
-        ] } }
+        { t: 'btlab', d: {} }
       ]
     },
     backtest: {
@@ -412,6 +381,7 @@
       case 'intel': return '<div class="pg-panel"><div class="pg-panel-t">🧭 ' + b.d.title + '</div>' +
         '<div class="intel-search"><input id="intelInput" placeholder="输入代码 / 名称,如 300308 或 中际旭创" spellcheck="false"><button id="intelBtn">综合研判</button></div>' +
         '<div class="intel-body" id="intelBody"><div class="intel-empty">输入股票代码或名称,生成 5 面评分 · 机构动向 · 研报 · 新闻综合研判</div></div></div>';
+      case 'btlab': return btLabHtml();
       case 'chat': return '<div class="pg-chat">' + b.d.map(m =>
         '<div class="msg ' + m.role + '"><span class="msg-ic">' + (m.role === 'u' ? '🧑' : '🤖') + '</span><div class="msg-b">' + m.text + '</div></div>'
       ).join('') + '</div>';
@@ -447,6 +417,388 @@
       }
     }
     return '';
+  }
+
+  // ---------- 回测工作台 ----------
+  const BT_STRATS = [
+    { id: 'ma', icon: '📐', name: '双均线', sub: 'MA5 上穿 MA20 买入,下穿卖出', tag: '趋势' },
+    { id: 'macd', icon: '📊', name: 'MACD', sub: 'DIF 上穿 DEA 买入,下穿卖出', tag: '趋势' },
+    { id: 'rsi', icon: '🌡️', name: 'RSI 反转', sub: 'RSI14 < 30 买入,> 70 卖出', tag: '反转' },
+    { id: 'mom', icon: '🚀', name: '动量突破', sub: '创 20 日新高买入,跌破 MA20 卖出', tag: '动量' },
+    { id: 'rev', icon: '💎', name: '乖离修复', sub: '20 日乖离 -10% 买入,+10% 卖出', tag: '反转' }
+  ];
+  const BT_PERIODS = [
+    { k: 250, t: '近 1 年' },
+    { k: 750, t: '近 3 年' },
+    { k: 1250, t: '近 5 年' }
+  ];
+  const BT_NAME = { ma: '双均线', macd: 'MACD', rsi: 'RSI 反转', mom: '动量突破', rev: '乖离修复' };
+  const BT_ICON = { ma: '📐', macd: '📊', rsi: '🌡️', mom: '🚀', rev: '💎' };
+  const BT_INDICATORS = [
+    { id: 'ma', icon: '📐', name: 'MA 均线', desc: '快线上穿慢线视为看多', params: [{ k: 'w1', label: '快线', def: 5 }, { k: 'w2', label: '慢线', def: 20 }] },
+    { id: 'macd', icon: '📊', name: 'MACD', desc: 'DIFF 高于 DEA 视为看多', params: [{ k: 'f', label: '快', def: 12 }, { k: 's', label: '慢', def: 26 }, { k: 'm', label: '信号', def: 9 }] },
+    { id: 'rsi', icon: '🌡️', name: 'RSI', desc: 'RSI 高于 50 视为看多', params: [{ k: 'w', label: '周期', def: 14 }] },
+    { id: 'kdj', icon: '⚡', name: 'KDJ', desc: 'K 高于 D 视为看多', params: [{ k: 'w', label: '周期', def: 9 }] },
+    { id: 'boll', icon: '🎯', name: 'BOLL', desc: '收盘价高于中轨视为看多', params: [{ k: 'w', label: '周期', def: 20 }, { k: 'k', label: '倍数', def: 2 }] },
+    { id: 'mom', icon: '🚀', name: '动量', desc: '价格高于 N 日前视为看多', params: [{ k: 'w', label: '周期', def: 20 }] },
+    { id: 'bias', icon: '💎', name: '乖离率', desc: '收盘价高于均线视为看多', params: [{ k: 'w', label: '周期', def: 20 }] }
+  ];
+
+  function btRnd(code, off) {
+    const x = Math.sin((code * 7.31 + off * 13.77) % 10000) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function btLabHtml() {
+    const presetCards = BT_STRATS.map((s, i) =>
+      '<div class="bt-strat' + (i === 0 ? ' active' : '') + '" data-bt-strat="' + s.id + '">' +
+      '<div class="bt-st-icon">' + s.icon + '</div>' +
+      '<div class="bt-st-name">' + s.name + '</div>' +
+      '<div class="bt-st-sub">' + s.sub + '</div>' +
+      '<span class="bt-st-tag">' + s.tag + '</span></div>'
+    ).join('');
+    const indicCards = BT_INDICATORS.map((ind, i) =>
+      '<div class="bt-indic' + (i === 0 ? ' active' : '') + '" data-ind="' + ind.id + '">' +
+      '<div class="bt-ind-top"><span class="bt-ind-icon">' + ind.icon + '</span><span class="bt-ind-name">' + ind.name + '</span><span class="bt-ind-check">✓</span></div>' +
+      '<div class="bt-ind-desc">' + ind.desc + '</div>' +
+      '<div class="bt-ind-params">' + ind.params.map(p =>
+        '<span class="bt-ip"><label>' + p.label + '</label><input class="bt-num" data-pk="' + p.k + '" value="' + p.def + '" inputmode="numeric"></span>'
+      ).join('') + '</div></div>'
+    ).join('');
+    const periodBtns = BT_PERIODS.map((p, i) =>
+      '<span class="bt-period' + (i === 1 ? ' active' : '') + '" data-days="' + p.k + '">' + p.t + '</span>'
+    ).join('');
+    return '<div class="bt-wrap">' +
+      '<div class="bt-panel"><div class="bt-panel-t">🎯 1 · 快速预设 <span class="bt-run-hint">点击自动配置下方指标组合</span></div><div class="bt-strats">' + presetCards + '</div></div>' +
+      '<div class="bt-panel"><div class="bt-panel-t">📌 2 · 回测参数</div>' +
+      '<div class="bt-params">' +
+      '<div class="bt-param"><div class="bt-label">指标筛选</div>' +
+      '<div class="bt-combo"><span class="bt-combo-opt active" data-combo="and">全部满足 AND</span><span class="bt-combo-opt" data-combo="or">任一满足 OR</span></div></div>' +
+      '<div class="bt-indics">' + indicCards + '</div>' +
+      '<div class="bt-param"><div class="bt-label">止盈止损</div>' +
+      '<div class="bt-tpsl">' +
+      '<span class="bt-ip"><label>止盈 %</label><input class="bt-num" id="btTp" value="" placeholder="留空不启用"></span>' +
+      '<span class="bt-ip"><label>止损 %</label><input class="bt-num" id="btSl" value="" placeholder="留空不启用"></span>' +
+      '</div></div>' +
+      '<div class="bt-param"><div class="bt-label">区间</div><div class="bt-periods">' + periodBtns + '</div></div>' +
+      '<div class="bt-param"><div class="bt-label">初始资金</div>' +
+      '<div class="bt-cash"><span class="bt-cash-opt active" data-cash="1000000">100 万</span><span class="bt-cash-opt" data-cash="500000">50 万</span><span class="bt-cash-opt" data-cash="100000">10 万</span></div></div>' +
+      '</div>' +
+      '<div class="bt-run"><button class="bt-run-btn" id="btRunBtn">▶ 运行回测</button>' +
+      '<span class="bt-run-hint">前端模拟引擎 · 暂不计交易成本 · 止盈止损按收盘价触发</span></div>' +
+      '</div>' +
+      '<div class="bt-result" id="btResult"><div class="bt-empty">选择指标组合,点击「运行回测」查看模拟回测结果</div></div>' +
+      '</div>';
+  }
+
+  function btDates(n, endStr) {
+    const end = new Date(endStr + 'T00:00:00');
+    const days = [];
+    const d = new Date(end);
+    while (days.length < n) {
+      const wd = d.getDay();
+      if (wd !== 0 && wd !== 6) days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+      d.setDate(d.getDate() - 1);
+    }
+    return days.reverse();
+  }
+
+  function btPriceSeries(code, startPx, n) {
+    const px = [];
+    let cur = parseFloat(startPx);
+    for (let i = 0; i < n; i++) {
+      const drift = (btRnd(code, 900 + i) - 0.47) * 0.030;
+      cur = cur * (1 + drift);
+      px.push(cur);
+    }
+    const base = parseFloat(startPx) / px[n - 1];
+    return px.map(v => v * base);
+  }
+
+  function btMA(px, w) {
+    const out = [];
+    let sum = 0;
+    for (let i = 0; i < px.length; i++) {
+      sum += px[i];
+      if (i >= w) sum -= px[i - w];
+      out.push(i >= w - 1 ? sum / w : null);
+    }
+    return out;
+  }
+
+  function btEMA(px, w) {
+    const k = 2 / (w + 1);
+    const out = [];
+    let prev = null;
+    for (let i = 0; i < px.length; i++) {
+      prev = prev === null ? px[i] : px[i] * k + prev * (1 - k);
+      out.push(prev);
+    }
+    return out;
+  }
+
+  function btRSI(px, w) {
+    const out = [null];
+    let avgG = 0, avgL = 0;
+    for (let i = 1; i < px.length; i++) {
+      const ch = px[i] - px[i - 1];
+      const g = Math.max(ch, 0), l = Math.max(-ch, 0);
+      if (i <= w) { avgG += g / w; avgL += l / w; }
+      else { avgG = (avgG * (w - 1) + g) / w; avgL = (avgL * (w - 1) + l) / w; }
+      out.push(avgL === 0 ? 100 : 100 - 100 / (1 + avgG / avgL));
+    }
+    return out;
+  }
+
+  function btIndicatorState(id, p, px, n) {
+    if (id === 'ma') {
+      const f = btMA(px, p.w1), s = btMA(px, p.w2);
+      return px.map((v, i) => (f[i] === null || s[i] === null) ? 0 : (f[i] > s[i] ? 1 : 0));
+    }
+    if (id === 'macd') {
+      const f = btEMA(px, p.f), s = btEMA(px, p.s);
+      const dif = f.map((v, i) => v - s[i]);
+      const dea = btEMA(dif, p.m);
+      return dif.map((v, i) => v > dea[i] ? 1 : 0);
+    }
+    if (id === 'rsi') {
+      const rsi = btRSI(px, p.w);
+      return rsi.map(v => v === null ? 0 : (v > 50 ? 1 : 0));
+    }
+    if (id === 'kdj') {
+      const llv = [], hhv = [];
+      for (let i = 0; i < n; i++) {
+        const lo = Math.max(0, i - p.w + 1);
+        let mn = Infinity, mx = -Infinity;
+        for (let j = lo; j <= i; j++) { mn = Math.min(mn, px[j]); mx = Math.max(mx, px[j]); }
+        llv.push(mn); hhv.push(mx);
+      }
+      let k = 50, d = 50;
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const rsv = hhv[i] - llv[i] === 0 ? 50 : (px[i] - llv[i]) / (hhv[i] - llv[i]) * 100;
+        k = (2 / 3) * k + (1 / 3) * rsv;
+        d = (2 / 3) * d + (1 / 3) * k;
+        out.push(k > d ? 1 : 0);
+      }
+      return out;
+    }
+    if (id === 'boll') {
+      const mid = btMA(px, p.w);
+      const sd = [];
+      for (let i = 0; i < n; i++) {
+        if (mid[i] === null) { sd.push(null); continue; }
+        let v = 0;
+        for (let j = i - p.w + 1; j <= i; j++) v += (px[j] - mid[i]) * (px[j] - mid[i]);
+        sd.push(Math.sqrt(v / p.w));
+      }
+      return px.map((v, i) => sd[i] === null ? 0 : (v >= mid[i] ? 1 : 0));
+    }
+    if (id === 'mom') {
+      return px.map((v, i) => i < p.w ? 0 : (v > px[i - p.w] ? 1 : 0));
+    }
+    if (id === 'bias') {
+      const ma = btMA(px, p.w);
+      return px.map((v, i) => ma[i] === null ? 0 : (v > ma[i] ? 1 : 0));
+    }
+    return new Array(n).fill(0);
+  }
+
+  function btRun(stock, indIds, combo, indParams, tp, sl, days, cash) {
+    const n = days;
+    const px = btPriceSeries(stock.c, stock.px, n);
+    const states = indIds.map(id => btIndicatorState(id, indParams[id], px, n));
+    const signal = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      let on = 1;
+      for (let s = 0; s < states.length; s++) {
+        if (combo === 'and' && !states[s][i]) { on = 0; break; }
+        if (combo === 'or' && states[s][i]) { on = 1; break; }
+        if (combo === 'or') on = 0;
+      }
+      signal[i] = on;
+    }
+    let cashAvail = cash;
+    let shares = 0, holding = false, buyPx = 0, buyI = 0;
+    const equity = [{ i: 0, nav: cash, bench: cash }];
+    const trades = [];
+    for (let i = 1; i < n; i++) {
+      const p = px[i];
+      let closed = false;
+      let reason = '';
+      if (holding) {
+        const ret = (p - buyPx) / buyPx;
+        if (sl > 0 && ret <= -sl / 100) { closed = true; reason = '止损'; }
+        else if (tp > 0 && ret >= tp / 100) { closed = true; reason = '止盈'; }
+        if (closed) {
+          const after = shares * p;
+          const pnl = after - shares * buyPx;
+          trades.push({ buyI, buyPx, sellI: i, sellPx: p, days: i - buyI, pnl, pct: pnl / (shares * buyPx) * 100, reason });
+          cashAvail = after;
+          shares = 0; holding = false;
+        }
+      }
+      if (!closed && holding && signal[i] === 0 && signal[i - 1] === 1) {
+        const after = shares * p;
+        const pnl = after - shares * buyPx;
+        trades.push({ buyI, buyPx, sellI: i, sellPx: p, days: i - buyI, pnl, pct: pnl / (shares * buyPx) * 100, reason: '信号' });
+        cashAvail = after;
+        shares = 0; holding = false;
+      }
+      if (!holding && signal[i] === 1 && signal[i - 1] === 0) {
+        shares = cashAvail / p;
+        buyPx = p; buyI = i; holding = true;
+      }
+      const navNow = holding ? shares * p : cashAvail;
+      equity.push({ i, nav: navNow, bench: cash / px[0] * p });
+    }
+    if (holding) {
+      const p = px[n - 1];
+      const after = shares * p;
+      const pnl = after - shares * buyPx;
+      trades.push({ buyI, buyPx, sellI: n - 1, sellPx: p, days: n - 1 - buyI, pnl, pct: pnl / (shares * buyPx) * 100, reason: '持仓至期末' });
+      cashAvail = after;
+    }
+    const navEnd = cashAvail;
+    const totalReturn = navEnd / cash - 1;
+    const years = n / 250;
+    const cagr = Math.pow(navEnd / cash, 1 / years) - 1;
+    let peak = cash, maxDD = 0;
+    equity.forEach(e => { peak = Math.max(peak, e.nav); maxDD = Math.max(maxDD, (peak - e.nav) / peak); });
+    let mean = 0, m2 = 0, cnt = 0;
+    for (let i = 1; i < equity.length; i++) {
+      const r = equity[i].nav / equity[i - 1].nav - 1;
+      if (!isFinite(r)) continue;
+      cnt++; mean += r;
+    }
+    mean = cnt ? mean / cnt : 0;
+    for (let i = 1; i < equity.length; i++) {
+      const r = equity[i].nav / equity[i - 1].nav - 1;
+      if (!isFinite(r)) continue;
+      m2 += (r - mean) * (r - mean);
+    }
+    const sd = cnt > 1 ? Math.sqrt(m2 / (cnt - 1)) : 0;
+    const sharpe = sd > 0 ? mean / sd * Math.sqrt(250) : 0;
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const dates = btDates(n, stock.sel || '2026-08-08');
+    const indNames = indIds.map(id => {
+      const ind = BT_INDICATORS.find(x => x.id === id);
+      return ind ? ind.name : id;
+    });
+    return {
+      strategy: indIds.map(id => BT_ICON[id] + ' ' + BT_NAME[id] || id).join(''),
+      combo, indNames, code: stock.c, name: stock.n,
+      days: n, cash, tp, sl,
+      metrics: {
+        totalReturn, cagr, maxDD, sharpe,
+        winRate: trades.length ? wins / trades.length : 0,
+        trades: trades.length
+      },
+      equity, trades, dates, px
+    };
+  }
+
+  function btFmt(v, digits, sign) {
+    const s = v.toFixed(digits);
+    return sign && v > 0 ? '+' + s : s;
+  }
+
+  function btEquityChart(r, width, height) {
+    const n = r.equity.length;
+    const step = Math.max(1, Math.floor(n / 600));
+    const pts = [];
+    for (let i = 0; i < n; i += step) pts.push(i);
+    if (pts[pts.length - 1] !== n - 1) pts.push(n - 1);
+    let mx = r.cash, mn = r.cash;
+    pts.forEach(i => { mx = Math.max(mx, r.equity[i].nav, r.equity[i].bench); mn = Math.min(mn, r.equity[i].nav, r.equity[i].bench); });
+    const pad = 8, H = height - 24;
+    const X = i => pad + i / (n - 1) * (width - pad * 2);
+    const Y = v => pad + (1 - (v - mn) / (mx - mn || 1)) * H;
+    const path = (key) => pts.map((i, k) => (k === 0 ? 'M' : 'L') + X(i).toFixed(1) + ',' + Y(r.equity[i][key]).toFixed(1)).join(' ');
+    let marks = '';
+    const trades = r.trades.filter(t => t.buyI >= 0 && t.buyI < n && t.sellI >= 0 && t.sellI < n);
+    trades.forEach(t => {
+      const by = Y(r.equity[t.buyI].nav);
+      marks += '<circle cx="' + X(t.buyI).toFixed(1) + '" cy="' + (by - 5).toFixed(1) + '" r="3" fill="#26B25A" stroke="#0D1117" stroke-width="1"/>';
+      const sy = Y(r.equity[t.sellI].nav);
+      marks += '<circle cx="' + X(t.sellI).toFixed(1) + '" cy="' + (sy - 5).toFixed(1) + '" r="3" fill="#E93A3A" stroke="#0D1117" stroke-width="1"/>';
+    });
+    return '<svg class="bt-eq-chart" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
+      '<path d="' + path('bench') + '" fill="none" stroke="#3D4C5F" stroke-width="1.3" stroke-dasharray="4 3"/>' +
+      '<path d="' + path('nav') + '" fill="none" stroke="#2962FF" stroke-width="1.8"/>' +
+      '<path d="' + path('nav') + ' L ' + X(n - 1).toFixed(1) + ',' + (height - 16) + ' L ' + X(0).toFixed(1) + ',' + (height - 16) + ' Z" fill="#2962FF" opacity="0.06"/>' +
+      marks +
+      '<text x="' + pad + '" y="' + (height - 6) + '" fill="#3D4C5F" font-size="10">' + r.dates[0] + '</text>' +
+      '<text x="' + (width - pad - 60) + '" y="' + (height - 6) + '" fill="#3D4C5F" font-size="10">' + r.dates[n - 1] + '</text></svg>';
+  }
+
+  function btRenderResult(r) {
+    const m = r.metrics;
+    const kpis = [
+      { t: '总收益率', v: btFmt(m.totalReturn * 100, 2, true) + '%', c: m.totalReturn >= 0 ? 'up' : 'down', d: '期末 ' + r.cash.toLocaleString() + ' → ' + Math.round(r.equity[r.equity.length - 1].nav).toLocaleString() },
+      { t: '年化收益', v: btFmt(m.cagr * 100, 2, true) + '%', c: m.cagr >= 0 ? 'up' : 'down', d: '区间 ' + (r.days / 250).toFixed(1) + ' 年' },
+      { t: '最大回撤', v: '-' + (m.maxDD * 100).toFixed(2) + '%', c: 'down', d: '净值峰谷最深回落' },
+      { t: '夏普比率', v: m.sharpe.toFixed(2), c: m.sharpe >= 0 ? 'up' : 'down', d: '年化 · 无风险 0' },
+      { t: '胜率', v: (m.winRate * 100).toFixed(1) + '%', c: m.winRate >= 0.5 ? 'up' : 'down', d: '盈利交易占比' },
+      { t: '交易次数', v: m.trades, c: '', d: '共 ' + r.trades.length + ' 笔完整交易' }
+    ];
+    const lastNav = r.equity[r.equity.length - 1].nav;
+    const benchEnd = r.equity[r.equity.length - 1].bench;
+    const kpiHtml = kpis.map(k =>
+      '<div class="bt-kpi"><div class="bt-kpi-t">' + k.t + '</div><div class="bt-kpi-v ' + k.c + '">' + k.v + '</div><div class="bt-kpi-d">' + k.d + '</div></div>'
+    ).join('');
+    const trHtml = r.trades.slice(-12).reverse().map((t, idx) => {
+      const no = r.trades.length - idx;
+      const cls = t.pnl >= 0 ? 'up' : 'down';
+      const rcls = t.reason === '止盈' || t.reason === '止损' ? 'bt-rs-' + (t.reason === '止盈' ? 'tp' : 'sl') : '';
+      return '<tr><td>' + no + '</td><td>' + r.dates[t.buyI] + '</td><td>' + t.buyPx.toFixed(2) + '</td><td>' + r.dates[t.sellI] + '</td><td>' + t.sellPx.toFixed(2) + '</td><td>' + t.days + '</td><td class="' + cls + '">' + btFmt(t.pnl, 0, true) + '</td><td class="' + cls + '">' + btFmt(t.pct, 2, true) + '%</td><td class="' + rcls + '">' + t.reason + '</td></tr>';
+    }).join('');
+    const tpslTxt = (r.tp > 0 || r.sl > 0) ? (' · 止盈 ' + (r.tp > 0 ? r.tp + '%' : '关') + ' / 止损 ' + (r.sl > 0 ? r.sl + '%' : '关')) : '';
+    return '<div class="bt-kpis">' + kpiHtml + '</div>' +
+      '<div class="bt-equity-card"><div class="bt-eq-head">' +
+      '<span class="bt-eq-title">📈 净值曲线 · ' + r.name + ' ' + r.code + ' · ' + r.indNames.join(' + ') + '</span>' +
+      '<span class="bt-legend"><span><i style="background:#2962FF"></i>策略净值 ' + btFmt((lastNav / r.cash - 1) * 100, 1, true) + '%</span>' +
+      '<span><i style="background:#3D4C5F"></i>基准(买入持有) ' + btFmt((benchEnd / r.cash - 1) * 100, 1, true) + '%</span>' +
+      '<span><i style="background:#26B25A"></i>买点</span><span><i style="background:#E93A3A"></i>卖点</span></span></div>' +
+      btEquityChart(r, 1000, 220) +
+      '<div class="bt-note">注:价格序列由前端引擎按该标的现价确定性模拟生成;组合逻辑「' + (r.combo === 'and' ? '全部满足 AND' : '任一满足 OR') + '」' + tpslTxt + ';暂不计交易成本。接入 AROS 后端真实日线后,曲线与指标即来自真实回测引擎。</div></div>' +
+      '<div class="pg-table bt-table"><table><thead><tr>' +
+      '<th>#</th><th>买入日期</th><th>买入价</th><th>卖出日期</th><th>卖出价</th><th>持有(天)</th><th>盈亏</th><th>收益率</th><th>平仓原因</th></tr></thead><tbody>' +
+      (trHtml || '<tr><td colspan="9" style="text-align:center;color:var(--faint)">区间内无交易信号</td></tr>') +
+      '</tbody></table></div>';
+  }
+
+  function btExec() {
+    const result = document.getElementById('btResult');
+    if (!result) return;
+    const indIds = [];
+    const indParams = {};
+    document.querySelectorAll('.bt-indic.active').forEach(el => {
+      const id = el.dataset.ind;
+      indIds.push(id);
+      const p = {};
+      el.querySelectorAll('.bt-num').forEach(inp => { p[inp.dataset.pk] = parseInt(inp.value, 10) || 1; });
+      indParams[id] = p;
+    });
+    if (indIds.length === 0) {
+      result.innerHTML = '<div class="bt-empty">请至少选择一个技术指标</div>';
+      return;
+    }
+    const comboEl = document.querySelector('.bt-combo-opt.active');
+    const periodEl = document.querySelector('.bt-period.active');
+    const cashEl = document.querySelector('.bt-cash-opt.active');
+    if (!comboEl || !periodEl || !cashEl) return;
+    const combo = comboEl.dataset.combo;
+    const days = parseInt(periodEl.dataset.days, 10);
+    const cash = parseInt(cashEl.dataset.cash, 10);
+    const tpEl = document.getElementById('btTp');
+    const slEl = document.getElementById('btSl');
+    const tp = tpEl && tpEl.value !== '' ? parseFloat(tpEl.value) || 0 : 0;
+    const sl = slEl && slEl.value !== '' ? parseFloat(slEl.value) || 0 : 0;
+    const pool = PAGES.watchlist.blocks[0].d;
+    const stock = pool[0];
+    const r = btRun(stock, indIds, combo, indParams, tp, sl, days, cash);
+    result.innerHTML = btRenderResult(r);
   }
 
   function renderPage(id) {
@@ -886,6 +1238,39 @@
     renderWatchlist();
 
     document.addEventListener('click', e => {
+      const preset = e.target.closest('.bt-strat');
+      if (preset && !e.target.closest('input')) {
+        preset.parentElement.querySelectorAll('.bt-strat').forEach(c => c.classList.remove('active'));
+        preset.classList.add('active');
+        const map = { ma: ['ma'], macd: ['macd'], rsi: ['rsi'], mom: ['mom'], rev: ['bias'] };
+        const ids = map[preset.dataset.btStrat] || [];
+        document.querySelectorAll('.bt-indic').forEach(c => {
+          c.classList.toggle('active', ids.indexOf(c.dataset.ind) !== -1);
+        });
+        document.querySelectorAll('.bt-combo-opt').forEach(c => c.classList.toggle('active', c.dataset.combo === 'and'));
+        return;
+      }
+      const ind = e.target.closest('.bt-indic');
+      if (ind && !e.target.closest('input')) { ind.classList.toggle('active'); return; }
+      const comboOpt = e.target.closest('.bt-combo-opt');
+      if (comboOpt) {
+        comboOpt.parentElement.querySelectorAll('.bt-combo-opt').forEach(c => c.classList.remove('active'));
+        comboOpt.classList.add('active');
+        return;
+      }
+      const per = e.target.closest('.bt-period');
+      if (per) {
+        per.parentElement.querySelectorAll('.bt-period').forEach(c => c.classList.remove('active'));
+        per.classList.add('active');
+        return;
+      }
+      const cashOpt = e.target.closest('.bt-cash-opt');
+      if (cashOpt) {
+        cashOpt.parentElement.querySelectorAll('.bt-cash-opt').forEach(c => c.classList.remove('active'));
+        cashOpt.classList.add('active');
+        return;
+      }
+      if (e.target.closest('#btRunBtn')) { btExec(); return; }
       const tab = e.target.closest('.pg-flow-tab');
       if (tab) {
         const panel = tab.closest('.pg-panel');
