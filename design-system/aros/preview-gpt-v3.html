@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AROS Terminal - Design Preview v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04070D;
+    --bg-soft: #060A12;
+    --panel: #080D15;
+    --panel2: #0A101A;
+    --border: #1E2A3D;
+    --border-soft: rgba(255,255,255,0.13);
+    --fg: #F5F7FA;
+    --sub: #A8B2C0;
+    --dim: #5F6E80;
+    --faint: #45536A;
+    --up: #E05555;        /* 涨 - 红 (低饱和) */
+    --down: #3DAF5F;      /* 跌 - 绿 */
+    --blue: #4A7DFF;      /* 主蓝 (文字/强调) */
+    --blue-fill: #2050C0; /* 主蓝 (填充) */
+    --purple: #7048E8;
+    --orange: #E09030;
+    --sidebar-w: 168px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-thumb { background: #1A2433; border-radius: 3px; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== TOP BAR ===== */
+  .topbar {
+    height: 46px; flex-shrink: 0;
+    background: #02040A;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px;
+  }
+  .logo { font-weight: 600; font-size: 13.5px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; color: var(--fg); white-space: nowrap; }
+  .logo .mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, #2050C0, #7048E8); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; font-weight: 700; }
+  .logo span.b { color: #7EA6FF; }
+  .search-box {
+    flex: 1; max-width: 380px; height: 28px;
+    background: #0A101A; border: 1px solid rgba(255,255,255,0.10); border-radius: 7px;
+    display: flex; align-items: center; padding: 0 11px; gap: 7px; color: var(--dim); font-size: 11.5px;
+  }
+  .add-widget {
+    margin-left: auto; height: 28px; padding: 0 12px; border-radius: 6px;
+    background: var(--blue-fill); color: #fff; font-size: 11px; font-weight: 500;
+    display: flex; align-items: center; gap: 5px; cursor: pointer; border: none;
+  }
+  .top-icons { display: flex; gap: 7px; }
+  .top-icons .ic { width: 28px; height: 28px; border-radius: 6px; background: #0A101A; border: 1px solid rgba(255,255,255,0.10); display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; color: var(--sub); }
+
+  /* ===== MAIN ===== */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: #071023; border-right: 1px solid rgba(255,255,255,0.10);
+    padding: 8px 6px; overflow-y: auto;
+  }
+  .side-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px;
+    border-radius: 6px; font-size: 12px; color: #C2CCD9;
+    cursor: pointer; transition: all 0.15s; margin-bottom: 1px; font-weight: 400;
+  }
+  .side-item:hover { background: rgba(74,125,255,0.10); color: var(--fg); }
+  .side-item.active { background: rgba(32,80,192,0.30); color: #A8C4FF; font-weight: 500; }
+  .side-item .ic { width: 15px; text-align: center; font-size: 11px; opacity: 0.85; }
+
+  /* ===== CONTENT ===== */
+  .content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 10px; gap: 10px; background: var(--bg); }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .kpi {
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; min-height: 84px;
+  }
+  .kpi .k-label { font-size: 9.5px; color: var(--dim); letter-spacing: 0.5px; text-transform: uppercase; font-weight: 500; }
+  .kpi .k-value { font-size: 20px; font-weight: 700; line-height: 1.1; color: var(--fg); }
+  .kpi .k-sub { font-size: 10.5px; color: var(--sub); }
+  .kpi .k-bar { height: 3px; border-radius: 2px; margin-top: auto; background: rgba(255,255,255,0.07); }
+  .kpi .k-bar i { display: block; height: 100%; border-radius: 2px; }
+  .kpi .k-bar .w-78 { width: 78%; background: linear-gradient(90deg, #2050C0, #4A7DFF); }
+  .kpi .k-bar .w-72 { width: 72%; background: linear-gradient(90deg, #2050C0, #E09030); }
+  .kpi .k-bar .w-53 { width: 53%; background: linear-gradient(90deg, #2050C0, #E05555); }
+
+  /* PANEL */
+  .panel { background: var(--panel); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .panel-head h3 { font-size: 12px; font-weight: 600; color: var(--fg); }
+  .panel-head .tabs { display: flex; gap: 2px; margin-left: auto; background: var(--panel2); padding: 2px; border-radius: 6px; }
+  .tab {
+    padding: 3px 9px; font-size: 10.5px; border-radius: 4px; color: var(--dim);
+    cursor: pointer; transition: all 0.15s; font-family: 'JetBrains Mono';
+  }
+  .tab:hover { color: var(--fg); }
+  .tab.active { background: rgba(32,80,192,0.45); color: #C9D8FF; }
+
+  /* ALPHA TABLE */
+  table.alpha { width: 100%; border-collapse: collapse; }
+  table.alpha th {
+    text-align: left; padding: 7px 13px; font-size: 9.5px; font-weight: 500;
+    color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.08); font-family: 'JetBrains Mono';
+  }
+  table.alpha td { padding: 8px 13px; font-size: 11.5px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  table.alpha tr:hover td { background: rgba(74,125,255,0.05); }
+  .rank-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-family: 'JetBrains Mono'; font-size: 10.5px; font-weight: 700;
+    color: #F0F6FF; position: relative;
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.35), rgba(255,255,255,0.04) 45%),
+                linear-gradient(160deg, #2C4AA0, #14264E);
+    border: 1px solid rgba(124,158,255,0.55);
+    box-shadow: 0 0 8px rgba(74,125,255,0.35), inset 0 1px 1px rgba(255,255,255,0.25);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  }
+  .rank-badge.gold {
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.45), rgba(255,255,255,0.05) 45%),
+                linear-gradient(160deg, #D9A441, #7A5310);
+    border-color: rgba(255,205,110,0.7);
+    box-shadow: 0 0 10px rgba(224,144,48,0.55), inset 0 1px 1px rgba(255,255,255,0.4);
+    color: #FFF3D6;
+  }
+  .rank-badge.silver {
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.4), rgba(255,255,255,0.04) 45%),
+                linear-gradient(160deg, #9AA7B8, #4A5666);
+    border-color: rgba(190,205,225,0.6);
+    box-shadow: 0 0 8px rgba(170,185,205,0.35), inset 0 1px 1px rgba(255,255,255,0.3);
+  }
+  .rank-badge.bronze {
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.4), rgba(255,255,255,0.04) 45%),
+                linear-gradient(160deg, #C07A4A, #6E3D1C);
+    border-color: rgba(226,155,100,0.6);
+    box-shadow: 0 0 8px rgba(184,115,51,0.4), inset 0 1px 1px rgba(255,255,255,0.3);
+  }
+  .stock-name { font-weight: 500; color: var(--fg); }
+  .stock-code { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--faint); margin-left: 7px; }
+  .score-cell { display: flex; align-items: center; gap: 7px; }
+  .score { font-family: 'JetBrains Mono'; font-weight: 600; color: #7EA6FF; }
+  .stars { display: inline-flex; gap: 1.5px; }
+  .stars .st { font-size: 10px; color: #3DAF5F; text-shadow: 0 0 5px rgba(61,175,95,0.55); }
+  .stars .st.off { color: rgba(255,255,255,0.10); text-shadow: none; }
+  .ring {
+    --p: 0; width: 32px; height: 32px; border-radius: 50%; position: relative;
+    background: conic-gradient(var(--ring-c, #3DAF5F) calc(var(--p) * 1%), rgba(255,255,255,0.07) 0);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .ring::before {
+    content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--panel);
+  }
+  .ring span {
+    position: relative; z-index: 1;
+    font-family: 'JetBrains Mono'; font-size: 9.5px; font-weight: 600; color: var(--fg);
+  }
+  .hit-bar { display: inline-flex; gap: 2.5px; align-items: center; }
+  .hit-bar i { width: 5px; height: 13px; border-radius: 1.5px; background: rgba(255,255,255,0.08); }
+  .hit-bar i.on { background: linear-gradient(180deg, #3DAF5F, #2C8A4C); box-shadow: 0 0 4px rgba(61,175,95,0.35); }
+  .chip { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9.5px; font-family: 'JetBrains Mono'; }
+  .chip.strong { background: rgba(224,85,85,0.15); color: #E88585; }
+  .chip.neutral { background: rgba(154,165,181,0.12); color: var(--sub); }
+  .chip.watch { background: rgba(32,80,192,0.30); color: #8FB0FF; }
+
+  /* HEATMAP */
+  .heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; padding: 12px 13px; }
+  .hm-cell { border-radius: 7px; padding: 10px 11px; min-height: 60px; display: flex; flex-direction: column; gap: 4px; }
+  .hm-cell .hm-name { font-size: 10.5px; color: #C8D2E0; }
+  .hm-cell .hm-pct { font-family: 'JetBrains Mono'; font-size: 16px; font-weight: 700; }
+  .hm-cell .hm-sub { font-family: 'JetBrains Mono'; font-size: 9.5px; color: rgba(240,240,240,0.55); }
+  .hm-red { background: linear-gradient(135deg, rgba(224,85,85,0.32), rgba(224,85,85,0.08)); border: 1px solid rgba(224,85,85,0.30); }
+  .hm-green { background: linear-gradient(135deg, rgba(61,175,95,0.28), rgba(61,175,95,0.06)); border: 1px solid rgba(61,175,95,0.28); }
+
+  /* PORTFOLIO */
+  .portfolio-body { display: grid; grid-template-columns: 1fr 1fr; }
+  .p-summary { padding: 12px 14px; border-right: 1px solid rgba(255,255,255,0.08); }
+  .p-holdings { padding: 12px 14px; }
+  .p-title { font-size: 9.5px; color: var(--dim); letter-spacing: 0.6px; margin-bottom: 10px; text-transform: uppercase; font-weight: 500; }
+  .p-total { font-size: 26px; font-weight: 700; font-family: 'JetBrains Mono'; color: var(--fg); }
+  .p-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .p-stat .v { font-family: 'JetBrains Mono'; font-size: 14px; font-weight: 600; }
+  .p-stat .l { font-size: 9.5px; color: var(--faint); margin-top: 2px; }
+  .hold-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .hold-row:last-child { border-bottom: none; }
+  .hold-row .h-name { font-size: 12px; font-weight: 500; width: 92px; color: var(--fg); }
+  .hold-row .h-price { font-family: 'JetBrains Mono'; font-size: 11.5px; color: var(--sub); margin-left: auto; }
+  .hold-row .h-return { font-family: 'JetBrains Mono'; font-size: 11.5px; font-weight: 600; width: 60px; text-align: right; }
+
+  /* ===== STATUS BAR ===== */
+  .statusbar {
+    height: 26px; flex-shrink: 0; background: #02040A; border-top: 1px solid rgba(255,255,255,0.10);
+    display: flex; align-items: center; gap: 16px; padding: 0 14px;
+    font-family: 'JetBrains Mono'; font-size: 10px; color: var(--dim);
+  }
+  .statusbar .live { color: var(--down); }
+  .statusbar .right { margin-left: auto; display: flex; gap: 16px; }
+
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo"><div class="mark">A</div>AROS <span class="b">Terminal</span></div>
+  <div class="search-box">⌕ Search stocks, strategies, reports...</div>
+  <div class="add-widget">+ Add Widget</div>
+  <div class="top-icons">
+    <div class="ic">🔔</div>
+    <div class="ic">⚙️</div>
+    <div class="ic">👤</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="side-item active"><span class="ic">▦</span>Dashboard</div>
+    <div class="side-item"><span class="ic">📈</span>Market Overview</div>
+    <div class="side-item"><span class="ic">📡</span>Alpha Radar</div>
+    <div class="side-item"><span class="ic">🔍</span>Stock Intelligence</div>
+    <div class="side-item"><span class="ic">🎯</span>Strategy Lab</div>
+    <div class="side-item"><span class="ic">💼</span>Portfolio</div>
+    <div class="side-item"><span class="ic">🧪</span>Beta</div>
+    <div class="side-item"><span class="ic">🤖</span>AI Research</div>
+    <div class="side-item"><span class="ic">🔄</span>Paper Trading</div>
+    <div class="side-item"><span class="ic">🛡️</span>Risk Monitor</div>
+    <div class="side-item"><span class="ic">📅</span>Calendar</div>
+    <div class="side-item"><span class="ic">📄</span>Reports</div>
+    <div class="side-item"><span class="ic">⚙️</span>Settings</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- KPI ROW -->
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="k-label">Market Regime</div>
+        <div class="k-value mono">78<span style="font-size:12px;color:var(--sub)">%</span></div>
+        <div class="k-sub">Strength · <span class="up">Risk-on</span></div>
+        <div class="k-bar"><i class="w-78"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Market Sentiment</div>
+        <div class="k-value mono">72</div>
+        <div class="k-sub">Greed Index · <span class="up">Greedy</span></div>
+        <div class="k-bar"><i class="w-72"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Capital Flow (Today)</div>
+        <div class="k-value mono up">+45.6B</div>
+        <div class="k-sub">Net Inflow · CNY</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Risk Level</div>
+        <div class="k-value mono">53</div>
+        <div class="k-sub">Risk Score · <span style="color:var(--orange)">Moderate</span></div>
+        <div class="k-bar"><i class="w-53"></i></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">Volatility (VIX)</div>
+        <div class="k-value mono">18.7</div>
+        <div class="k-sub">VIX · <span class="down">Calm</span></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">A-index (AROS Index)</div>
+        <div class="k-value mono">1,238</div>
+        <div class="k-sub">Composite · <span class="up">+1.02%</span></div>
+      </div>
+    </div>
+
+    <!-- ALPHA RADAR -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Today's Alpha Radar</h3>
+        <div class="tabs">
+          <div class="tab active">All (28)</div>
+          <div class="tab">S (8)</div>
+          <div class="tab">A (12)</div>
+          <div class="tab">B (8)</div>
+        </div>
+      </div>
+      <table class="alpha">
+        <thead>
+          <tr>
+            <th>Rank</th><th>Stock</th><th>Alpha Score</th><th>Entry Score</th>
+            <th>Strategy Hit</th><th>Market Context</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="rank-badge gold">1</span></td>
+            <td><span class="stock-name">中际旭创</span><span class="stock-code">300308.SZ</span></td>
+            <td><div class="score-cell"><span class="score">95</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
+            <td><div class="ring" style="--p:88;--ring-c:#3DAF5F"><span>88</span></div></td>
+            <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td><span class="rank-badge silver">2</span></td>
+            <td><span class="stock-name">新易盛</span><span class="stock-code">300502.SZ</span></td>
+            <td><div class="score-cell"><span class="score">93</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
+            <td><div class="ring" style="--p:82;--ring-c:#3DAF5F"><span>82</span></div></td>
+            <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span></td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td><span class="rank-badge bronze">3</span></td>
+            <td><span class="stock-name">紫光国微-U</span><span class="stock-code">688255.SH</span></td>
+            <td><div class="score-cell"><span class="score">91</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
+            <td><div class="ring" style="--p:76;--ring-c:#3DAF5F"><span>76</span></div></td>
+            <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span></td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td><span class="rank-badge">4</span></td>
+            <td><span class="stock-name">沪电股份</span><span class="stock-code">002463.SZ</span></td>
+            <td><div class="score-cell"><span class="score">88</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st off">★</span></span></div></td>
+            <td><div class="ring" style="--p:70;--ring-c:#E09030"><span>70</span></div></td>
+            <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span></td>
+            <td><span class="chip neutral">Neutral</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td><span class="rank-badge">5</span></td>
+            <td><span class="stock-name">中科曙光</span><span class="stock-code">603019.SH</span></td>
+            <td><div class="score-cell"><span class="score">87</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st off">★</span></span></div></td>
+            <td><div class="ring" style="--p:68;--ring-c:#E09030"><span>68</span></div></td>
+            <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i></span></td>
+            <td><span class="chip neutral">Neutral</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MARKET OVERVIEW HEATMAP -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Market Overview</h3>
+        <div class="tabs">
+          <div class="tab active">Heatmap</div>
+          <div class="tab">Sectors</div>
+          <div class="tab">Indices</div>
+        </div>
+      </div>
+      <div class="heatmap">
+        <div class="hm-cell hm-green">
+          <div class="hm-name">上证指数</div>
+          <div class="hm-pct down">-0.89%</div>
+          <div class="hm-sub">3,390.12</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">深证成指</div>
+          <div class="hm-pct up">+1.23%</div>
+          <div class="hm-sub">10,856.77</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">创业板指</div>
+          <div class="hm-pct up">+1.65%</div>
+          <div class="hm-sub">2,214.30</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">科创 50</div>
+          <div class="hm-pct up">+2.08%</div>
+          <div class="hm-sub">982.45</div>
+        </div>
+        <div class="hm-cell hm-green">
+          <div class="hm-name">沪深 300</div>
+          <div class="hm-pct down">-0.42%</div>
+          <div class="hm-sub">3,856.23</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">中证 500</div>
+          <div class="hm-pct up">+0.78%</div>
+          <div class="hm-sub">5,412.88</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAPER PORTFOLIO -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Paper Portfolio</h3>
+        <div class="tabs">
+          <div class="tab active">Overview</div>
+          <div class="tab">Holdings</div>
+          <div class="tab">Trades</div>
+        </div>
+      </div>
+      <div class="portfolio-body">
+        <div class="p-summary">
+          <div class="p-title">Total Assets</div>
+          <div class="p-total">113,580.45</div>
+          <div class="p-stats">
+            <div class="p-stat"><div class="v up">+13.58%</div><div class="l">总回报</div></div>
+            <div class="p-stat"><div class="v up">+1.23%</div><div class="l">日收益率</div></div>
+            <div class="p-stat"><div class="v down">-3.21%</div><div class="l">最大回撤</div></div>
+            <div class="p-stat"><div class="v">68.7%</div><div class="l">胜率</div></div>
+          </div>
+        </div>
+        <div class="p-holdings">
+          <div class="p-title">Top Holdings</div>
+          <div class="hold-row">
+            <span class="h-name">中际旭创</span>
+            <span class="h-price mono">128.45</span>
+            <span class="h-return up">+15.23%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">新易盛</span>
+            <span class="h-price mono">98.76</span>
+            <span class="h-return up">+12.45%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">紫光国微-U</span>
+            <span class="h-price mono">552.10</span>
+            <span class="h-return up">+8.76%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">沪电股份</span>
+            <span class="h-price mono">38.92</span>
+            <span class="h-return down">-2.14%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <span class="live">● LIVE</span>
+  <span>19:21:33</span>
+  <span>2025-07-21 Mon</span>
+  <div class="right">
+    <span>Data: AKShare ✓</span>
+    <span>Strategy Engine ✓</span>
+    <span>DB ✓</span>
+    <span>v0.1.0</span>
+  </div>
+</div>
+
+</body>
+</html>

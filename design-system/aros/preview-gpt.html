@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AROS Terminal - Design Preview (GPT Layout)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020617;
+    --panel: #0F172A;
+    --panel2: #111B2E;
+    --border: #233047;
+    --fg: #F8FAFC;
+    --sub: #94A3B8;
+    --dim: #64748B;
+    --faint: #475569;
+    --up: #FF4D4F;      /* 涨 - 红 */
+    --down: #52C41A;    /* 跌 - 绿 */
+    --blue: #3B82F6;
+    --blue-dim: #1E3A6E;
+    --sidebar-w: 200px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Fira Sans', -apple-system, sans-serif;
+    background: var(--bg); color: var(--fg);
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .mono { font-family: 'Fira Code', monospace; }
+
+  /* ===== TOP BAR ===== */
+  .topbar {
+    height: 50px; flex-shrink: 0;
+    background: #0A0F1E;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; padding: 0 18px;
+  }
+  .logo { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+  .logo .mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, #3B82F6, #6366F1); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; }
+  .logo span.b { color: #3B82F6; }
+  .search-box {
+    flex: 1; max-width: 420px; height: 32px;
+    background: #0F172A; border: 1px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; padding: 0 12px; gap: 8px; color: var(--dim); font-size: 12px;
+  }
+  .add-widget {
+    margin-left: auto; height: 32px; padding: 0 14px; border-radius: 8px;
+    background: var(--blue); color: #fff; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px; cursor: pointer; border: none;
+  }
+  .top-icons { display: flex; gap: 10px; }
+  .top-icons .ic { width: 32px; height: 32px; border-radius: 8px; background: #0F172A; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; }
+
+  /* ===== MAIN ===== */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: #0A0F1E; border-right: 1px solid var(--border);
+    padding: 10px; overflow-y: auto;
+  }
+  .side-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: 7px; font-size: 12.5px; color: var(--sub);
+    cursor: pointer; transition: all 0.15s; margin-bottom: 2px;
+  }
+  .side-item:hover { background: rgba(59,130,246,0.1); color: var(--fg); }
+  .side-item.active { background: rgba(59,130,246,0.18); color: #7EB3FF; font-weight: 500; }
+  .side-item .ic { width: 16px; text-align: center; font-size: 12px; opacity: 0.85; }
+
+  /* ===== CONTENT ===== */
+  .content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 14px; gap: 14px; }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 96px;
+  }
+  .kpi .k-label { font-size: 11px; color: var(--dim); letter-spacing: 0.3px; }
+  .kpi .k-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .kpi .k-sub { font-size: 11px; color: var(--sub); }
+  .kpi .k-bar { height: 4px; border-radius: 2px; background: var(--blue); margin-top: auto; }
+  .kpi .k-bar.w-78 { width: 78%; background: linear-gradient(90deg, #3B82F6, #22C55E); }
+  .kpi .k-bar.w-72 { width: 72%; background: linear-gradient(90deg, #3B82F6, #F59E0B); }
+  .kpi .k-bar.w-53 { width: 53%; background: linear-gradient(90deg, #3B82F6, #EF4444); }
+
+  /* PANEL */
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .panel-head { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--border); }
+  .panel-head h3 { font-size: 13px; font-weight: 600; }
+  .panel-head .tabs { display: flex; gap: 4px; margin-left: auto; }
+  .tab {
+    padding: 4px 10px; font-size: 11px; border-radius: 6px; color: var(--dim);
+    cursor: pointer; transition: all 0.15s; font-family: 'Fira Code';
+  }
+  .tab:hover { color: var(--fg); background: var(--panel2); }
+  .tab.active { background: rgba(59,130,246,0.15); color: #7EB3FF; }
+
+  /* ALPHA TABLE */
+  table.alpha { width: 100%; border-collapse: collapse; }
+  table.alpha th {
+    text-align: left; padding: 8px 14px; font-size: 10.5px; font-weight: 500;
+    color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border); font-family: 'Fira Code';
+  }
+  table.alpha td { padding: 9px 14px; font-size: 12px; border-bottom: 1px solid rgba(35,48,71,0.55); }
+  table.alpha tr:hover td { background: rgba(59,130,246,0.04); }
+  .rank-num { font-family: 'Fira Code'; color: var(--dim); font-weight: 600; }
+  .stock-name { font-weight: 500; }
+  .stock-code { font-family: 'Fira Code'; font-size: 11px; color: var(--faint); margin-left: 8px; }
+  .score { font-family: 'Fira Code'; font-weight: 600; color: var(--blue); }
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10.5px; font-family: 'Fira Code'; }
+  .chip.strong { background: rgba(255,77,79,0.12); color: var(--up); }
+  .chip.neutral { background: rgba(148,163,184,0.12); color: var(--sub); }
+  .chip.watch { background: rgba(59,130,246,0.15); color: #7EB3FF; }
+
+  /* HEATMAP */
+  .heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 14px 16px; }
+  .hm-cell { border-radius: 9px; padding: 12px; min-height: 72px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); }
+  .hm-cell .hm-name { font-size: 11.5px; color: var(--sub); }
+  .hm-cell .hm-pct { font-family: 'Fira Code'; font-size: 18px; font-weight: 700; }
+  .hm-cell .hm-sub { font-family: 'Fira Code'; font-size: 10.5px; color: rgba(248,250,252,0.6); }
+  .hm-red { background: linear-gradient(135deg, rgba(255,77,79,0.28), rgba(255,77,79,0.08)); }
+  .hm-green { background: linear-gradient(135deg, rgba(82,196,26,0.22), rgba(82,196,26,0.06)); }
+
+  /* PORTFOLIO */
+  .portfolio-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .p-summary { padding: 14px 16px; border-right: 1px solid var(--border); }
+  .p-holdings { padding: 14px 16px; }
+  .p-title { font-size: 11px; color: var(--dim); letter-spacing: 0.5px; margin-bottom: 12px; text-transform: uppercase; }
+  .p-total { font-size: 30px; font-weight: 700; font-family: 'Fira Code'; }
+  .p-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  .p-stat .v { font-family: 'Fira Code'; font-size: 16px; font-weight: 600; }
+  .p-stat .l { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+  .hold-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(35,48,71,0.4); }
+  .hold-row:last-child { border-bottom: none; }
+  .hold-row .h-name { font-size: 12.5px; font-weight: 500; width: 110px; }
+  .hold-row .h-price { font-family: 'Fira Code'; font-size: 12.5px; color: var(--sub); margin-left: auto; }
+  .hold-row .h-return { font-family: 'Fira Code'; font-size: 12.5px; font-weight: 600; width: 70px; text-align: right; }
+
+  /* ===== STATUS BAR ===== */
+  .statusbar {
+    height: 30px; flex-shrink: 0; background: #0A0F1E; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 20px; padding: 0 16px;
+    font-family: 'Fira Code'; font-size: 11px; color: var(--dim);
+  }
+  .statusbar .right { margin-left: auto; display: flex; gap: 20px; }
+
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo"><div class="mark">A</div>AROS <span class="b">Terminal</span></div>
+  <div class="search-box">🔍 Search stocks, strategies, reports...</div>
+  <div class="add-widget">+ Add Widget</div>
+  <div class="top-icons">
+    <div class="ic">🔔</div>
+    <div class="ic">⚙️</div>
+    <div class="ic">👤</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="side-item active"><span class="ic">📊</span>Dashboard</div>
+    <div class="side-item"><span class="ic">📈</span>Market Overview</div>
+    <div class="side-item"><span class="ic">📡</span>Alpha Radar</div>
+    <div class="side-item"><span class="ic">🔍</span>Stock Intelligence</div>
+    <div class="side-item"><span class="ic">🎯</span>Strategy Lab</div>
+    <div class="side-item"><span class="ic">💼</span>Portfolio</div>
+    <div class="side-item"><span class="ic">🧪</span>Beta</div>
+    <div class="side-item"><span class="ic">🤖</span>AI Research</div>
+    <div class="side-item"><span class="ic">🔄</span>Paper Trading</div>
+    <div class="side-item"><span class="ic">🛡️</span>Risk Monitor</div>
+    <div class="side-item"><span class="ic">📅</span>Calendar</div>
+    <div class="side-item"><span class="ic">📄</span>Reports</div>
+    <div class="side-item"><span class="ic">⚙️</span>Settings</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- KPI ROW -->
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="k-label">MARKET REGIME</div>
+        <div class="k-value mono">78<span style="font-size:13px;color:var(--sub)">%</span></div>
+        <div class="k-sub">Strength · <span class="up">Risk-on</span></div>
+        <div class="k-bar w-78"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">MARKET SENTIMENT</div>
+        <div class="k-value mono">72</div>
+        <div class="k-sub">Greed Index · <span class="up">Greedy</span></div>
+        <div class="k-bar w-72"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">CAPITAL FLOW (TODAY)</div>
+        <div class="k-value mono up">+45.6B</div>
+        <div class="k-sub">Net Inflow · CNY</div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">RISK LEVEL</div>
+        <div class="k-value mono">53</div>
+        <div class="k-sub">Risk Score · <span style="color:var(--orange, #F59E0B)">Moderate</span></div>
+        <div class="k-bar w-53"></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">VOLATILITY (VIX)</div>
+        <div class="k-value mono">18.7</div>
+        <div class="k-sub">VIX · <span class="down">Calm</span></div>
+      </div>
+      <div class="kpi">
+        <div class="k-label">A-INDEX (AROS INDEX)</div>
+        <div class="k-value mono">1,238</div>
+        <div class="k-sub">Composite · <span class="up">+1.02%</span></div>
+      </div>
+    </div>
+
+    <!-- ALPHA RADAR -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📡 Today's Alpha Radar</h3>
+        <div class="tabs">
+          <div class="tab active">All (28)</div>
+          <div class="tab">S Rank (8)</div>
+          <div class="tab">A Rank (12)</div>
+          <div class="tab">B Rank (8)</div>
+        </div>
+      </div>
+      <table class="alpha">
+        <thead>
+          <tr>
+            <th>#</th><th>Stock</th><th>Alpha Score</th><th>Entry Score</th>
+            <th>Strategy Hit</th><th>Market Context</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rank-num">1</td>
+            <td><span class="stock-name">中际旭创</span><span class="stock-code">300308.SZ</span></td>
+            <td class="score">95</td><td class="score">88</td><td class="mono">7/10</td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td class="rank-num">2</td>
+            <td><span class="stock-name">新易盛</span><span class="stock-code">300502.SZ</span></td>
+            <td class="score">93</td><td class="score">82</td><td class="mono">6/10</td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td class="rank-num">3</td>
+            <td><span class="stock-name">紫光国微-U</span><span class="stock-code">688255.SH</span></td>
+            <td class="score">91</td><td class="score">76</td><td class="mono">6/10</td>
+            <td><span class="chip strong">Strong</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td class="rank-num">4</td>
+            <td><span class="stock-name">沪电股份</span><span class="stock-code">002463.SZ</span></td>
+            <td class="score">88</td><td class="score">70</td><td class="mono">5/10</td>
+            <td><span class="chip neutral">Neutral</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+          <tr>
+            <td class="rank-num">5</td>
+            <td><span class="stock-name">中科曙光</span><span class="stock-code">603019.SH</span></td>
+            <td class="score">87</td><td class="score">68</td><td class="mono">5/10</td>
+            <td><span class="chip neutral">Neutral</span></td><td><span class="chip watch">Watch</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MARKET OVERVIEW HEATMAP -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>🌡️ Market Overview</h3>
+        <div class="tabs">
+          <div class="tab active">Heatmap</div>
+          <div class="tab">Sectors</div>
+          <div class="tab">Indices</div>
+        </div>
+      </div>
+      <div class="heatmap">
+        <div class="hm-cell hm-green">
+          <div class="hm-name">上证指数</div>
+          <div class="hm-pct down">-0.89%</div>
+          <div class="hm-sub">3,390.12</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">深证成指</div>
+          <div class="hm-pct up">+1.23%</div>
+          <div class="hm-sub">10,856.77</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">创业板指</div>
+          <div class="hm-pct up">+1.65%</div>
+          <div class="hm-sub">2,214.30</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">科创 50</div>
+          <div class="hm-pct up">+2.08%</div>
+          <div class="hm-sub">982.45</div>
+        </div>
+        <div class="hm-cell hm-green">
+          <div class="hm-name">沪深 300</div>
+          <div class="hm-pct down">-0.42%</div>
+          <div class="hm-sub">3,856.23</div>
+        </div>
+        <div class="hm-cell hm-red">
+          <div class="hm-name">中证 500</div>
+          <div class="hm-pct up">+0.78%</div>
+          <div class="hm-sub">5,412.88</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAPER PORTFOLIO -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>💼 Paper Portfolio</h3>
+        <div class="tabs">
+          <div class="tab active">Overview</div>
+          <div class="tab">Holdings</div>
+          <div class="tab">Trades</div>
+        </div>
+      </div>
+      <div class="portfolio-body">
+        <div class="p-summary">
+          <div class="p-title">总资产 Total Assets</div>
+          <div class="p-total">113,580.45</div>
+          <div class="p-stats">
+            <div class="p-stat"><div class="v up">+13.58%</div><div class="l">总回报</div></div>
+            <div class="p-stat"><div class="v up">+1.23%</div><div class="l">日收益率</div></div>
+            <div class="p-stat"><div class="v down">-3.21%</div><div class="l">最大回撤</div></div>
+            <div class="p-stat"><div class="v">68.7%</div><div class="l">胜率</div></div>
+          </div>
+        </div>
+        <div class="p-holdings">
+          <div class="p-title">Top Holdings</div>
+          <div class="hold-row">
+            <span class="h-name">中际旭创</span>
+            <span class="h-price mono">128.45</span>
+            <span class="h-return up">+15.23%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">新易盛</span>
+            <span class="h-price mono">98.76</span>
+            <span class="h-return up">+12.45%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">紫光国微-U</span>
+            <span class="h-price mono">552.10</span>
+            <span class="h-return up">+8.76%</span>
+          </div>
+          <div class="hold-row">
+            <span class="h-name">沪电股份</span>
+            <span class="h-price mono">38.92</span>
+            <span class="h-return down">-2.14%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <span>● LIVE</span>
+  <span>19:21:33</span>
+  <span>2025-07-21 Mon</span>
+  <div class="right">
+    <span>Data: AKShare ✓</span>
+    <span>Strategy Engine ✓</span>
+    <span>DB ✓</span>
+    <span>AROS Terminal v0.1.0</span>
+  </div>
+</div>
+
+</body>
+</html>

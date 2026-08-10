@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AROS · Dashboard (Fusion)</title>
+<style>
+  :root{
+    --bg:#0A0D13;
+    --bg-2:#0C0F17;
+    --panel:#11151F;
+    --panel-2:#151A26;
+    --panel-hover:#1C2333;
+    --border:rgba(255,255,255,.06);
+    --border-strong:rgba(255,255,255,.12);
+    --text:#E8EBF2;
+    --text-2:#98A2B5;
+    --text-3:#5B6478;
+    --up:#EF4444;        /* A股 涨 = 红 */
+    --down:#22C55E;      /* A股 跌 = 绿 */
+    --accent:#6366F1;
+    --accent-2:#3B82F6;
+    --accent-soft:rgba(99,102,241,.16);
+    --warn:#F59E0B;
+    --mono:'JetBrains Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+    --sans:'Inter',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+    --r:13px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:radial-gradient(1100px 600px at 85% -8%,rgba(99,102,241,.10),transparent 60%),var(--bg);
+    color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+
+  /* 侧栏 */
+  .sidebar{background:linear-gradient(180deg,var(--bg-2),var(--bg));border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:16px 12px}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+  .brand .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--up),var(--accent-2));
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;box-shadow:0 4px 12px rgba(239,68,68,.35)}
+  .brand b{font-size:16px;letter-spacing:.5px}
+  .brand span{display:block;font-size:9px;color:var(--text-3);letter-spacing:2px}
+  .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+  .nav-group{font-size:10px;color:var(--text-3);letter-spacing:1.5px;margin:12px 10px 4px}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--text-2);
+    cursor:pointer;font-size:13.5px;transition:.15s;border:1px solid transparent}
+  .nav-item:hover{background:var(--panel-hover);color:var(--text)}
+  .nav-item.active{background:var(--accent-soft);color:#fff;box-shadow:inset 2px 0 0 var(--accent);border-color:rgba(99,102,241,.3)}
+  .nav-item .ico{width:18px;text-align:center;opacity:.85}
+  .nav-item .badge{margin-left:auto;font-size:9.5px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:999px;font-family:var(--mono)}
+  .sb-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;background:var(--panel);border:1px solid var(--border)}
+  .sb-foot .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#22C55E,#0EA5E9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06231a}
+  .sb-foot small{display:block;color:var(--text-3);font-size:11px}
+
+  /* 顶栏 */
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:14px;padding:13px 24px;border-bottom:1px solid var(--border);
+    background:rgba(10,13,19,.7);backdrop-filter:blur(8px)}
+  .ttl h1{font-size:17px;font-weight:700}
+  .ttl p{color:var(--text-3);font-size:11.5px;margin-top:1px}
+  .idx{display:flex;gap:16px;margin-left:16px}
+  .idx .i{font-family:var(--mono);font-size:12.5px}
+  .idx .i small{color:var(--text-3);margin-right:6px;font-family:var(--sans)}
+  .search{flex:1;max-width:360px;margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-2)}
+  .search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--down);background:rgba(34,197,94,.12);
+    padding:5px 11px;border-radius:999px;border:1px solid rgba(34,197,94,.3);font-family:var(--mono)}
+  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--down)}
+  .icon-btn{width:36px;height:36px;border-radius:10px;background:var(--panel);border:1px solid var(--border);color:var(--text-2);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+  .icon-btn:hover{color:var(--text);background:var(--panel-hover)}
+  .av2{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#22C55E,#0EA5E9);display:flex;align-items:center;justify-content:center;font-weight:700;color:#06231a;cursor:pointer}
+
+  /* 内容 */
+  .content{padding:20px 24px;overflow:auto;display:flex;flex-direction:column;gap:18px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kpi{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--r);padding:15px 17px;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;right:-18px;top:-18px;width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.16),transparent 70%)}
+  .kpi .lbl{color:var(--text-3);font-size:12px}
+  .kpi .val{font-family:var(--mono);font-size:23px;font-weight:700;margin-top:7px}
+  .kpi .sub{font-size:11.5px;color:var(--text-2);margin-top:3px;font-family:var(--mono)}
+
+  .grid{display:grid;grid-template-columns:1.7fr 1fr;gap:18px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:18px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:10px;padding:13px 17px;border-bottom:1px solid var(--border)}
+  .card-h h3{font-size:14px;font-weight:700}
+  .card-h .tag{font-size:10px;color:var(--text-2);background:var(--panel-hover);border:1px solid var(--border);padding:2px 8px;border-radius:999px;margin-left:auto;font-family:var(--mono)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;color:var(--text-3);font-weight:600;font-size:10.5px;letter-spacing:.4px;
+    padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase}
+  thead th.num{text-align:right}
+  tbody td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:12.5px}
+  tbody tr:hover{background:var(--panel-hover)}
+  .sym b{font-family:var(--sans);font-size:13px;color:var(--text)}
+  .sym small{font-family:var(--mono);color:var(--text-3);font-size:11px;display:block}
+  td.num{text-align:right}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .bar{height:6px;border-radius:999px;background:var(--panel-hover);overflow:hidden;min-width:54px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:999px}
+  .pill{font-size:10px;padding:2px 8px;border-radius:999px;font-family:var(--mono);font-weight:600;white-space:nowrap}
+  .pill.buy{background:rgba(239,68,68,.16);color:var(--up);border:1px solid rgba(239,68,68,.4)}
+  .pill.hold{background:rgba(245,158,11,.14);color:var(--warn);border:1px solid rgba(245,158,11,.35)}
+  .pill.watch{background:rgba(99,102,241,.14);color:#a5b4fc;border:1px solid rgba(99,102,241,.35)}
+
+  .insight{padding:15px 17px;display:flex;flex-direction:column;gap:11px}
+  .insight .ai{display:flex;gap:11px;align-items:flex-start}
+  .insight .ai .av{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#a855f7,#6366f1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .insight p{font-size:12.5px;color:var(--text-2);line-height:1.65}
+  .insight p b{color:var(--text)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:10.5px;font-family:var(--mono);padding:3px 9px;border-radius:999px;background:var(--panel-hover);border:1px solid var(--border);color:var(--text-2)}
+
+  .pfrow{display:flex;align-items:center;justify-content:space-between;padding:9px 17px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .pfrow:last-child{border-bottom:none}
+  .pfrow .nm{font-size:13px} .pfrow .nm small{color:var(--text-3);font-family:var(--mono);font-size:11px;display:block}
+  .pfrow .v{font-family:var(--mono);text-align:right}
+  .pf-foot{display:flex;justify-content:space-between;align-items:center;padding:13px 17px;border-top:1px solid var(--border);font-family:var(--mono);font-size:13px}
+  .pf-foot b{font-size:16px}
+
+  .sec{display:flex;flex-direction:column;gap:12px;padding:14px 17px}
+  .sec .row{display:flex;align-items:center;gap:10px}
+  .sec .name{font-size:12px;width:70px;color:var(--text-2)}
+  .sec .track{flex:1;height:7px;background:var(--panel-hover);border-radius:999px;overflow:hidden}
+  .sec .track > i{display:block;height:100%;border-radius:999px}
+  .sec .pct{font-family:var(--mono);font-size:11px;width:52px;text-align:right}
+
+  .alerts{padding:4px 0}
+  .alert{display:flex;gap:11px;padding:10px 17px;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start}
+  .alert:last-child{border-bottom:none}
+  .alert .ic{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .alert .ic.r{background:rgba(239,68,68,.16);color:var(--up)}
+  .alert .ic.g{background:rgba(34,197,94,.16);color:var(--down)}
+  .alert .ic.b{background:rgba(59,130,246,.16);color:var(--accent-2)}
+  .alert p{font-size:12px;color:var(--text-2);line-height:1.5}
+  .alert p b{color:var(--text)}
+  .alert small{color:var(--text-3);font-family:var(--mono);font-size:10px}
+
+  .bottom{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .stat{display:flex;align-items:center;gap:12px;padding:11px 17px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .stat:last-child{border-bottom:none}
+  .stat .k{color:var(--text-3);font-size:12px;width:84px}
+  .stat .v{font-family:var(--mono);font-size:12.5px;margin-left:auto}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--panel-hover);border-radius:999px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 (ChatGPT 风格) -->
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">A</div><div><b>AROS</b><span>RESEARCH OS</span></div></div>
+    <div class="nav-group">分析</div>
+    <div class="nav-item active"><span class="ico">▦</span> Dashboard</div>
+    <div class="nav-item"><span class="ico">◴</span> Market Overview</div>
+    <div class="nav-item"><span class="ico">◎</span> Alpha Radar <span class="badge">8</span></div>
+    <div class="nav-item"><span class="ico">⌕</span> Stock Intelligence</div>
+    <div class="nav-item"><span class="ico">⚗</span> Strategy Lab</div>
+    <div class="nav-group">组合</div>
+    <div class="nav-item"><span class="ico">◫</span> Portfolio</div>
+    <div class="nav-item"><span class="ico">⊞</span> Paper Trading</div>
+    <div class="nav-item"><span class="ico">⛨</span> Risk Monitor</div>
+    <div class="nav-group">其它</div>
+    <div class="nav-item"><span class="ico">✶</span> AI Research</div>
+    <div class="nav-item"><span class="ico">▤</span> Calendar</div>
+    <div class="nav-item"><span class="ico">⎙</span> Reports</div>
+    <div class="nav-item"><span class="ico">⚙</span> Settings</div>
+    <div class="sb-foot">
+      <div class="av">R</div>
+      <div><b style="font-size:13px">Ricky Sun</b><small>Pro · 已连接</small></div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <header class="topbar">
+      <div class="ttl"><h1>Dashboard Overview</h1><p>晚上好，Ricky · 市场开放中</p></div>
+      <div class="idx">
+        <span class="i"><small>上证</small>3,285.6 <span class="up">+0.82%</span></span>
+        <span class="i"><small>深证</small>10,942.3 <span class="up">+1.14%</span></span>
+      </div>
+      <div class="search"><span>⌕</span><input placeholder="搜索股票 / 因子 / 策略…" /></div>
+      <div class="status"><span class="dot"></span> 实时</div>
+      <div class="icon-btn">🔔</div>
+      <div class="av2">R</div>
+    </header>
+
+    <div class="content">
+      <!-- KPI (Kimi) -->
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">上证综指</div><div class="val">3,285.6</div><div class="sub up">+0.82% · +26.7</div></div>
+        <div class="kpi"><div class="lbl">深证成指</div><div class="val">10,942.3</div><div class="sub up">+1.14% · +123.4</div></div>
+        <div class="kpi"><div class="lbl">两市成交额</div><div class="val">¥9,840亿</div><div class="sub up">+12.3% 放量</div></div>
+        <div class="kpi"><div class="lbl">活跃策略</div><div class="val">14</div><div class="sub">今日触发 6</div></div>
+      </div>
+
+      <!-- 主网格 -->
+      <div class="grid">
+        <!-- 左列:Kimi watchlist + ChatGPT Alpha Radar -->
+        <div class="col">
+          <div class="card">
+            <div class="card-h"><h3>自选股 · Market Watchlist</h3><span class="tag">实时</span></div>
+            <table>
+              <thead><tr>
+                <th>代码 / 名称</th><th class="num">最新价</th><th class="num">涨跌</th>
+                <th class="num">涨跌幅</th><th class="num">成交量</th><th class="num">市值</th><th class="num">PE</th>
+              </tr></thead>
+              <tbody id="wl"></tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>Alpha Radar</h3><span class="tag">因子评分</span></div>
+            <table>
+              <thead><tr>
+                <th>#</th><th>标的</th><th>Alpha</th><th>入场</th><th>策略命中</th><th>市况</th><th>动作</th>
+              </tr></thead>
+              <tbody id="radar"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 右列:ChatGPT 亮点 + Kimi 板块/告警 -->
+        <div class="col">
+          <div class="card">
+            <div class="card-h"><h3>AI Market Insight</h3><span class="tag">GPT-4o</span></div>
+            <div class="insight">
+              <div class="ai"><div class="av">✦</div>
+                <p>今日 <b>半导体</b> 与 <b>新能源</b> 板块资金共振，<b>宁德时代</b>、<b>北方华创</b> 出现周线级 <b style="color:var(--up)">放量突破</b>。
+                北向资金连续 3 日净流入，短线情绪偏多；但沪深 300 接近前高，建议 <b>控制仓位、逢高减仓</b>。</p></div>
+              <div class="chips"><span class="chip">#半导体</span><span class="chip">#北向流入</span><span class="chip">#周线突破</span><span class="chip">#风险中性</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>Paper Portfolio</h3><span class="tag">模拟</span></div>
+            <div id="pf"></div>
+            <div class="pf-foot"><span>总收益</span><b class="up">+13.58%</b></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>板块表现</h3><span class="tag">今日</span></div>
+            <div class="sec" id="sectors"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>实时告警</h3><span class="tag">Alerts</span></div>
+            <div class="alerts" id="alerts"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部:ChatGPT 系统状态 + 日历 -->
+      <div class="bottom">
+        <div class="card">
+          <div class="card-h"><h3>系统状态</h3><span class="tag">Aros-core</span></div>
+          <div class="stat"><span class="k">数据引擎</span><span class="v up">在线</span></div>
+          <div class="stat"><span class="k">因子库</span><span class="v">142 项</span></div>
+          <div class="stat"><span class="k">今日计算</span><span class="v">1.2M 指标</span></div>
+          <div class="stat"><span class="k">延迟</span><span class="v">38 ms</span></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>日历 / 事件</h3><span class="tag">本周</span></div>
+          <div class="stat"><span class="k">08-08</span><span class="v">CPI 数据公布</span></div>
+          <div class="stat"><span class="k">08-09</span><span class="v down">宁德时代 解禁 12亿</span></div>
+          <div class="stat"><span class="k">08-11</span><span class="v">央行 MLF 续作</span></div>
+          <div class="stat"><span class="k">08-12</span><span class="v up">茅台 中报披露</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const wl=[
+  {c:"600519",n:"贵州茅台",p:"1,842.00",d:"+28.50",pc:"+1.57%",v:"3.2M",cap:"2.31万亿",pe:"28.4",up:true},
+  {c:"300750",n:"宁德时代",p:"218.60",d:"+8.90",pc:"+4.25%",v:"18.6M",cap:"9,610亿",pe:"22.1",up:true},
+  {c:"601318",n:"中国平安",p:"48.20",d:"-0.55",pc:"-1.13%",v:"12.1M",cap:"8,790亿",pe:"8.6",up:false},
+  {c:"000858",n:"五粮液",p:"152.30",d:"+1.30",pc:"+0.86%",v:"6.4M",cap:"5,910亿",pe:"19.2",up:true},
+  {c:"600036",n:"招商银行",p:"38.10",d:"+0.42",pc:"+1.11%",v:"9.8M",cap:"9,610亿",pe:"6.1",up:true},
+  {c:"002415",n:"海康威视",p:"31.05",d:"-0.62",pc:"-1.96%",v:"7.3M",cap:"2,870亿",pe:"18.9",up:false},
+  {c:"600276",n:"恒瑞医药",p:"52.40",d:"+0.95",pc:"+1.85%",v:"5.1M",cap:"3,340亿",pe:"45.3",up:true},
+  {c:"000001",n:"平安银行",p:"11.20",d:"-0.18",pc:"-1.58%",v:"14.2M",cap:"2,180亿",pe:"4.7",up:false},
+];
+document.getElementById("wl").innerHTML=wl.map(x=>`
+  <tr><td><div class="sym"><b>${x.n}</b><small>${x.c}</small></div></td>
+  <td class="num">${x.p}</td><td class="num ${x.up?'up':'down'}">${x.d}</td>
+  <td class="num ${x.up?'up':'down'}">${x.pc}</td><td class="num">${x.v}</td>
+  <td class="num">${x.cap}</td><td class="num">${x.pe}</td></tr>`).join("");
+
+const radar=[
+  {r:1,n:"贵州茅台",s:"600519",a:92,e:88,h:"9/10",m:"放量突破",act:"buy"},
+  {r:2,n:"宁德时代",s:"300750",a:89,e:84,h:"8/10",m:"资金共振",act:"buy"},
+  {r:3,n:"中国平安",s:"601318",a:81,e:79,h:"7/10",m:"估值修复",act:"hold"},
+  {r:4,n:"五粮液",s:"000858",a:77,e:72,h:"7/10",m:"横盘整理",act:"hold"},
+  {r:5,n:"招商银行",s:"600036",a:74,e:70,h:"6/10",m:"防御配置",act:"watch"},
+  {r:6,n:"海康威视",s:"002415",a:71,e:68,h:"6/10",m:"弱势震荡",act:"watch"},
+];
+const actMap={buy:["buy","买入"],hold:["hold","持有"],watch:["watch","观察"]};
+document.getElementById("radar").innerHTML=radar.map(x=>{
+  const[a,al]=actMap[x.act];
+  return `<tr><td class="rank">${x.r}</td>
+    <td><div class="sym"><b>${x.n}</b><small>${x.s}</small></div></td>
+    <td><div style="display:flex;align-items:center;gap:8px"><span>${x.a}</span><div class="bar"><i style="width:${x.a}%"></i></div></div></td>
+    <td>${x.e}</td><td>${x.h}</td><td style="color:var(--text-2)">${x.m}</td>
+    <td><span class="pill ${a}">${al}</span></td></tr>`;
+}).join("");
+
+const pf=[
+  {n:"贵州茅台",s:"600519",v:"¥1,842.00",c:"+2.31%",up:true},
+  {n:"宁德时代",s:"300750",v:"¥218.60",c:"+4.05%",up:true},
+  {n:"中国平安",s:"601318",v:"¥48.20",c:"-1.12%",up:false},
+  {n:"五粮液",s:"000858",v:"¥152.30",c:"+0.86%",up:true},
+];
+document.getElementById("pf").innerHTML=pf.map(x=>`
+  <div class="pfrow"><div class="nm">${x.n}<small>${x.s}</small></div>
+  <div class="v"><div>${x.v}</div><div class="${x.up?'up':'down'}">${x.c}</div></div></div>`).join("");
+
+const sectors=[
+  {n:"半导体",p:4.8,up:true},{n:"新能源",p:3.2,up:true},{n:"白酒",p:1.6,up:true},
+  {n:"银行",p:0.9,up:true},{n:"医药",p:-0.7,up:false},{n:"地产",p:-2.1,up:false},
+  {n:"钢铁",p:-1.4,up:false},{n:"传媒",p:0.4,up:true},
+];
+document.getElementById("sectors").innerHTML=sectors.map(s=>{
+  const w=Math.min(Math.abs(s.p)*9,100),col=s.up?'var(--up)':'var(--down)';
+  return `<div class="row"><span class="name">${s.n}</span>
+    <div class="track"><i style="width:${w}%;background:${col}"></i></div>
+    <span class="pct ${s.up?'up':'down'}">${s.up?'+':''}${s.p}%</span></div>`;
+}).join("");
+
+const alerts=[
+  {t:"r",h:"宁德时代 触发突破信号",s:"量比 3.2 · 站上 20 日均线",time:"09:41"},
+  {t:"g",h:"五粮液 资金流入转正",s:"主力净流入 ¥4.2亿",time:"10:07"},
+  {t:"b",h:"中国平安 估值进入低位",s:"PE 低于行业 1σ",time:"10:33"},
+  {t:"r",h:"海康威视 跌破支撑",s:"收盘低于 ¥31.50",time:"11:02"},
+  {t:"b",h:"策略 #动量轮动 触发",s:"持仓切换至半导体 ETF",time:"13:15"},
+];
+document.getElementById("alerts").innerHTML=alerts.map(a=>{
+  const ic=a.t==='r'?'▲':a.t==='g'?'●':'◆';
+  return `<div class="alert"><div class="ic ${a.t}">${ic}</div>
+    <div><p><b>${a.h}</b></p><p>${a.s}</p><small>${a.time}</small></div></div>`;
+}).join("");
+
+document.querySelectorAll(".nav-item").forEach(el=>{
+  el.addEventListener("click",()=>{
+    document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+    el.classList.add("active");
+  });
+});
+</script>
+</body>
+</html>

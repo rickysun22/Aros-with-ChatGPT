@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AROS · A股研究终端</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --panel: #151A23;
+    --panel-2: #1B2230;
+    --border: #232A36;
+    --text: #E6EAF0;
+    --muted: #7A8494;
+    --up: #EF4444;      /* A股: 涨=红 */
+    --down: #22C55E;    /* A股: 跌=绿 */
+    --accent: #4C8DFF;
+    --grid: #1A2030;
+    --shadow: 0 8px 30px rgba(0,0,0,0.35);
+    --radius: 14px;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  [data-theme="light"] {
+    --bg: #F4F4F6;
+    --panel: #FFFFFF;
+    --panel-2: #FAFAFC;
+    --border: #E2E2E8;
+    --text: #1D1D1F;
+    --muted: #6E6E73;
+    --up: #E2483D;
+    --down: #13A463;
+    --accent: #2F6BFF;
+    --grid: #EDEDF2;
+    --shadow: 0 8px 30px rgba(20,20,40,0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+
+  /* ---------- App shell ---------- */
+  .app {
+    display: grid;
+    grid-template-rows: 52px 1fr;
+    grid-template-columns: 220px 1fr 260px;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "watch  main   side";
+    gap: 10px;
+    padding: 10px;
+    height: 100vh;
+  }
+  .topbar { grid-area: topbar; }
+  .watch  { grid-area: watch; }
+  .main   { grid-area: main; display: grid; grid-template-rows: 1fr 200px; gap: 10px; min-width: 0; }
+  .side   { grid-area: side; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 13px;
+    flex: 0 0 auto;
+  }
+  .panel-head .sub { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .panel-body { padding: 8px 10px; overflow: auto; flex: 1 1 auto; min-height: 0; }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .3px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--up), var(--accent)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .search {
+    flex: 1 1 auto; max-width: 420px; display: flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 7px 12px; color: var(--muted);
+  }
+  .search input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+  }
+  .pills { display: flex; gap: 4px; }
+  .pill {
+    padding: 5px 12px; border-radius: 8px; font-size: 12px; cursor: pointer;
+    color: var(--muted); border: 1px solid transparent; user-select: none;
+  }
+  .pill:hover { color: var(--text); }
+  .pill.active { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+  .spacer { flex: 1 1 auto; }
+  .iconbtn {
+    width: 32px; height: 32px; display: grid; place-items: center;
+    border-radius: 9px; cursor: pointer; color: var(--muted);
+    border: 1px solid var(--border); background: var(--panel-2);
+  }
+  .iconbtn:hover { color: var(--text); }
+
+  /* ---------- Watchlist ---------- */
+  .wl-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+    padding: 8px 8px; border-radius: 10px; cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .wl-row:hover { background: var(--panel-2); border-color: var(--border); }
+  .wl-row.active { background: var(--panel-2); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .wl-name { font-weight: 600; font-size: 13px; }
+  .wl-code { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .wl-price { text-align: right; font-family: var(--mono); font-size: 13px; }
+  .wl-chg { text-align: right; font-family: var(--mono); font-size: 11px; }
+
+  /* ---------- Chart ---------- */
+  .chart-head { display: flex; align-items: baseline; gap: 12px; }
+  .chart-head .ticker { font-size: 16px; font-weight: 700; }
+  .chart-head .last { font-family: var(--mono); font-size: 15px; }
+  .chart-head .chg { font-family: var(--mono); font-size: 12px; }
+  #chart { width: 100%; height: 100%; display: block; }
+  .chart-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-family: var(--mono); font-size: 11px;
+    color: var(--text); box-shadow: var(--shadow); display: none; min-width: 140px;
+  }
+  .tooltip .row { display: flex; justify-content: space-between; gap: 14px; }
+  .tooltip .row span:first-child { color: var(--muted); }
+
+  /* ---------- Side indicators ---------- */
+  .ind { padding: 9px 8px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr auto; gap: 2px; }
+  .ind:last-child { border-bottom: none; }
+  .ind .label { color: var(--muted); font-size: 12px; }
+  .ind .val { font-family: var(--mono); font-size: 13px; text-align: right; }
+  .ind .bar { grid-column: 1 / -1; height: 4px; border-radius: 3px; background: var(--panel-2); margin-top: 5px; overflow: hidden; }
+  .ind .bar > i { display: block; height: 100%; border-radius: 3px; }
+
+  /* ---------- Bottom table ---------- */
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  thead th { color: var(--muted); font-weight: 500; text-align: right; padding: 6px 10px; position: sticky; top: 0; background: var(--panel); }
+  thead th:first-child { text-align: left; }
+  tbody td { text-align: right; padding: 6px 10px; border-top: 1px solid var(--border); }
+  tbody td:first-child { text-align: left; color: var(--text); }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span> AROS</div>
+    <div class="search">
+      <span>⌕</span>
+      <input id="search" placeholder="搜索代码 / 名称，如 600000" />
+    </div>
+    <div class="pills" id="rangePills">
+      <div class="pill active" data-range="日K">日K</div>
+      <div class="pill" data-range="周K">周K</div>
+      <div class="pill" data-range="月K">月K</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="iconbtn" id="themeBtn" title="切换主题">◐</div>
+  </header>
+
+  <!-- Watchlist -->
+  <aside class="panel watch">
+    <div class="panel-head">自选股 <span class="sub">Watchlist</span></div>
+    <div class="panel-body" id="watchlist"></div>
+  </aside>
+
+  <!-- Main: chart + table -->
+  <section class="main">
+    <div class="panel" style="min-height:0">
+      <div class="panel-head chart-head">
+        <span class="ticker" id="tkName">600000 浦发银行</span>
+        <span class="last num" id="tkLast">11.82</span>
+        <span class="chg num up" id="tkChg">+1.24%</span>
+        <span class="sub" id="tkRange" style="margin-left:auto;color:var(--muted)">日K · 2026</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div class="tooltip" id="tip"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">日线数据 <span class="sub">Daily Bars</span></div>
+      <div class="panel-body" style="padding:0">
+        <table>
+          <thead><tr><th>日期</th><th>开</th><th>高</th><th>低</th><th>收</th><th>量(万)</th></tr></thead>
+          <tbody id="bars"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Side indicators -->
+  <aside class="panel side">
+    <div class="panel-head">指标 / 因子 <span class="sub">Indicators</span></div>
+    <div class="panel-body" id="indicators" style="padding:0"></div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- mock data ---------- */
+  function PRNG(seed){ let s = seed >>> 0; return function(){ s = (s*1664525 + 1013904223) >>> 0; return s/4294967296; }; }
+
+  function genSeries(seed, start, n){
+    const rnd = PRNG(seed);
+    let price = start;
+    const out = [];
+    const d = new Date(2026, 3, 1);
+    for (let i=0; i<n; i++){
+      while (d.getDay()===0 || d.getDay()===6) d.setDate(d.getDate()+1);
+      const o = price;
+      const drift = (rnd()-0.47)*0.32;
+      const c = Math.max(1, +(o+drift).toFixed(2));
+      const h = +(Math.max(o,c) + rnd()*0.16).toFixed(2);
+      const l = +(Math.min(o,c) - rnd()*0.16).toFixed(2);
+      const v = Math.round(120 + rnd()*320);
+      out.push({ date: d.toISOString().slice(0,10), o, h, l, c, v });
+      price = c;
+      d.setDate(d.getDate()+1);
+    }
+    return out;
+  }
+
+  const WATCH = [
+    { code:"600000", name:"浦发银行", seed:20260401, start:11.0 },
+    { code:"600519", name:"贵州茅台", seed:20260502, start:1680 },
+    { code:"000001", name:"平安银行", seed:20260603, start:12.0 },
+    { code:"300750", name:"宁德时代", seed:20260704, start:195 },
+    { code:"000858", name:"五粮液",   seed:20260805, start:140 },
+    { code:"601318", name:"中国平安", seed:20260906, start:48 },
+    { code:"600036", name:"招商银行", seed:20261007, start:38 },
+    { code:"000333", name:"美的集团", seed:20261108, start:72 },
+  ];
+
+  let current = null; // { meta, data }
+
+  function loadStock(meta){
+    const data = genSeries(meta.seed, meta.start, 90);
+    current = { meta, data };
+    renderWatch();
+    renderHead();
+    renderIndicators();
+    renderBars();
+    drawChart();
+  }
+
+  /* ---------- watchlist ---------- */
+  function renderWatch(){
+    const el = document.getElementById("watchlist");
+    el.innerHTML = "";
+    WATCH.forEach((m) => {
+      const data = genSeries(m.seed, m.start, 90);
+      const last = data[data.length-1].c;
+      const prev = data[data.length-2].c;
+      const chg = ((last-prev)/prev*100);
+      const up = chg >= 0;
+      const row = document.createElement("div");
+      row.className = "wl-row" + (current && current.meta.code===m.code ? " active" : "");
+      row.innerHTML =
+        '<div class="wl-name">'+m.name+'</div>'+
+        '<div class="wl-price num">'+last.toFixed(2)+'</div>'+
+        '<div class="wl-code">'+m.code+'</div>'+
+        '<div class="wl-chg num '+(up?"up":"down")+'">'+(up?"+":"")+chg.toFixed(2)+'%</div>';
+      row.onclick = () => loadStock(m);
+      el.appendChild(row);
+    });
+  }
+
+  function renderHead(){
+    const d = current.data;
+    const last = d[d.length-1].c, prev = d[d.length-2].c;
+    const chg = (last-prev)/prev*100, up = chg>=0;
+    document.getElementById("tkName").textContent = current.meta.code + " " + current.meta.name;
+    document.getElementById("tkLast").textContent = last.toFixed(2);
+    const chgEl = document.getElementById("tkChg");
+    chgEl.textContent = (up?"+":"") + chg.toFixed(2) + "%";
+    chgEl.className = "chg num " + (up?"up":"down");
+  }
+
+  /* ---------- indicators ---------- */
+  function sma(arr, p){
+    const out = new Array(arr.length).fill(null);
+    let sum = 0;
+    for (let i=0;i<arr.length;i++){
+      sum += arr[i].c;
+      if (i>=p) sum -= arr[i-p].c;
+      if (i>=p-1) out[i] = sum/p;
+    }
+    return out;
+  }
+  function rsi(arr, p){
+    const out = new Array(arr.length).fill(null);
+    let gain=0, loss=0;
+    for (let i=1;i<arr.length;i++){
+      const d = arr[i].c - arr[i-1].c;
+      if (i<=p){ const g=Math.max(d,0), l=Math.max(-d,0); gain+=g; loss+=l; if(i===p){ gain/=p; loss/=p; out[i]=100 - 100/(1+(loss===0?100:gain/loss)); } }
+      else { const g=Math.max(d,0), l=Math.max(-d,0); gain=(gain*(p-1)+g)/p; loss=(loss*(p-1)+l)/p; out[i]=100 - 100/(1+(loss===0?100:gain/loss)); }
+    }
+    return out;
+  }
+  function renderIndicators(){
+    const d = current.data;
+    const ma5 = sma(d,5), ma20 = sma(d,20), ma60 = sma(d,60);
+    const ma12 = sma(d,12), ma26 = sma(d,26);
+    const r = rsi(d,14);
+    const lastMA5 = ma5[ma5.length-1], lastMA20 = ma20[ma20.length-1], lastMA60 = ma60[ma60.length-1];
+    const lastR = r[r.length-1];
+    const macd = ma12[ma12.length-1] - ma26[ma26.length-1];
+    const denom = (d[d.length-3].h - d[d.length-12].l) || 1;
+    const k = Math.max(0, Math.min(100, 50 + (d[d.length-1].c - d[d.length-10].c)/denom*50));
+    const items = [
+      { label:"MA5",  val: lastMA5, bar: 0.6, color:"var(--accent)" },
+      { label:"MA20", val: lastMA20, bar: 0.5, color:"var(--accent)" },
+      { label:"MA60", val: lastMA60, bar: 0.4, color:"var(--accent)" },
+      { label:"MACD", val: macd, bar: Math.min(1,Math.abs(macd)/0.5), color: macd>=0?"var(--up)":"var(--down)" },
+      { label:"RSI(14)", val: lastR, bar: lastR/100, color:"var(--accent)" },
+      { label:"KDJ-K", val: k, bar: k/100, color:"var(--accent)" },
+      { label:"BOLL 中轨", val: lastMA20, bar: 0.5, color:"var(--accent)" },
+      { label:"F-Score", val: "8/9", bar: 8/9, color:"var(--down)" },
+    ];
+    const el = document.getElementById("indicators");
+    el.innerHTML = "";
+    items.forEach(it=>{
+      const div = document.createElement("div");
+      div.className = "ind";
+      const v = (typeof it.val === "number") ? it.val.toFixed(2) : it.val;
+      div.innerHTML =
+        '<div class="label">'+it.label+'</div>'+
+        '<div class="val">'+v+'</div>'+
+        '<div class="bar"><i style="width:'+(it.bar*100).toFixed(0)+'%;background:'+it.color+'"></i></div>';
+      el.appendChild(div);
+    });
+  }
+
+  /* ---------- bottom bars ---------- */
+  function renderBars(){
+    const d = current.data.slice(-12).reverse();
+    const tb = document.getElementById("bars");
+    tb.innerHTML = "";
+    d.forEach(r=>{
+      const up = r.c >= r.o;
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td>'+r.date.slice(5)+'</td>'+
+        '<td>'+r.o.toFixed(2)+'</td>'+
+        '<td>'+r.h.toFixed(2)+'</td>'+
+        '<td>'+r.l.toFixed(2)+'</td>'+
+        '<td class="'+(up?"up":"down")+'">'+r.c.toFixed(2)+'</td>'+
+        '<td>'+r.v.toFixed(0)+'</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------- canvas chart ---------- */
+  const canvas = document.getElementById("chart");
+  const ctx = canvas.getContext("2d");
+  const tip = document.getElementById("tip");
+  let geom = null; // {x, y, w, h, step, padR, padB, data, min, max, volMax}
+
+  function resize(){
+    const wrap = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = wrap.clientWidth * dpr;
+    canvas.height = wrap.clientHeight * dpr;
+    canvas.style.width = wrap.clientWidth + "px";
+    canvas.style.height = wrap.clientHeight + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    drawChart();
+  }
+
+  function drawChart(hoverIndex){
+    if (!current) return;
+    const d = current.data;
+    const W = canvas.width / (window.devicePixelRatio||1);
+    const H = canvas.height / (window.devicePixelRatio||1);
+    const padL = 8, padR = 56, padT = 10, padB = 8;
+    const plotW = W - padL - padR;
+    const volH = Math.min(70, H*0.22);
+    const priceH = H - padT - padB - volH - 6;
+    const n = d.length;
+    let min=Infinity, max=-Infinity, volMax=0;
+    d.forEach(r=>{ if(r.l<min)min=r.l; if(r.h>max)max=r.h; if(r.v>volMax)volMax=r.v; });
+    const pad = (max-min)*0.08; min-=pad; max+=pad;
+    const step = plotW / (n-1);
+    const xAt = i => padL + i*step;
+    const yAt = p => padT + (1-(p-min)/(max-min))*priceH;
+    const cw = Math.max(2, Math.min(11, step*0.62));
+    const volBase = padT + priceH + 6 + volH;
+    const vAt = v => padT + priceH + 6 + volH - (v/volMax)*volH;
+
+    const up = getCSS("--up"), down = getCSS("--down"), grid = getCSS("--grid");
+    const text = getCSS("--muted"), border = getCSS("--border");
+
+    ctx.clearRect(0,0,W,H);
+
+    // grid + price axis
+    ctx.font = "11px "+getMono();
+    ctx.textBaseline = "middle";
+    const ticks = 5;
+    for (let i=0;i<=ticks;i++){
+      const p = min + (max-min)*i/ticks;
+      const y = yAt(p);
+      ctx.strokeStyle = grid; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+plotW,y); ctx.stroke();
+      ctx.fillStyle = text; ctx.textAlign = "left";
+      ctx.fillText(p.toFixed(2), padL+plotW+6, y);
+    }
+
+    // candles
+    for (let i=0;i<n;i++){
+      const r = d[i]; const x = xAt(i); const isUp = r.c>=r.o;
+      const col = isUp ? up : down;
+      ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, yAt(r.h)); ctx.lineTo(x, yAt(r.l)); ctx.stroke();
+      const yo = yAt(r.o), yc = yAt(r.c);
+      const top = Math.min(yo,yc), bh = Math.max(1, Math.abs(yc-yo));
+      ctx.fillStyle = col;
+      ctx.fillRect(x - cw/2, top, cw, bh);
+      // volume
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(x - cw/2, vAt(r.v), cw, volBase - vAt(r.v));
+      ctx.globalAlpha = 1;
+    }
+
+    // volume baseline
+    ctx.strokeStyle = border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, volBase); ctx.lineTo(padL+plotW, volBase); ctx.stroke();
+
+    geom = { xAt, yAt, step, padL, padR, padT, W, H, n, d, min, max, priceH, volBase, cw };
+
+    // crosshair
+    if (hoverIndex!=null && hoverIndex>=0 && hoverIndex<n){
+      const x = xAt(hoverIndex);
+      ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, volBase); ctx.stroke();
+      ctx.setLineDash([]);
+      const r = d[hoverIndex];
+      const isUp = r.c>=r.o; const col = isUp?up:down;
+      // marker dot on close
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(x, yAt(r.c), 3, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  function getCSS(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function getMono(){ return 'ui-monospace, Menlo, Consolas, monospace'; }
+
+  canvas.addEventListener("mousemove", (e)=>{
+    if (!geom) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const idx = Math.round((mx - geom.padL)/geom.step);
+    if (idx<0 || idx>=geom.n){ tip.style.display="none"; drawChart(); return; }
+    drawChart(idx);
+    const r = geom.d[idx];
+    const isUp = r.c>=r.o;
+    tip.style.display = "block";
+    const xx = geom.xAt(idx);
+    tip.style.left = Math.min(xx+12, geom.W-160) + "px";
+    tip.style.top = geom.padT + 6 + "px";
+    tip.innerHTML =
+      '<div class="row"><span>日期</span><span>'+r.date+'</span></div>'+
+      '<div class="row"><span>开</span><span>'+r.o.toFixed(2)+'</span></div>'+
+      '<div class="row"><span>高</span><span>'+r.h.toFixed(2)+'</span></div>'+
+      '<div class="row"><span>低</span><span>'+r.l.toFixed(2)+'</span></div>'+
+      '<div class="row"><span>收</span><span class="'+(isUp?'up':'down')+'">'+r.c.toFixed(2)+'</span></div>'+
+      '<div class="row"><span>量</span><span>'+r.v.toFixed(0)+'万</span></div>';
+  });
+  canvas.addEventListener("mouseleave", ()=>{ tip.style.display="none"; drawChart(); });
+
+  /* ---------- interactions ---------- */
+  document.getElementById("rangePills").addEventListener("click", (e)=>{
+    const p = e.target.closest(".pill"); if(!p) return;
+    document.querySelectorAll("#rangePills .pill").forEach(x=>x.classList.remove("active"));
+    p.classList.add("active");
+    document.getElementById("tkRange").textContent = p.dataset.range + " · 2026";
+  });
+  document.getElementById("themeBtn").addEventListener("click", ()=>{
+    const el = document.documentElement;
+    el.setAttribute("data-theme", el.getAttribute("data-theme")==="dark" ? "light" : "dark");
+    drawChart();
+  });
+  window.addEventListener("resize", resize);
+
+  /* ---------- boot ---------- */
+  loadStock(WATCH[0]);
+  requestAnimationFrame(resize);
+})();
+</script>
+</body>
+</html>
