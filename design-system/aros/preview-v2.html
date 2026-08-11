@@ -803,6 +803,35 @@
   .wiz-run-btn { background:var(--blue); color:#fff; font-size:13px; font-weight:700; padding:10px 22px; border-radius:8px; cursor:pointer; border:none; }
   .wiz-run-btn:hover { opacity:.9; }
   .wiz-run-hint { font-size:12px; color:var(--sub); }
+  /* 风险监控 */
+  .risk-banner { display:flex; align-items:center; gap:24px; background:var(--panel); border:1px solid var(--border); border-left-width:5px; border-radius:12px; padding:20px 24px; margin-bottom:16px; }
+  .risk-banner-l { text-align:center; }
+  .risk-banner-num { font-size:46px; font-weight:800; line-height:1; }
+  .risk-banner-lab { font-size:12px; color:var(--sub); margin-top:4px; }
+  .risk-banner-r { flex:1; }
+  .risk-badge { display:inline-block; color:#fff; font-size:16px; font-weight:800; padding:7px 18px; border-radius:20px; }
+  .risk-banner-sub { font-size:13px; color:var(--fg); margin-top:10px; line-height:1.6; }
+  .risk-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:16px; }
+  .risk-card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .risk-card-t { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--fg); margin-bottom:10px; }
+  .risk-ic { font-size:18px; }
+  .risk-score-row { display:flex; align-items:baseline; gap:10px; }
+  .risk-score { font-size:34px; font-weight:800; }
+  .risk-level { font-size:13px; font-weight:700; }
+  .risk-bar { height:8px; background:var(--bg); border-radius:5px; overflow:hidden; margin:10px 0 12px; }
+  .risk-bar i { display:block; height:100%; border-radius:5px; }
+  .risk-nodata { font-size:13px; color:var(--sub); padding:18px 0; text-align:center; }
+  .risk-status { font-size:12.5px; color:var(--sub); line-height:1.6; margin-bottom:12px; }
+  .risk-metrics { display:flex; flex-wrap:wrap; gap:10px 18px; }
+  .risk-m { display:flex; flex-direction:column; gap:2px; font-size:11.5px; color:var(--sub); }
+  .risk-m b { font-size:14px; color:var(--fg); font-weight:700; }
+  .risk-reasons { margin:0; padding:14px 18px 14px 34px; }
+  .risk-reasons li { font-size:13px; color:var(--fg); line-height:1.9; }
+  .risk-extra { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .risk-extra-card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
+  .rec-t { font-size:13px; font-weight:700; color:var(--fg); margin-bottom:8px; }
+  .rec-b { font-size:12.5px; color:var(--sub); line-height:1.7; }
+  .rec-b b { color:var(--fg); }
 </style>
 </head>
 <body>
@@ -2294,20 +2323,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     risk: {
-      icon: '🛡️', title: '风险监控', sub: '组合风险实时评估 · 最新扫描 15:00',
+      icon: '🛡️', title: '风险监控', sub: '全市场全景扫描 · 大盘情绪/资金量能/两融/外围 · 快照 2026-08-11',
       blocks: [
-        { t: 'kpis', d: [
-          { t: '组合风险分', v: '62', d: '中等偏高', cls: 'warn', icon: '🌡️' },
-          { t: '最大回撤(近30日)', v: '-6.8%', d: '阈值 -10%', cls: '', icon: '🕳️' },
-          { t: '集中度', v: '71.2%', d: '前 3 大持仓占比,超阈值 70%', cls: 'warn', icon: '🎯' },
-          { t: '波动率(年化)', v: '28.4%', d: '高于基准 6.2pp', cls: '', icon: '📊' }
-        ] },
-        { t: 'list', d: [
-          { t: '⚠️ 集中度超限', sub: '通信设备板块占比 36.8%,建议降至 30% 以下以控制回撤', tag: '警告', cls: 'warn', time: '15:00' },
-          { t: '🔔 紫光国微跌破成本', sub: '浮亏 -6.3%,已触发 -5% 提醒线,建议关注支撑位 82.5', tag: '提示', cls: 'blue', time: '14:21' },
-          { t: '✅ 杠杆水平正常', sub: '当前无两融持仓,杠杆率 0%', tag: '正常', cls: 'up', time: '15:00' },
-          { t: '✅ 流动性充裕', sub: '现金占比 17.4%,可满足 3 个交易日极端赎回', tag: '正常', cls: 'up', time: '15:00' }
-        ] }
+        { t: 'risk', d: {} }
       ]
     },
     positions: {
@@ -2448,6 +2466,44 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPage('watchlist');
   }
 
+  // ---------- 风险监控(真实数据驱动) ----------
+  function riskHtml() {
+    const R = (typeof RISK_DATA !== 'undefined') ? RISK_DATA : { composite: 0, verdict: '数据未接入', verdictLevel: 'warn', dims: {}, reasons: [], extra: {}, source: '', date: '' };
+    const band = R.verdictLevel === 'up' ? '#16a34a' : (R.verdictLevel === 'warn' ? '#f59e0b' : '#dc2626');
+    const dimOrder = ['sentiment', 'fund', 'margin', 'external'];
+    const dimIcon = { sentiment: '😰', fund: '💧', margin: '🔗', external: '🌐' };
+    const cards = dimOrder.map(k => {
+      const d = R.dims[k]; if (!d) return '';
+      const has = (d.score != null);
+      const sc = has ? d.score : 50;
+      const col = !has ? '#94a3b8' : (sc >= 60 ? '#16a34a' : (sc >= 45 ? '#f59e0b' : '#dc2626'));
+      const metrics = (d.metrics || []).map(m => '<div class="risk-m"><span>' + m.t + '</span><b>' + m.v + '</b></div>').join('');
+      return '<div class="risk-card">' +
+        '<div class="risk-card-t"><span class="risk-ic">' + dimIcon[k] + '</span>' + d.name + '</div>' +
+        (has
+          ? '<div class="risk-score-row"><span class="risk-score" style="color:' + col + '">' + sc + '</span><span class="risk-level" style="color:' + col + '">' + d.level + '</span></div>' +
+            '<div class="risk-bar"><i style="width:' + sc + '%;background:' + col + '"></i></div>'
+          : '<div class="risk-nodata">' + (d.level || '暂无数据') + '</div>') +
+        '<div class="risk-status">' + d.status + '</div>' +
+        '<div class="risk-metrics">' + metrics + '</div>' +
+        '</div>';
+    }).join('');
+    const reasons = (R.reasons || []).map(r => '<li>' + r + '</li>').join('');
+    const ex = R.extra || {};
+    const valHtml = ex.valuation ? ('<div class="risk-extra-card"><div class="rec-t">估值水位</div><div class="rec-b">中证全指 PE(TTM) <b>' + ex.valuation.pe + '</b> · 10年分位 <b>' + ex.valuation.pePct10y + '%</b> · ' + ex.valuation.level + '</div></div>') : '';
+    const techHtml = ex.technical ? ('<div class="risk-extra-card"><div class="rec-t">技术面</div><div class="rec-b">RSI6 <b>' + ex.technical.rsi6 + '</b> · MACD(DIF) <b>' + ex.technical.macd + '</b> · 中长期趋势 <b>' + ex.technical.trendLong + '</b> · ' + ex.technical.ma + '</div></div>') : '';
+    const srcHtml = '<div class="risk-extra-card"><div class="rec-t">数据来源</div><div class="rec-b">' + (R.source || '') + ' · 快照 ' + (R.date || '') + '</div></div>';
+    return '' +
+      '<div class="risk-banner" style="border-color:' + band + '">' +
+        '<div class="risk-banner-l"><div class="risk-banner-num" style="color:' + band + '">' + R.composite + '</div><div class="risk-banner-lab">机会指数 / 100</div></div>' +
+        '<div class="risk-banner-r"><div class="risk-badge" style="background:' + band + '">' + (R.verdictLevel === 'up' ? '🟢 ' : (R.verdictLevel === 'warn' ? '🟡 ' : '🔴 ')) + R.verdict + '</div>' +
+        '<div class="risk-banner-sub">' + (R.summary || '') + '</div></div>' +
+      '</div>' +
+      '<div class="risk-grid">' + cards + '</div>' +
+      '<div class="pg-panel"><div class="pg-panel-t">🧭 信号解读</div><ul class="risk-reasons">' + reasons + '</ul></div>' +
+      '<div class="risk-extra">' + valHtml + techHtml + srcHtml + '</div>';
+  }
+
   // ---------- 渲染块 ----------
   function renderBlock(b) {
     switch (b.t) {
@@ -2478,6 +2534,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'watchlist': return watchlistHtml();
       case 'room': return roomHtml();
       case 'wizard': return wizardHtml();
+      case 'risk': return riskHtml();
       case 'chat': return '<div class="pg-chat">' + b.d.map(m =>
         '<div class="msg ' + m.role + '"><span class="msg-ic">' + (m.role === 'u' ? '🧑' : '🤖') + '</span><div class="msg-b">' + m.text + '</div></div>'
       ).join('') + '</div>';
@@ -2577,6 +2634,129 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
   let WATCH_DEFAULT = SEED_WATCH;
   let WATCH = loadWatch() || WATCH_DEFAULT.map(x => ({ 'c': x.c, 'n': x.n, 'sec': x.sec || '', 'con': x.con || '', 'px': x.px, 'chg': x.chg }));
   PAGES.watchlist.blocks[0].d = WATCH;
+    const RISK_DATA = {
+  "date": "2026-08-11",
+  "source": "westock MCP · data_market_overview(all) + data_quote(外围)",
+  "composite": 32,
+  "verdict": "离场警告",
+  "verdictLevel": "down",
+  "summary": "市场广度极差、量能萎缩、外围偏弱、估值偏高 —— 当前风险偏多环境,建议控制仓位、防范回调,等待广度修复与放量信号。",
+  "dims": {
+    "sentiment": {
+      "name": "大盘情绪",
+      "score": 23,
+      "level": "偏空",
+      "status": "涨股比 29.1%,超 2/3 个股下跌,涨停 54 / 跌停 0,广度极差",
+      "metrics": [
+        {
+          "t": "涨股比",
+          "v": "29.1%"
+        },
+        {
+          "t": "涨跌比",
+          "v": "0.43"
+        },
+        {
+          "t": "涨停/跌停",
+          "v": "54 / 0"
+        },
+        {
+          "t": "上涨家数",
+          "v": "1615 / 5542"
+        }
+      ]
+    },
+    "fund": {
+      "name": "资金量能",
+      "score": 38,
+      "level": "偏弱",
+      "status": "两市成交 2.32 万亿,缩量至 5 日均的 91.4%(10 日 96.4%),资金观望;北向自 2024-08 起暂停披露",
+      "metrics": [
+        {
+          "t": "成交额",
+          "v": "2.32 万亿"
+        },
+        {
+          "t": "5 日均比",
+          "v": "91.4%"
+        },
+        {
+          "t": "10 日均比",
+          "v": "96.4%"
+        },
+        {
+          "t": "北向资金",
+          "v": "暂停披露"
+        }
+      ]
+    },
+    "margin": {
+      "name": "两融余额",
+      "score": null,
+      "level": "今日未披露",
+      "status": "westock 两融接口今日未返回有效数据,该维度暂不参与评分(诚实留白)",
+      "metrics": [
+        {
+          "t": "融资余额",
+          "v": "未披露"
+        },
+        {
+          "t": "5 日变动",
+          "v": "—"
+        },
+        {
+          "t": "参与评分",
+          "v": "否"
+        }
+      ]
+    },
+    "external": {
+      "name": "外围影响",
+      "score": 40,
+      "level": "偏弱",
+      "status": "外围普跌:港股 -1.10% · 纳指 -0.62% · 道指 -0.21%,风险偏好回落(均值 -0.64%)",
+      "metrics": [
+        {
+          "t": "恒生",
+          "v": "-1.10%"
+        },
+        {
+          "t": "纳指",
+          "v": "-0.62%"
+        },
+        {
+          "t": "道指",
+          "v": "-0.21%"
+        },
+        {
+          "t": "外围均值",
+          "v": "-0.64%"
+        }
+      ]
+    }
+  },
+  "reasons": [
+    "涨股比仅 29.1%,超 2/3 个股下跌(1615 涨 / 3777 跌),市场广度极差",
+    "两市成交 2.32 万亿,缩量至 5 日均的 91.4%,资金观望意愿强",
+    "外围普跌(港股 -1.10% · 纳指 -0.62% · 道指 -0.21%),风险偏好回落",
+    "中证全指 PE(TTM) 21.85,处 10 年 94.8% 分位,估值偏高(补充观察)",
+    "中长期趋势「弱势下跌」,收盘价 3934 低于 MA60(3996),技术面承压"
+  ],
+  "extra": {
+    "valuation": {
+      "pe": 21.85,
+      "pePct10y": 94.8,
+      "level": "高估"
+    },
+    "technical": {
+      "rsi6": 62.59,
+      "macd": "-15.37",
+      "trendLong": "弱势下跌",
+      "ma": "收盘 3934 < MA60 3996"
+    }
+  }
+};
+
   const CAND = WATCH;
 
   const FACTOR_ROWS = [
