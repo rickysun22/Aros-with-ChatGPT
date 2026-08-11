@@ -585,9 +585,9 @@
   .pg-flow-tab:hover { color: var(--fg); }
   .pg-flow-tab.active { background: var(--blue); color: #fff; font-weight: 600; }
   .ff-day { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
-  .ff-row { display: flex; align-items: center; gap: 8px; }
+  .ff-row { display: flex; align-items: center; gap: 10px; }
   .ff-name { width: 58px; font-size: 11px; color: var(--fg); white-space: nowrap; text-align: right; }
-  .ff-track { position: relative; flex: 1; height: 13px; background: rgba(51,65,85,0.22); border-radius: 7px; overflow: hidden; }
+  .ff-track { position: relative; flex: 1; min-width: 90px; height: 13px; background: rgba(51,65,85,0.22); border-radius: 7px; padding: 0 4px; box-sizing: border-box; overflow: hidden; }
   .ff-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(148,163,184,0.55); }
   .ff-fill { position: absolute; top: 0; bottom: 0; border-radius: 7px; transition: width 0.3s; }
   .ff-fill.up { background: linear-gradient(90deg, rgba(255,77,79,0.75), #FF4D4F); }
@@ -3267,7 +3267,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
         '<div class="ff-note">' + (mode === 'd5' ? '近 5 日' : '近 10 日') + '累计主力净流入(亿元)</div>';
       bodyEl.innerHTML = note + '<div class="ff-day">' + gs.map(g => {
         const v = valOf(g);
-        const w = Math.max(Math.abs(v) / maxAbs * 44, 1.5);
+        const w = Math.min(Math.max(Math.abs(v) / maxAbs * 40, 1.5), 40);
         const up = v >= 0;
         const ta = flowTA(g.px);
         const tcls = ta.tag === '偏多' ? 'up' : (ta.tag === '偏空' ? 'down' : 'mid');
