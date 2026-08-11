@@ -2823,7 +2823,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     return ({ '动量': 'tech', '估值': 'sent', '盈利': 'news', '资金': 'fund', '风险': 'flow', '流动性': 'flow' })[cat] || 'tech';
   }
   function roomFacRaw(stock, f, idx) {
-    const base = stock.faces[roomFacDim(f.cat)] || 60;
+    const base = (stock.faces || {})[roomFacDim(f.cat)] || 60;
     const wob = btRnd(stock.c * 31 + idx * 7, 5) * 30 - 15;
     return Math.max(2, Math.min(100, base + wob));
   }
@@ -3660,6 +3660,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     function rowHtml(code) {
       const s = CAND.find(x => x.c === code);
       if (!s) return '';
+      const F = s.faces || { fund: 50, tech: 50, flow: 50, news: 50, sent: 50 };
       const stars = s.alpha >= 92 ? 5 : s.alpha >= 86 ? 4 : 3;
       const starHtml = [1, 2, 3, 4, 5].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '">★</span>').join('');
       const ringC = s.alpha >= 88 ? '#52C41A' : s.alpha >= 80 ? '#FF9800' : '#FF4D4F';
@@ -3674,7 +3675,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
         '<td><div class="ring" style="--p:' + s.entry + ';--ring-c:' + ringC + '"><span>' + s.entry + '</span></div></td>' +
         '<td><span class="hit-bar">' + hitHtml + '</span></td>' +
         '<td><span class="chip ' + bgCls + '">' + s.bg + '</span></td>' +
-        '<td><span class="tgt" title="未来 20 个交易日(约 1 个月)· 5面加权 ' + faceScore(s).toFixed(0) + ' · K线技术 ' + kTechScore(s).toFixed(0) + ' · 基本面 ' + s.faces.fund + ' · 技术面 ' + s.faces.tech + ' · 资金面 ' + s.faces.flow + ' · 新闻面 ' + s.faces.news + ' · 情绪面 ' + s.faces.sent + '">' + calcTgt(s) + '</span></td>' +
+        '<td><span class="tgt" title="未来 20 个交易日(约 1 个月)· 5面加权 ' + faceScore(s).toFixed(0) + ' · K线技术 ' + kTechScore(s).toFixed(0) + ' · 基本面 ' + F.fund + ' · 技术面 ' + F.tech + ' · 资金面 ' + F.flow + ' · 新闻面 ' + F.news + ' · 情绪面 ' + F.sent + '">' + calcTgt(s) + '</span></td>' +
         '<td><span class="' + (s.act.startsWith('-') ? 'down' : 'up') + '">' + s.act + '</span></td>' +
         '<td><span class="sel-day">' + s.sel + '</span></td>' +
         '<td><button class="as-remove" data-code="' + s.c + '" title="移除自选">✕</button></td></tr>';
