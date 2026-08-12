@@ -720,6 +720,9 @@
   .bt-scan-row { display: flex; gap: 18px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
   .bt-scan-opt { font-size: 12px; color: var(--sub); background: var(--muted); border: 1px solid var(--border); padding: 5px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; }
   .bt-scan-opt.active { background: rgba(34,197,94,0.15); border-color: #22C55E; color: #fff; }
+  .bt-scope-row { display: flex; gap: 14px; align-items: center; margin: 0 0 14px; flex-wrap: wrap; }
+  .bt-scope-btn { font-size: 13px; color: var(--sub); background: var(--muted); border: 1px solid var(--border); padding: 7px 18px; border-radius: 10px; cursor: pointer; transition: background .15s, border-color .15s; }
+  .bt-scope-btn.active { background: rgba(41,98,255,0.16); border-color: #2962FF; color: #fff; }
   .bt-cost { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--sub); cursor: pointer; }
   .bt-bridge { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; min-height: 0; }
   .bt-bridge-empty { font-size: 12px; color: var(--faint); }
@@ -2285,44 +2288,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     sim: {
-      icon: '🔄', title: '模拟交易 · 组合', sub: '虚拟资金 100 万 · 持仓与组合一体 · 支持 T+1 与两融模拟',
+      icon: '🔄', title: '模拟交易 · 组合', sub: '真实 K 线驱动的组合回测 · 自选等权(动量突破 · 真实价)',
       blocks: [
-        { t: 'panel', d: { title: '买入委托', fields: [
-          { k: '股票代码', v: '300308 中际旭创' },
-          { k: '委托价格', v: '93.15(限价)' },
-          { k: '委托数量', v: '10,000 股 = 93.15 万' }
-        ], btn: '提交委托' } },
-        { t: 'kpis', d: [
-          { t: '模拟资产', v: '112.6 万', d: '今日 +1.2 万', cls: 'up', icon: '💰' },
-          { t: '可用资金', v: '19.4 万', d: '持仓市值 93.2 万', cls: '', icon: '💳' },
-          { t: '委托成功率', v: '96.4%', d: '滑点控制 0.1%', cls: '', icon: '✅' }
-        ] },
-        { t: 'table', d: { head: ['时间', '方向', '股票', '价格', '数量', '状态'], rows: [
-          ['08-08 14:32', '<span class="up">买入</span>', '中际旭创', '92.80', '10,000', '<span class="up">已成交</span>'],
-          ['08-07 10:05', '<span class="up">买入</span>', '新易盛', '90.40', '5,000', '<span class="up">已成交</span>'],
-          ['08-06 13:20', '<span class="down">卖出</span>', '天孚通信', '115.20', '2,000', '<span class="up">已成交</span>'],
-          ['08-05 09:41', '<span class="up">买入</span>', '寒武纪', '305.00', '800', '排队中']
-        ] } },
-        { t: 'kpis', d: [
-          { t: '总资产', v: '328.65 万', d: '较昨日 +0.56%', cls: 'up', icon: '💰' },
-          { t: '累计收益', v: '+68.4 万', d: '年化 +26.2%', cls: 'up', icon: '🏆' },
-          { t: '仓位', v: '82.6%', d: '现金 57.2 万', cls: '', icon: '⚖️' },
-          { t: '今日盈亏', v: '+18,245', d: '跑赢沪深300 +0.4%', cls: 'up', icon: '📈' }
-        ] },
-        { t: 'table', d: { head: ['股票', '持仓', '成本', '现价', '市值', '盈亏'], rows: [
-          ['中际旭创', '12,000 股', '71.20', '93.15', '111.78 万', '<span class="up">+30.8%</span>'],
-          ['新易盛', '8,000 股', '78.50', '92.80', '74.24 万', '<span class="up">+18.2%</span>'],
-          ['寒武纪', '1,200 股', '268.00', '312.55', '37.51 万', '<span class="up">+16.6%</span>'],
-          ['紫光国微', '5,000 股', '89.90', '84.20', '42.10 万', '<span class="down">-6.3%</span>'],
-          ['现金', '—', '—', '—', '57.20 万', '—']
-        ] } },
-        { t: 'bars', d: [
-          { name: '通信设备', val: 72, txt: '36.8%', color: '#FF4D4F' },
-          { name: '半导体', val: 38, txt: '19.2%', color: '#722ED1' },
-          { name: '消费电子', val: 30, txt: '15.4%', color: '#2962FF' },
-          { name: '军工电子', val: 22, txt: '11.2%', color: '#13C2C2' },
-          { name: '现金', val: 34, txt: '17.4%', color: '#8C8C8C' }
-        ] }
+        { t: 'simreal', d: {} }
       ]
     },
     risk: {
@@ -2530,6 +2498,52 @@ document.addEventListener('DOMContentLoaded', () => {
       document.head.appendChild(sc);
     });
   }
+  // ---------- 全市场 K 线加载器(东方财富 push2his · 真实前复权日线) ----------
+  const RK_FULL = {};
+  function emSecid(c) {
+    if (/^(60|68|90|11|5)/.test(c)) return '1.' + c;
+    return '0.' + c;
+  }
+  function loadKlineEM(c, n) {
+    n = n || 400;
+    const begY = new Date().getFullYear() - Math.ceil(n / 250) - 1;
+    const beg = begY + '0101';
+    const cb = '__emcb_k' + c;
+    const url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + emSecid(c) +
+      '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&beg=' + beg + '&end=20500101&lmt=' + n + '&cb=' + cb;
+    if (RK_FULL[c] && RK_FULL[c].c && RK_FULL[c].c.length >= n) return Promise.resolve(RK_FULL[c]);
+    return jsonpEM(url, cb.replace('__emcb_', '')).then(function (d) {
+      const k = d && d.data && d.data.klines;
+      if (!k || !k.length) { RK_FULL[c] = null; return null; }
+      const dts = [], cs = [];
+      k.forEach(function (line) { const a = line.split(','); dts.push(a[0]); cs.push(parseFloat(a[2])); });
+      RK_FULL[c] = { d: dts, c: cs };
+      return RK_FULL[c];
+    }).catch(function () { RK_FULL[c] = null; return null; });
+  }
+  function ensureKlines(codes, n, limit) {
+    n = n || 400;
+    const need = codes.filter(function (c) { return !(RK_FULL[c] && RK_FULL[c].c && RK_FULL[c].c.length >= n); });
+    const batch = limit || 10;
+    const chunks = [];
+    for (let i = 0; i < need.length; i += batch) chunks.push(need.slice(i, i + batch));
+    return chunks.reduce(function (chain, ch) {
+      return chain.then(function () { return Promise.all(ch.map(function (c) { return loadKlineEM(c, n); })); });
+    }, Promise.resolve()).then(function () { return codes.map(function (c) { return RK_FULL[c]; }).filter(Boolean); });
+  }
+  function ensureMarketScan() {
+    return new Promise(function (res) {
+      if (MS_ALL) return res(MS_ALL);
+      loadMarketScan('f3', 'desc', true);
+      const t = setInterval(function () { if (MS_ALL) { clearInterval(t); res(MS_ALL); } }, 200);
+      setTimeout(function () { clearInterval(t); res(MS_ALL); }, 15000);
+    });
+  }
+  function pickUniverse(all, key, K) {
+    const arr = all.filter(function (x) { return x && x[key] != null && typeof x[key] === 'number'; });
+    arr.sort(function (a, b) { return b[key] - a[key]; });
+    return arr.slice(0, K || 100);
+  }
   let MS_ALL = null, MS_LOADING = false;
   function msEMUrl(pn) {
     const PZ = 500;
@@ -2621,10 +2635,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------- 回测系统:真实回测引擎接线 ----------
-  function computeBacktestLab() {
+  function computeBacktestLab(list) {
     const days = 400, cash = 1e6, cost = true, tp = 15, sl = 8;
     const indIds = ['mom'], combo = 'and', indParams = { mom: { w: 20 } };
-    const runs = CAND.map(s => { try { return btRun(s, indIds, combo, indParams, tp, sl, days, cash, cost); } catch (e) { return null; } }).filter(Boolean);
+    const runs = (list || CAND).map(s => { try { return btRun(s, indIds, combo, indParams, tp, sl, days, cash, cost); } catch (e) { return null; } }).filter(Boolean);
     if (!runs.length) return null;
     const L = Math.min.apply(null, runs.map(r => r.equity.length));
     if (L < 5) return null;
@@ -2660,28 +2674,60 @@ document.addEventListener('DOMContentLoaded', () => {
       for (let i = a; i <= b; i++) { pk = Math.max(pk, pNav[i]); dd = Math.max(dd, (pk - pNav[i]) / pk); }
       segRows.push(['第' + (sgi + 1) + '段', (ret >= 0 ? '+' : '') + (ret * 100).toFixed(1) + '%', '-' + (dd * 100).toFixed(1) + '%', Math.round(trades / segN), '<span class="' + (ret >= 0 ? 'up' : 'down') + '">' + (ret >= 0 ? '有效' : '失效') + '</span>']);
     }
-    return { totalReturn, cagr, maxDD, sharpe, winRate, trades, pts, segRows, n: runs.length, benchEnd: pBench[L - 1] / pBench[0] - 1 };
+    return { totalReturn, cagr, maxDD, sharpe, winRate, trades, pts, segRows, n: runs.length, years: L / 250, benchEnd: pBench[L - 1] / pBench[0] - 1 };
   }
-  function renderBacktestLab() {
-    const el = document.getElementById('btRealWrap');
-    if (!el || el.dataset.done) return;
-    const r = computeBacktestLab();
-    if (!r) { el.innerHTML = '<div class="bt-empty">真实回测引擎无可计算标的(REAL_KLINE 缺失)</div>'; return; }
-    el.dataset.done = '1';
+  function btScopeHtml(r, n, label) {
     const kpis = [
       { t: '累计收益', v: (r.totalReturn >= 0 ? '+' : '') + (r.totalReturn * 100).toFixed(1) + '%', c: r.totalReturn >= 0 ? 'up' : 'down', d: '基准沪深300 ' + (r.benchEnd >= 0 ? '+' : '') + (r.benchEnd * 100).toFixed(1) + '%' },
-      { t: '年化收益', v: (r.cagr >= 0 ? '+' : '') + (r.cagr * 100).toFixed(1) + '%', c: r.cagr >= 0 ? 'up' : 'down', d: '区间约 ' + (r.n * 400 / 250).toFixed(1) + ' 年' },
+      { t: '年化收益', v: (r.cagr >= 0 ? '+' : '') + (r.cagr * 100).toFixed(1) + '%', c: r.cagr >= 0 ? 'up' : 'down', d: '区间约 ' + (r.years != null ? r.years.toFixed(1) : '—') + ' 年' },
       { t: '最大回撤', v: '-' + (r.maxDD * 100).toFixed(2) + '%', c: 'down', d: '净值峰谷最深回落' },
-      { t: '胜率', v: (r.winRate * 100).toFixed(1) + '%', c: r.winRate >= 0.5 ? 'up' : 'down', d: r.n + ' 只标的均值' },
+      { t: '胜率', v: (r.winRate * 100).toFixed(1) + '%', c: r.winRate >= 0.5 ? 'up' : 'down', d: n + ' 只标的均值' },
       { t: '夏普比率', v: r.sharpe.toFixed(2), c: r.sharpe >= 0 ? 'up' : 'down', d: '年化 · 无风险 0' },
       { t: '交易次数', v: r.trades, c: '', d: '共 ' + r.trades + ' 笔完整交易' }
     ];
     const kpiHtml = kpis.map(k => '<div class="bt-kpi"><div class="bt-kpi-t">' + k.t + '</div><div class="bt-kpi-v ' + k.c + '">' + k.v + '</div><div class="bt-kpi-d">' + k.d + '</div></div>').join('');
-    const eqHtml = '<div class="bt-equity-card"><div class="bt-eq-head"><span class="bt-eq-title">📈 真实组合净值曲线 · ' + r.n + ' 只等权(动量突破 · 真实价)</span><span class="bt-legend"><span><i style="background:#2962FF"></i>策略 ' + (r.totalReturn >= 0 ? '+' : '') + (r.totalReturn * 100).toFixed(1) + '%</span><span><i style="background:#3D4C5F"></i>基准 ' + (r.benchEnd >= 0 ? '+' : '') + (r.benchEnd * 100).toFixed(1) + '%</span></span></div>' + sparkline(r.pts, 1000, 200, '#2962FF') + '</div>';
+    const eqHtml = '<div class="bt-equity-card"><div class="bt-eq-head"><span class="bt-eq-title">📈 真实组合净值曲线 · ' + n + ' 只等权(动量突破 · 真实价)</span><span class="bt-legend"><span><i style="background:#2962FF"></i>策略 ' + (r.totalReturn >= 0 ? '+' : '') + (r.totalReturn * 100).toFixed(1) + '%</span><span><i style="background:#3D4C5F"></i>基准 ' + (r.benchEnd >= 0 ? '+' : '') + (r.benchEnd * 100).toFixed(1) + '%</span></span></div>' + sparkline(r.pts, 1000, 200, '#2962FF') + '</div>';
     const rows = r.segRows.map(rw => '<tr><td>' + rw[0] + '</td><td class="' + (rw[1].indexOf('-') < 0 ? 'up' : 'down') + '">' + rw[1] + '</td><td class="down">' + rw[2] + '</td><td>' + rw[3] + '</td><td>' + rw[4] + '</td></tr>').join('');
     const tableHtml = '<div class="pg-table"><table><thead><tr><th>分段</th><th>收益</th><th>回撤</th><th>交易数</th><th>结论</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-    el.innerHTML = '<div class="bt-kpis">' + kpiHtml + '</div>' + eqHtml + tableHtml +
-      '<div class="bt-note">真实回测:对 ' + r.n + ' 只候选股逐一运行动量突破策略(创 20 日新高买入、跌破 MA20 卖出,止盈 15% / 止损 8%,含交易成本),价格取自 AROS 真实前复权日线(REAL_KLINE),基准沪深300。组合净值 = 各标的净值等权平均;分段按回测区间等分。这是真实计算结果,非演示值。</div>';
+    return '<div class="bt-kpis">' + kpiHtml + '</div>' + eqHtml + tableHtml +
+      '<div class="bt-note">真实回测(' + (label || '') + '):对 ' + n + ' 只标的逐一运行动量突破策略(创 20 日新高买入、跌破 MA20 卖出,止盈 15% / 止损 8%,含交易成本),价格取自真实前复权日线(候选池用内置 REAL_KLINE,全市场用东方财富 push2his 实时拉取),基准沪深300。组合净值 = 各标的净值等权平均;分段按回测区间等分。这是真实计算结果,非演示值。</div>';
+  }
+  function renderBacktestLab(mode) {
+    const el = document.getElementById('btRealWrap');
+    if (!el) return;
+    mode = mode || el.dataset.mode || 'pool';
+    el.dataset.mode = mode;
+    if (!el.dataset.shell) {
+      el.innerHTML = '<div class="bt-scope-row">' +
+        '<span class="bt-scope-btn active" data-scope="pool">候选池(16 只真实股)</span>' +
+        '<span class="bt-scope-btn" data-scope="up">全市场 Top100(涨幅)</span>' +
+        '<span class="bt-scope-btn" data-scope="main">全市场 Top100(主力)</span></div>' +
+        '<div class="bt-scope-result" id="btScopeResult"><div class="bt-empty">计算中…</div></div>';
+      el.dataset.shell = '1';
+    }
+    el.querySelectorAll('.bt-scope-btn').forEach(b => b.classList.toggle('active', b.dataset.scope === mode));
+    const resEl = document.getElementById('btScopeResult');
+    if (mode === 'pool') {
+      const r = computeBacktestLab(CAND);
+      resEl.innerHTML = r ? btScopeHtml(r, r.n, '候选池 16 只') : '<div class="bt-empty">候选池真实回测无可计算标的(REAL_KLINE 缺失)</div>';
+      return;
+    }
+    resEl.innerHTML = '<div class="bt-empty">正在拉取全市场实时行情与历史 K 线(首次约 10–20 秒)…</div>';
+    ensureMarketScan().then(function (all) {
+      if (!all) { resEl.innerHTML = '<div class="bt-empty">全市场行情拉取失败(预览环境可能拦截外部请求)。请用本机浏览器打开本文件(file://)查看。</div>'; return; }
+      const key = mode === 'up' ? 'f3' : 'f62';
+      const top = pickUniverse(all, key, 100);
+      const codes = top.map(function (x) { return x.f12; });
+      ensureKlines(codes, 400, 10).then(function () {
+        const list = codes.map(function (c) {
+          const t = top.filter(function (x) { return x.f12 === c; })[0] || {};
+          return { c: c, n: t.f14 || c, sel: '2026-08-08' };
+        });
+        const r = computeBacktestLab(list);
+        if (!r) resEl.innerHTML = '<div class="bt-empty">全市场 Top100 真实回测无可计算标的(真实 K 线不足)</div>';
+        else resEl.innerHTML = btScopeHtml(r, r.n, (mode === 'up' ? '全市场涨幅榜' : '全市场主力净流入榜') + ' Top100');
+      }).catch(function (e) { resEl.innerHTML = '<div class="bt-empty">全市场回测出错:' + ((e && e.message) || e) + '</div>'; });
+    }).catch(function (e) { resEl.innerHTML = '<div class="bt-empty">全市场回测出错:' + ((e && e.message) || e) + '</div>'; });
   }
 
   // ---------- 自选 / Alpha 雷达 实时价(腾讯 qt.gtimg.cn) ----------
@@ -2762,6 +2808,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'risk': return riskHtml();
       case 'marketscan': return marketScanHtml();
       case 'btlabreal': return '<div id="btRealWrap"></div>';
+      case 'simreal': return '<div id="simRealWrap"></div>';
       case 'chat': return '<div class="pg-chat">' + b.d.map(m =>
         '<div class="msg ' + m.role + '"><span class="msg-ic">' + (m.role === 'u' ? '🧑' : '🤖') + '</span><div class="msg-b">' + m.text + '</div></div>'
       ).join('') + '</div>';
@@ -3034,7 +3081,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<span class="bt-run-hint">标的</span></div>' +
       '<div class="bt-scan-row"><span style="font-size:12px;color:var(--dim)">回测范围</span>' +
       '<span class="bt-scan-opt active" data-scan="single">单只标的</span>' +
-      '<span class="bt-scan-opt" data-scan="all">全市场扫描(' + CAND.length + ' 只)</span>' +
+      '<span class="bt-scan-opt" data-scan="all">候选池扫描(' + CAND.length + ' 只)</span>' +
       '<label class="bt-cost"><input type="checkbox" id="btCost"> 含交易成本</label></div>' +
       '<div class="bt-bridge" id="btBridge"></div>' +
       btLabHtml() + '</div>';
@@ -3167,7 +3214,8 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const days = 250, tp = 15, sl = 8, cash = 1000000;
     const mom = BT_INDICATORS.find(x => x.id === 'mom');
     const momParams = { mom: {} }; mom.params.forEach(p => momParams.mom[p.k] = p.def);
-    const runs = ROOM_BASKET.map(s => btRun(s, ['mom'], 'and', momParams, tp, sl, days, cash, cost));
+    const runs = ROOM_BASKET.map(s => btRun(s, ['mom'], 'and', momParams, tp, sl, days, cash, cost)).filter(Boolean);
+    if (!runs.length || !runs[0].equity) { result.innerHTML = '<div class="bt-empty">信号篮真实 K 线不足,无法回测</div>'; return; }
     const L = runs[0].equity.length;
     const avgNav = new Array(L).fill(0);
     runs.forEach(r => { for (let i = 0; i < L; i++) avgNav[i] += r.equity[i].nav / r.cash; });
@@ -3195,7 +3243,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<span class="bt-legend"><span><i style="background:#2962FF"></i>组合净值 ' + (totalReturn * 100).toFixed(1) + '%</span>' +
       '<span><i style="background:#3D4C5F"></i>等权基准(归一)</span></span></div>' +
       btEquityChart(chartR, 1000, 200) +
-      '<div class="bt-note">组合净值 = 篮内 ' + N + ' 只等权归一后的平均净值;回测用动量突破(创 20 日新高买入,跌破 MA20 卖出),止盈 15% / 止损 8%' + (cost ? ',已含交易成本。' : ',暂不计交易成本。') + '价格为前端模拟引擎生成,接入 AROS 真实日线后即为真实组合回测。</div></div>';
+      '<div class="bt-note">组合净值 = 篮内 ' + N + ' 只等权归一后的平均净值;回测用动量突破(创 20 日新高买入,跌破 MA20 卖出),止盈 15% / 止损 8%' + (cost ? ',已含交易成本。' : ',暂不计交易成本。') + '价格取自 AROS 真实前复权日线(REAL_KLINE),为真实组合回测,非演示值。</div></div>';
     if (slicesEl) {
       const segN = 4;
       const size = Math.floor(L / segN);
@@ -3259,7 +3307,8 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const cash = 1000000;
     const mom = BT_INDICATORS.find(x => x.id === 'mom');
     const momParams = { mom: {} }; mom.params.forEach(p => momParams.mom[p.k] = p.def);
-    const runs = sel.map(s => btRun(s, ['mom'], 'and', momParams, tp, sl, days, cash, cost));
+    const runs = sel.map(s => btRun(s, ['mom'], 'and', momParams, tp, sl, days, cash, cost)).filter(Boolean);
+    if (!runs.length || !runs[0].equity) { result.innerHTML = '<div class="bt-empty">所选股票真实 K 线不足,无法回测</div>'; return; }
     const L = runs[0].equity.length;
     const avgNav = new Array(L).fill(0);
     runs.forEach(r => { for (let i = 0; i < L; i++) avgNav[i] += r.equity[i].nav / r.cash; });
@@ -3288,7 +3337,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<span class="bt-legend"><span><i style="background:#2962FF"></i>组合 ' + (totalReturn * 100).toFixed(1) + '%</span>' +
       '<span><i style="background:#3D4C5F"></i>等权基准</span></span></div>' +
       btEquityChart(chartR, 1000, 200) +
-      '<div class="bt-note">回测逻辑:篮内股票等权,动量突破(创 20 日新高买,破 MA20 卖)' + (tpOn ? (';' + tpTxt) : '') + (cost ? ',已含交易成本。' : ';暂不计交易成本。') + '价格为前端模拟生成,接入真实日线后即为真实回测。</div></div>';
+      '<div class="bt-note">回测逻辑:篮内股票等权,动量突破(创 20 日新高买,破 MA20 卖)' + (tpOn ? (';' + tpTxt) : '') + (cost ? ',已含交易成本。' : ';暂不计交易成本。') + '价格取自 AROS 真实前复权日线(REAL_KLINE),为真实回测,非演示值。</div></div>';
     if (hint) hint.textContent = '已回测 ' + sel.length + ' 只 · ' + tpTxt;
   }
   function wizInit() {
@@ -3343,6 +3392,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<div class="bt-scan-row"><span style="font-size:12px;color:var(--dim)">回测范围</span>' +
       '<span class="bt-scan-opt active" data-scan="single">单只标的</span>' +
       '<span class="bt-scan-opt" data-scan="all">候选池扫描(' + CAND.length + ' 只真实股)</span>' +
+      '<span class="bt-scan-opt" data-scan="market">全市场扫描(实时 · Top100)</span>' +
       '<label class="bt-cost"><input type="checkbox" id="btCost"> 含交易成本</label></div>' +
       '<div class="bt-note">「候选池扫描」按所选指标组合 + 止盈止损,对 ' + CAND.length + ' 只真实候选股逐一回测并排名,列出符合条件的个股。价格取自 AROS 真实前复权日线(REAL_KLINE)。</div></div>';
     return '<div class="bt-wrap">' +
@@ -3390,15 +3440,11 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const rk = (typeof REAL_KLINE !== 'undefined') ? REAL_KLINE[code] : null;
     if (rk && rk.c && rk.c.length >= n) return rk.c.slice(rk.c.length - n);
     if (rk && rk.c && rk.c.length > 0) return rk.c.slice();
-    const px = [];
-    let cur = parseFloat(startPx);
-    for (let i = 0; i < n; i++) {
-      const drift = (btRnd(code, 900 + i) - 0.47) * 0.030;
-      cur = cur * (1 + drift);
-      px.push(cur);
-    }
-    const base = parseFloat(startPx) / px[n - 1];
-    return px.map(v => v * base);
+    const rkf = (typeof RK_FULL !== 'undefined') ? RK_FULL[code] : null;
+    if (rkf && rkf.c && rkf.c.length >= n) return rkf.c.slice(rkf.c.length - n);
+    if (rkf && rkf.c && rkf.c.length > 0) return rkf.c.slice();
+    // 真实数据缺失:返回 null,由调用方放弃该标的(不再用随机游走模拟)
+    return null;
   }
 
   function btMA(px, w) {
@@ -3493,6 +3539,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
   function btRun(stock, indIds, combo, indParams, tp, sl, days, cash, cost) {
     const n = days;
     const px = btPriceSeries(stock.c, stock.px, n);
+    if (!px || px.length < 5) return null;
     const states = indIds.map(id => btIndicatorState(id, indParams[id], px, n));
     const signal = new Array(n).fill(0);
     for (let i = 0; i < n; i++) {
@@ -3573,7 +3620,9 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const grossLoss = trades.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0);
     const profitFactor = grossLoss < 0 ? (grossProfit / (-grossLoss)) : (grossProfit > 0 ? Infinity : 0);
     const rkD = (typeof REAL_KLINE !== 'undefined') ? REAL_KLINE[stock.c] : null;
-    const dates = (rkD && rkD.d && rkD.d.length >= n) ? rkD.d.slice(rkD.d.length - n) : btDates(n, stock.sel || '2026-08-08');
+    const rkF = (typeof RK_FULL !== 'undefined') ? RK_FULL[stock.c] : null;
+    const srcD = (rkD && rkD.d && rkD.d.length >= n) ? rkD : ((rkF && rkF.d && rkF.d.length >= n) ? rkF : null);
+    const dates = srcD ? srcD.d.slice(srcD.d.length - n) : btDates(n, stock.sel || '2026-08-08');
     const hsMap = {};
     if (typeof HS300 !== 'undefined') HS300.d.forEach((dd, k) => { hsMap[dd] = HS300.c[k]; });
     let hsStart = null;
@@ -3665,7 +3714,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<span><i style="background:#3D4C5F"></i>基准(沪深300) ' + btFmt((benchEnd / r.cash - 1) * 100, 1, true) + '%</span>' +
       '<span><i style="background:#26B25A"></i>买点</span><span><i style="background:#E93A3A"></i>卖点</span></span></div>' +
       btEquityChart(r, 1000, 220) +
-      '<div class="bt-note">注:价格序列由前端引擎按该标的现价确定性模拟生成;组合逻辑「' + (r.combo === 'and' ? '全部满足 AND' : '任一满足 OR') + '」' + tpslTxt + (r.cost ? ';已含交易成本(佣金+印花税+滑点)。' : ';暂不计交易成本。') + '接入 AROS 后端真实日线后,曲线与指标即来自真实回测引擎。</div></div>' +
+      '<div class="bt-note">注:价格序列取自 AROS 真实前复权日线(REAL_KLINE / 东方财富 push2his);组合逻辑「' + (r.combo === 'and' ? '全部满足 AND' : '任一满足 OR') + '」' + tpslTxt + (r.cost ? ';已含交易成本(佣金+印花税+滑点)。' : ';暂不计交易成本。') + '曲线与指标均来自真实回测。</div></div>' +
       '<div class="pg-table bt-table"><table><thead><tr>' +
       '<th>#</th><th>买入日期</th><th>买入价</th><th>卖出日期</th><th>卖出价</th><th>持有(天)</th><th>盈亏</th><th>收益率</th><th>平仓原因</th></tr></thead><tbody>' +
       (trHtml || '<tr><td colspan="9" style="text-align:center;color:var(--faint)">区间内无交易信号</td></tr>') +
@@ -3689,15 +3738,16 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       '<div class="bt-scan-note">扫描 ' + rows.length + ' 只标的,按总收益率排名;平均 ' + (avg * 100).toFixed(2) + '%,最佳 ' + best.name + ' ' + (best.total * 100).toFixed(2) + '%,最差 ' + worst.name + ' ' + (worst.total * 100).toFixed(2) + '%</div>' +
       '<div class="pg-table bt-scan-table"><table><thead><tr><th>排名</th><th>名称</th><th>代码</th><th>总收益</th><th>胜率</th><th>交易数</th><th>最大回撤</th><th>夏普</th></tr></thead>' +
       '<tbody>' + (tr || '<tr><td colspan="8" style="text-align:center;color:var(--faint)">无结果</td></tr>') + '</tbody></table></div>' +
-      '<div class="bt-note">注:价格为前端模拟引擎生成;扫描沿用当前指标组合与止盈止损设置。接入 AROS 真实日线后即为真实选股回测。</div></div>';
+      '<div class="bt-note">注:扫描沿用当前指标组合与止盈止损设置;候选池价格取自内置 REAL_KLINE,全市场扫描价格取自东方财富 push2his 实时前复权日线,均为真实回测,非演示值。</div></div>';
   }
 
-  function btExec() {
+  function btExec(btn) {
     const result = document.getElementById('btResult');
     if (!result) return;
+    const scope = btn ? btn.closest('.bt-wrap') : null;
     const indIds = [];
     const indParams = {};
-    document.querySelectorAll('.bt-indic.active').forEach(el => {
+    (scope || document).querySelectorAll('.bt-indic.active').forEach(el => {
       const id = el.dataset.ind;
       indIds.push(id);
       const p = {};
@@ -3708,9 +3758,9 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       result.innerHTML = '<div class="bt-empty">请至少选择一个技术指标</div>';
       return;
     }
-    const comboEl = document.querySelector('.bt-combo-opt.active');
-    const periodEl = document.querySelector('.bt-period.active');
-    const cashEl = document.querySelector('.bt-cash-opt.active');
+    const comboEl = (scope || document).querySelector('.bt-combo-opt.active');
+    const periodEl = (scope || document).querySelector('.bt-period.active');
+    const cashEl = (scope || document).querySelector('.bt-cash-opt.active');
     if (!comboEl || !periodEl || !cashEl) return;
     const combo = comboEl.dataset.combo;
     const days = parseInt(periodEl.dataset.days, 10);
@@ -3721,8 +3771,8 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const sl = slEl && slEl.value !== '' ? parseFloat(slEl.value) || 0 : 0;
     const costEl = document.getElementById('btCost');
     const cost = !!(costEl && costEl.checked);
-    const scanEl = document.querySelector('.bt-scan-opt.active');
-    const scan = !!(scanEl && scanEl.dataset.scan === 'all');
+    const scanEl = (scope || document).querySelector('.bt-scan-opt.active');
+    const scan = scanEl ? scanEl.dataset.scan : 'single';
     const pool = PAGES.watchlist.blocks[0].d;
     const selInput = document.getElementById('btStock');
     let stock = null;
@@ -3732,17 +3782,90 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
       const fuzzy = pool.filter(s => s.n.indexOf(kw) >= 0 || kw.indexOf(s.n) >= 0);
       stock = exact.length ? exact[0] : (fuzzy.length ? fuzzy[0] : null);
     }
-    if (scan) {
+    if (scan === 'market') {
+      result.innerHTML = '<div class="bt-empty">正在拉取全市场实时行情与历史 K 线(首次约 10–20 秒)…</div>';
+      ensureMarketScan().then(function (all) {
+        if (!all) { result.innerHTML = '<div class="bt-empty">全市场行情拉取失败(预览环境可能拦截外部请求)。请用本机浏览器打开本文件(file://)查看。</div>'; return; }
+        const top = pickUniverse(all, 'f3', 100);
+        const codes = top.map(function (x) { return x.f12; });
+        ensureKlines(codes, days, 10).then(function () {
+          const list = codes.map(function (c) { const t = top.filter(function (x) { return x.f12 === c; })[0] || {}; return { c: c, n: t.f14 || c, sel: '2026-08-08' }; });
+          const rows = list.map(function (s) {
+            const r = btRun(s, indIds, combo, indParams, tp, sl, days, cash, cost);
+            if (!r) return null;
+            return { code: s.c, name: s.n, total: r.metrics.totalReturn, win: r.metrics.winRate, trades: r.metrics.trades, dd: r.metrics.maxDD, sharpe: r.metrics.sharpe };
+          }).filter(Boolean).sort(function (a, b) { return b.total - a.total; });
+          result.innerHTML = btRenderScan(rows, indIds, cost);
+        }).catch(function (e) { result.innerHTML = '<div class="bt-empty">全市场扫描出错:' + ((e && e.message) || e) + '</div>'; });
+      }).catch(function (e) { result.innerHTML = '<div class="bt-empty">全市场扫描出错:' + ((e && e.message) || e) + '</div>'; });
+      return;
+    }
+    if (scan === 'all') {
       const rows = pool.map(s => {
         const r = btRun(s, indIds, combo, indParams, tp, sl, days, cash, cost);
+        if (!r) return null;
         return { code: s.c, name: s.n, total: r.metrics.totalReturn, win: r.metrics.winRate, trades: r.metrics.trades, dd: r.metrics.maxDD, sharpe: r.metrics.sharpe };
-      }).sort((a, b) => b.total - a.total);
+      }).filter(Boolean).sort(function (a, b) { return b.total - a.total; });
       result.innerHTML = btRenderScan(rows, indIds, cost);
       return;
     }
     if (!stock) stock = pool[0];
     const r = btRun(stock, indIds, combo, indParams, tp, sl, days, cash, cost);
+    if (!r) { result.innerHTML = '<div class="bt-empty">该标的真实 K 线不足,无法回测(请改用候选池或全市场扫描)。</div>'; return; }
     result.innerHTML = btRenderResult(r);
+  }
+
+  // ---------- 模拟交易:真实 K 线驱动的组合回测(替代原 mock 数据) ----------
+  function renderSimReal() {
+    const el = document.getElementById('simRealWrap');
+    if (!el || el.dataset.done) return;
+    const N = WATCH.length;
+    const cash = 1000000, cashPer = cash / N, days = 250, tp = 15, sl = 8, cost = true;
+    const mom = BT_INDICATORS.find(x => x.id === 'mom');
+    const momParams = { mom: {} }; mom.params.forEach(p => momParams.mom[p.k] = p.def);
+    const runs = WATCH.map(s => { try { return btRun(s, ['mom'], 'and', momParams, tp, sl, days, cashPer, cost); } catch (e) { return null; } });
+    const valid = runs.filter(Boolean);
+    if (!valid.length) { el.innerHTML = '<div class="bt-empty">真实 K 线缺失,无法驱动模拟组合(REAL_KLINE 未注入)</div>'; return; }
+    el.dataset.done = '1';
+    const L = valid[0].equity.length;
+    const avgNav = new Array(L).fill(0);
+    valid.forEach(r => { for (let i = 0; i < L; i++) avgNav[i] += r.equity[i].nav / cashPer; });
+    for (let i = 0; i < L; i++) avgNav[i] /= valid.length;
+    const totalReturn = avgNav[L - 1] / avgNav[0] - 1;
+    const years = days / 250;
+    const cagr = Math.pow(avgNav[L - 1] / avgNav[0], 1 / years) - 1;
+    const avgWin = valid.reduce((a, r) => a + r.metrics.winRate, 0) / valid.length;
+    const avgSharpe = valid.reduce((a, r) => a + r.metrics.sharpe, 0) / valid.length;
+    const worstDD = Math.max.apply(null, valid.map(r => r.metrics.maxDD));
+    const avgTrades = Math.round(valid.reduce((a, r) => a + r.metrics.trades, 0) / valid.length);
+    const navYuan = avgNav.map(v => v * cash);
+    const kpis = [
+      { t: '组合总资产', v: (navYuan[L - 1] / 10000).toFixed(1) + ' 万', d: '初始 ' + (cash / 10000).toFixed(0) + ' 万 · ' + valid.length + ' 只等权', c: totalReturn >= 0 ? 'up' : 'down' },
+      { t: '累计收益', v: (totalReturn >= 0 ? '+' : '') + (totalReturn * 100).toFixed(2) + '%', d: '年化 ' + (cagr >= 0 ? '+' : '') + (cagr * 100).toFixed(2) + '%', c: totalReturn >= 0 ? 'up' : 'down' },
+      { t: '最大回撤', v: '-' + (worstDD * 100).toFixed(2) + '%', d: '篮内最深', c: 'down' },
+      { t: '夏普比率', v: avgSharpe.toFixed(2), d: '年化 · 无风险 0', c: avgSharpe >= 0 ? 'up' : 'down' },
+      { t: '胜率', v: (avgWin * 100).toFixed(1) + '%', d: '平均', c: avgWin >= 0.5 ? 'up' : 'down' },
+      { t: '交易次数', v: avgTrades, d: '平均每只', c: '' }
+    ];
+    const kpiHtml = kpis.map(k => '<div class="bt-kpi"><div class="bt-kpi-t">' + k.t + '</div><div class="bt-kpi-v ' + k.c + '">' + k.v + '</div><div class="bt-kpi-d">' + k.d + '</div></div>').join('');
+    const chartR = { cash: 1, equity: avgNav.map((v, i) => ({ i, nav: v, bench: avgNav[0] })), trades: [], dates: valid[0].dates };
+    const eqHtml = '<div class="bt-equity-card"><div class="bt-eq-head"><span class="bt-eq-title">📈 模拟组合净值 · ' + valid.length + ' 只等权(动量突破 · 真实价)</span><span class="bt-legend"><span><i style="background:#2962FF"></i>组合 ' + (totalReturn * 100).toFixed(1) + '%</span><span><i style="background:#3D4C5F"></i>等权基准(归一)</span></span></div>' + btEquityChart(chartR, 1000, 200) +
+      '<div class="bt-note">组合 = 自选 ' + N + ' 只等权(各 ' + (cashPer / 10000).toFixed(1) + ' 万),对每只运行动量突破(创 20 日新高买入、跌破 MA20 卖出,止盈 15% / 止损 8%,含交易成本),价格取自 AROS 真实前复权日线(REAL_KLINE)。净值 = 各标的真实净值等权平均。这是真实回测驱动的组合,非演示数据。</div></div>';
+    const holdRows = valid.map(r => {
+      const lastPx = r.px[r.px.length - 1];
+      const cls = r.metrics.totalReturn >= 0 ? 'up' : 'down';
+      return '<tr><td>' + r.name + '</td><td>' + r.code + '</td><td>' + lastPx.toFixed(2) + '</td><td class="' + cls + '">' + (r.metrics.totalReturn >= 0 ? '+' : '') + (r.metrics.totalReturn * 100).toFixed(2) + '%</td><td class="down">-' + (r.metrics.maxDD * 100).toFixed(2) + '%</td><td>' + (r.metrics.winRate * 100).toFixed(1) + '%</td><td>' + r.metrics.trades + '</td></tr>';
+    }).join('');
+    const holdHtml = '<div class="pg-panel"><div class="pg-panel-t">📊 持仓明细(真实回测驱动 · ' + valid.length + ' 只)</div><div class="pg-table"><table><thead><tr><th>名称</th><th>代码</th><th>最新价</th><th>区间收益</th><th>最大回撤</th><th>胜率</th><th>交易数</th></tr></thead><tbody>' + holdRows + '</tbody></table></div></div>';
+    const secMap = {};
+    valid.forEach(r => { const s = WATCH.find(w => w.c === r.code) || {}; const sec = s.sec || '其他'; secMap[sec] = (secMap[sec] || 0) + r.equity[L - 1].nav; });
+    const totalNav = valid.reduce((a, r) => a + r.equity[L - 1].nav, 0);
+    const barsData = Object.keys(secMap).map(sec => { const pct = secMap[sec] / totalNav * 100; return { name: sec, val: Number(pct.toFixed(1)), txt: pct.toFixed(1) + '%', color: '#2962FF' }; });
+    const barsHtml = bars(barsData);
+    const tradeRows = [];
+    valid.forEach(r => { if (r.trades && r.trades.length) { const t = r.trades[r.trades.length - 1]; tradeRows.push('<tr><td>' + r.dates[t.sellI] + '</td><td>' + (t.reason === '买入' ? '买入' : '卖出') + '</td><td>' + r.name + '</td><td>' + t.buyPx.toFixed(2) + '</td><td>' + t.sellPx.toFixed(2) + '</td><td class="' + (t.pnl >= 0 ? 'up' : 'down') + '">' + (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(0) + '</td><td class="' + (t.pnl >= 0 ? 'up' : 'down') + '">' + (t.pct >= 0 ? '+' : '') + t.pct.toFixed(2) + '%</td><td>' + t.reason + '</td></tr>'); } });
+    const tradeHtml = '<div class="pg-panel" style="margin-top:12px"><div class="pg-panel-t">🧾 近期成交(每只最近一笔 · 真实回测)</div><div class="pg-table"><table><thead><tr><th>日期</th><th>方向</th><th>股票</th><th>买入价</th><th>卖出价</th><th>盈亏</th><th>收益率</th><th>原因</th></tr></thead><tbody>' + (tradeRows.join('') || '<tr><td colspan="8" style="text-align:center;color:var(--faint)">区间内无成交</td></tr>') + '</tbody></table></div></div>';
+    el.innerHTML = '<div class="bt-kpis">' + kpiHtml + '</div>' + eqHtml + holdHtml + barsHtml + tradeHtml;
   }
 
   function renderPage(id) {
@@ -3768,6 +3891,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     if (target) target.style.display = 'flex';
     if (id === 'marketscan') { const at = document.querySelector('.ms-tab.active'); loadMarketScan(at ? at.dataset.k : 'f3', at ? at.dataset.dir : 'desc', false); }
     if (id === 'backtest') renderBacktestLab();
+    if (id === 'sim') renderSimReal();
     if (id === 'watchlist' || id === 'radar') refreshLivePrices();
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === id));
     const sc = document.querySelector('.content');
@@ -3786,7 +3910,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
     const radar = document.getElementById('page-radar');
     if (moved && radar) { radar.appendChild(moved); moved.style.display = ''; }
     refreshLivePrices();
-    ['announce', 'events', 'portfolio', 'sim', 'positions', 'reports', 'messages', 'settings'].forEach(pid => {
+    ['announce', 'events', 'portfolio', 'positions', 'reports', 'messages', 'settings'].forEach(pid => {
       const pg = document.getElementById('page-' + pid);
       if (pg && !pg.querySelector('.app-backend-note')) {
         const b = document.createElement('div');
@@ -4429,7 +4553,9 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
         scanOpt.classList.add('active');
         return;
       }
-      if (e.target.closest('#btRunBtn')) { btExec(); return; }
+      const scopeBtn = e.target.closest('.bt-scope-btn');
+      if (scopeBtn) { renderBacktestLab(scopeBtn.dataset.scope); return; }
+      if (e.target.closest('#btRunBtn')) { btExec(e.target.closest('#btRunBtn')); return; }
       const tab = e.target.closest('.pg-flow-tab');
       if (tab) {
         const panel = tab.closest('.pg-panel');
