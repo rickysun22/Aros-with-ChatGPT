@@ -2257,7 +2257,7 @@
       case 'marketscan': return marketScanHtml();
       case 'btlabreal': return '<div id="btRealWrap"></div>';
       case 'simreal': return '<div id="simRealWrap"></div>';
-      case 'radarDyn': return '<div class="pg-kpis" id="radarKpis">加载中…</div><div id="radarBars" style="margin-top:10px"></div><div class="pg-note" id="radarNote"></div>';
+      case 'radarDyn': return '<div class="pg-kpis" id="radarKpis">加载中…</div><div class="pg-note" id="radarNote"></div>';
       case 'announceDyn': return '<div class="pg-kpis" id="annKpis"></div><div class="pg-list" id="annList"><div class="bt-empty">正在拉取沪深实时公告(东财)…</div></div>';
       case 'eventsDyn': return '<div class="pg-list" id="evtList"><div class="bt-empty">正在拉取实时公司事件(东财公告流)…</div></div><div class="pg-note" id="evtNote"></div>';
       case 'portfolioDyn': return '<div class="pg-kpis" id="pfKpis">加载中…</div><div id="pfTable"></div><div id="pfBars" style="margin-top:10px"></div>';
@@ -3435,12 +3435,8 @@ const RISK_DATA = {
       { t: '组合 Alpha', v: String(avgAlpha), d: '候选池技术面均值(真实 K 线推导)', cls: avgAlpha >= 70 ? 'up' : '', icon: '⚡' },
       { t: '胜率', v: avgWin + '%', d: '动量突破回测命中率(真实)', cls: '', icon: '🏆' }
     ]);
-    const bEl = document.getElementById('radarBars');
-    if (bEl) bEl.innerHTML = '<div class="pg-panel"><div class="pg-panel-t">🧬 因子 IC(全 A 股真实日线计算)</div>' + bars(FACTOR_ROWS.map(r => {
-      const ic = Math.abs(parseFloat(r.ic)); return { name: r.f, val: Math.round(Math.min(95, ic * 1000)), txt: r.ic, color: '#2962FF' };
-    })) + '</div>';
     const note = document.getElementById('radarNote');
-    if (note) note.innerHTML = 'Alpha 分数 = 候选池各股技术面(动量 / 均线 / RSI,由真实前复权日线 REAL_KLINE 推导)均值;胜率 = 动量突破策略在 REAL_KLINE 上的真实回测命中率;因子 IC 为全 A 股真实日线计算(见量化研究)。均为真实推导,非手编。';
+    if (note) note.innerHTML = 'Alpha 分数 = 候选池各股技术面(动量 / 均线 / RSI,由真实前复权日线推导)均值;胜率 = 动量突破策略在真实 K 线上的真实回测命中率。均为真实推导,非手编。';
   }
 
   // ---------- 东财公告中心(公告 / 事件 共用真实源) ----------
@@ -3965,7 +3961,6 @@ const RISK_DATA = {
   async function fillMarket() {
     await fetchPool();            // 动态标的池(东方财富实时主力净流入榜 top 30)
     setDynamicPool();             // CAND 切换为实时池,失败则保留本地自选 / SEED
-    await fetchPoolNewsFund(CAND);  // 拉取候选池真实新闻情绪 + 公募重仓(季报),填充 NEWS_CACHE / FUND_CACHE
     MARKET_LIST = await buildMarketCands();   // 真实前复权日线推导 alpha / 技术面
     fillMarketScores();
     mktRenderTable();
@@ -3989,6 +3984,15 @@ const RISK_DATA = {
     if (note) note.textContent = POOL_FALLBACK
       ? '⚠️ 实时标的池拉取失败(预览环境可能拦截外部请求),已回退到本地自选 / 默认池;请用本机浏览器打开本文件查看实时动态池。'
       : '✅ 标的池 = 东方财富实时主力净流入榜 top 30(动态,随行情变化);Alpha / 技术面 / 五维技术面 = 真实前复权日线推导。';
+    // 新闻+基金在后台补,不阻塞个股列表先显示出来
+    fetchPoolNewsFund(CAND).then(function () {
+      fillMarketScores();
+      if (tbody) {
+        const active = tbody.querySelector('tr.active');
+        if (active) mktRenderDetail(active);
+        else { const first = tbody.querySelector('tr'); if (first) mktRenderDetail(first); }
+      }
+    });
   }
 
   function renderPage(id) {
