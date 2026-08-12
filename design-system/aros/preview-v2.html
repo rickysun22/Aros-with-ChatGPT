@@ -1429,87 +1429,6 @@
           </div>
         </div>
 
-        <!-- UPCOMING EVENTS -->
-        <div class="panel" style="overflow-y:auto;flex:1;">
-          <div class="panel-header">
-            <h3>📅 Upcoming Events</h3>
-            <div class="panel-actions" style="display:flex;gap:6px;">
-              <div class="mini-btn">全部</div>
-            </div>
-          </div>
-          <div style="padding:4px 13px 10px;">
-            <div class="ev-item warn">
-              <div class="ev-date"><div class="d">12</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">美联储 FOMC 议息会议</div>
-                <div class="ev-impact">影响: <b>利率决议</b> · 美元指数波动,成长股估值承压</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">13</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">美国 7 月 CPI / PPI 数据</div>
-                <div class="ev-impact">影响: <b>通胀读数</b> · 影响降息预期定价,利好高估值成长</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">15</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">澜起科技(688008) IPO 上市</div>
-                <div class="ev-impact">影响: <b>半导体板块</b> · 新股虹吸效应,短期资金分流</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">18</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">中际旭创 中报披露</div>
-                <div class="ev-impact">影响: <b>业绩验证</b> · 一致预期净利 +55%,关注毛利率</div>
-              </div>
-            </div>
-            <div class="ev-item warn">
-              <div class="ev-date"><div class="d">20</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">LPR 报价公布</div>
-                <div class="ev-impact">影响: <b>流动性</b> · 降息预期,利好高估值成长</div>
-              </div>
-            </div>
-            <div class="ev-item warn">
-              <div class="ev-date"><div class="d">26</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">英伟达 (NVDA) Q2 财报</div>
-                <div class="ev-impact">影响: <b>AI 算力链</b> · 光模块/CPO 联动,业绩指引关键</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">31</div><div class="m">8月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">8 月制造业 PMI 数据</div>
-                <div class="ev-impact">影响: <b>经济景气度</b> · 顺周期板块风向标</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">04</div><div class="m">9月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">央行 MLF 操作</div>
-                <div class="ev-impact">影响: <b>资金面</b> · 关注续作量与利率</div>
-              </div>
-            </div>
-            <div class="ev-item">
-              <div class="ev-date"><div class="d">10</div><div class="m">9月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">华为 Mate 新品发布会</div>
-                <div class="ev-impact">影响: <b>消费电子</b> · 半导体/供应链主题催化</div>
-              </div>
-            </div>
-            <div class="ev-item warn">
-              <div class="ev-date"><div class="d">17</div><div class="m">9月</div></div>
-              <div class="ev-body">
-                <div class="ev-name">美联储 9 月 FOMC</div>
-                <div class="ev-impact">影响: <b>降息概率</b> · 市场预期 25bp,金银/成长股联动</div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -3462,6 +3381,20 @@ const RISK_DATA = {
     return Math.max(5, Math.min(95, sc));
   }
 
+  // 东方财富 stock/get 取真实行业(f100)/概念(f104),失败回退策略标签
+  function fetchStockMeta(codes) {
+    return Promise.all(codes.map(function (c) {
+      const secid = emSecid(c);
+      const cb = '__emcb_smeta' + c;
+      const emUrl = 'https://push2.eastmoney.com/api/qt/stock/get?secid=' + secid + '&fields=f57,f58,f100,f104&cb=' + cb;
+      return jsonpEM(emUrl, cb.replace('__emcb_', '')).then(function (d) {
+        const q = d && d.data;
+        let con = (q && q.f104) ? String(q.f104) : '';
+        if (!con || /^\d+$/.test(con)) con = '';   // 不是概念文本则丢弃,回退策略标签
+        return { c: c, sec: (q && q.f100) ? String(q.f100) : '', con: con };
+      }).catch(function () { return { c: c, sec: '', con: '' }; });
+    }));
+  }
   function fillRadar() {
     const tbody = document.getElementById('mktTbody');
     const note = document.getElementById('mktPoolNote');
@@ -3481,7 +3414,7 @@ const RISK_DATA = {
       });
     });
     const pool = Object.values(map).map(function (x) {
-      return { c: x.c, n: x.c, sec: '', con: x.sources.join('/'), sources: x.sources };
+      return { c: x.c, n: x.c, sec: '', con: x.sources.join('/') + ' 策略', sources: x.sources };
     });
     if (!pool.length) {
       if (note) note.textContent = '⚠️ LIVE_TARGETS 策略池为空';
@@ -3490,17 +3423,44 @@ const RISK_DATA = {
     }
     if (note) note.textContent = '正在加载 ' + lt.sel_date + ' A/B/H 真实选股行情与 K 线…';
     const codes = pool.map(function (s) { return s.c; });
-    fetchTencentBatch(codes).then(function (qmap) {
+    // 并行拉取实时价(腾讯) + 真实行业/概念(东财),任一失败均优雅回退
+    Promise.all([fetchTencentBatch(codes), fetchStockMeta(codes)]).then(function (res) {
+      const qmap = res[0] || {};
+      const mm = {}; (res[1] || []).forEach(function (m) { mm[m.c] = m; });
       pool.forEach(function (s) {
         const q = qmap[s.c];
         if (q) { s.n = q.name || s.c; s.px = q.price != null ? q.price.toFixed(2) : '—'; s.chg = q.pct != null ? (q.pct >= 0 ? '+' : '') + q.pct.toFixed(2) + '%' : '—'; }
+        const m = mm[s.c];
+        if (m) { if (m.sec) s.sec = m.sec; if (m.con) s.con = m.con; }
       });
-      buildMarketCands(pool).then(function (list) {
-        MARKET_LIST = list;
-        mktRenderTable();
-        if (note) note.textContent = '✅ 候选池 = A/B/H 三策略真实选股结果(' + lt.sel_date + ' 收盘 · 共 ' + pool.length + ' 只) · Alpha 由真实前复权日线推导。';
-        refreshLivePrices();
+      return buildMarketCands(pool);
+    }).then(function (list) {
+      MARKET_LIST = list;
+      mktRenderTable();
+      if (note) note.textContent = '✅ 候选池 = A/B/H 三策略真实选股结果(' + lt.sel_date + ' 收盘 · 共 ' + pool.length + ' 只) · Alpha / 板块 / 概念由真实行情推导。';
+      // 绑定列表点击 → 右侧 AI Insights / K线 / 公司业绩 联动(仅在尚未绑定时,避免重复绑定)
+      if (tbody && !MARKET_BOUND) {
+        tbody.addEventListener('click', function (e) {
+          const tr = e.target.closest('tr'); if (!tr) return;
+          tbody.querySelectorAll('tr').forEach(function (r) { r.classList.remove('active'); });
+          tr.classList.add('active');
+          mktRenderDetail(tr);
+        });
+        MARKET_BOUND = true;
+      }
+      // 首屏初始化右侧面板为第一只真实选股(修复此前停在中际旭创假数据的问题)
+      const first = tbody ? tbody.querySelector('tr') : null;
+      if (first) mktRenderDetail(first);
+      refreshLivePrices();
+      // 后台补东财公募重仓 / 新闻,丰富右侧机构面板与公司业绩(不阻塞首屏)
+      fetchPoolNewsFund(pool).then(function () {
+        if (!tbody) return;
+        const active = tbody.querySelector('tr.active') || tbody.querySelector('tr');
+        if (active) mktRenderDetail(active);
       });
+    }).catch(function (e) {
+      if (note) note.textContent = '⚠️ 行情 / 元数据拉取失败(预览环境可能拦截外部请求)。请用本机浏览器打开本文件(file://)查看实时数据。';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="ms-empty">网络受限:' + ((e && e.message) || e) + '</td></tr>';
     });
   }
 
@@ -3725,6 +3685,129 @@ const RISK_DATA = {
     const upEl = document.getElementById('mktUpd');
     if (upEl) upEl.textContent = '数据更新 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   }
+  // ---- 5 面评分:由真实行情/资金流推导(非机构评级) ----
+  function computeLiveFaces(bare, q, rk, inflowYuan, turnover) {
+    let tech = 50;
+    if (rk && rk.c && rk.c.length >= 15) {
+      const cs = rk.c, n = cs.length, last = cs[n - 1];
+      const ma20 = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / Math.min(20, n);
+      const ma60 = cs.slice(-60).reduce(function (a, b) { return a + b; }, 0) / Math.min(60, n);
+      const mom20 = (last / cs[Math.max(0, n - 21)] - 1) * 100;
+      let gain = 0, loss = 0;
+      for (let i = n - 14; i < n; i++) { const d = cs[i] - cs[i - 1]; if (d >= 0) gain += d; else loss -= d; }
+      const rs = loss === 0 ? 99 : (gain / 14) / (loss / 14);
+      const rsi = 100 - 100 / (1 + rs);
+      let sc = 50 + mom20 * 2.2; sc += (ma20 > ma60) ? 10 : -10; sc += (rsi - 50) * 0.4;
+      tech = Math.max(5, Math.min(95, sc));
+    }
+    let flow = 50;
+    if (inflowYuan != null && !isNaN(inflowYuan)) {
+      const yi = inflowYuan / 1e8;
+      flow = Math.max(5, Math.min(95, 50 + Math.sign(yi) * Math.min(45, Math.log10(Math.abs(yi) + 1) * 6)));
+    }
+    let fund = 50;
+    const fc = (typeof FUND_CACHE !== 'undefined') ? FUND_CACHE[bare] : null;
+    if (fc && fc.face != null) {
+      fund = fc.face;   // 真实公募重仓(季报)推导基本面
+    } else {
+      const pe = q.pe, pb = q.pb;
+      if (pe != null && pe > 0) {
+        fund = Math.max(20, Math.min(80, 70 - Math.min(pe, 80) * 0.4));
+        if (pb != null && pb > 0) fund = (fund + Math.max(20, Math.min(80, 65 - Math.min(pb, 20) * 1.5))) / 2;
+      } else if (pe != null && pe < 0) fund = 45;
+    }
+    const pct = q.pct || 0, to = turnover || 0;
+    const sent = Math.max(5, Math.min(95, 50 + pct * 2 + (to - 2) * 1.5));
+    const newsScore = (typeof NEWS_CACHE !== 'undefined' && NEWS_CACHE[bare] != null) ? NEWS_CACHE[bare].score : 50;
+    return { fund: Math.round(fund), tech: Math.round(tech), flow: Math.round(flow), news: Math.round(newsScore), sent: Math.round(sent) };
+  }
+
+    // ---- 个股真实新闻(东财 np-listapi · 浏览器端 JSONP,全市场任意股票) ----
+    // 返回 { list:[{t,sent,time,src,imp}], score:0-100, count }；网络/接口失败 cb(null) 不造假
+    function fetchNewsEM(code, cb) {
+      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
+      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
+      const cbName = '__emnw' + Math.random().toString(36).slice(2, 9);
+      const url = 'https://np-listapi.eastmoney.com/comm/wap/getNewsByCode?cb=' + cbName + '&code=1.' + code + '&pageSize=15&_=' + Date.now();
+      const sc = document.createElement('script');
+      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
+      window[cbName] = function (resp) {
+        cleanup();
+        try {
+          const list = (resp && resp.data && resp.data.list) ? resp.data.list : [];
+          if (!list.length) { cb(null); return; }
+          const POS = ['增持', '买入', '利好', '预增', '中标', '回购', '增长', '突破', '合作', '签约', '批准', '上调', '扩产', '订单', '扭亏', '超预期', '获批', '大涨', '创新高', '中标', '签约'];
+          const NEG = ['减持', '卖出', '利空', '预减', '下滑', '亏损', '警示', '立案', '处罚', '下调', '风险', '解禁', '商誉', '诉讼', '冻结', '违规', '大跌', '回落', '承压', '推迟', '问询'];
+          const items = []; let sum = 0, cnt = 0;
+          list.slice(0, 15).forEach(function (n) {
+            const t = (n.title || n.t || '') + '';
+            if (!t) return;
+            let s = 0;
+            POS.forEach(function (k) { if (t.indexOf(k) >= 0) s++; });
+            NEG.forEach(function (k) { if (t.indexOf(k) >= 0) s--; });
+            const sent = s > 0 ? 1 : (s < 0 ? -1 : 0);
+            sum += sent; cnt++;
+            const time = n.showTime || n.time || n.date || '';
+            const src = n.mediaName || n.source || n.src || '东财';
+            items.push({ t: t, sent: sent, time: ('' + time).slice(0, 10), src: src, imp: '个股新闻' });
+          });
+          if (!cnt) { cb(null); return; }
+          const score = Math.max(5, Math.min(95, 50 + (sum / cnt) * 35));
+          cb({ list: items, score: score, count: cnt });
+        } catch (e) { cb(null); }
+      };
+      sc.onerror = function () { cleanup(); cb(null); };
+      sc.src = url;
+      document.head.appendChild(sc);
+      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
+    }
+    // ---- 个股公募重仓(东财 datacenter RPT_FUND_STOCKNEW_HOLD · 季报真实,滞后约 1-2 月) ----
+    // 返回 { count:持仓基金数, mv:持股市值(亿元), face:0-100, rows }；失败 cb(null) 不造假
+    function fetchFundHoldEM(code, cb) {
+      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
+      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
+      const cbName = '__emfh' + Math.random().toString(36).slice(2, 9);
+      const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_FUND_STOCKNEW_HOLD&columns=ALL&filter=(SECURITY_CODE%3D%22' + code + '%22)&pageSize=8&sortColumns=HOLD_FUND_NUM&sortTypes=-1&source=WEB&client=WEB&cb=' + cbName;
+      const sc = document.createElement('script');
+      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
+      window[cbName] = function (resp) {
+        cleanup();
+        try {
+          const res = (resp && resp.data) ? resp.data : null;
+          const rows = (res && res.result) ? res.result : (res && res.data ? res.data : []);
+          if (!rows.length) { cb(null); return; }
+          let fundNum = 0, mv = 0;
+          rows.forEach(function (r) {
+            const fn = r.HOLD_FUND_NUM != null ? r.HOLD_FUND_NUM : (r.fundNum != null ? r.fundNum : null);
+            const m = r.MARKET_VALUE != null ? r.MARKET_VALUE : (r.marketValue != null ? r.marketValue : null);
+            fundNum = Math.max(fundNum, fn || 0);
+            if (m != null) mv += (typeof m === 'number' ? m : parseFloat(m) || 0);
+          });
+          const face = Math.max(20, Math.min(90, 45 + (fundNum || 0) * 0.18));
+          cb({ count: fundNum || 0, mv: mv / 1e8, face: face, rows: rows });
+        } catch (e) { cb(null); }
+      };
+      sc.onerror = function () { cleanup(); cb(null); };
+      sc.src = url;
+      document.head.appendChild(sc);
+      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
+    }
+    // ---- 批量拉取候选池真实新闻 + 公募重仓(分批并发,结果写入缓存并挂到 s 上) ----
+    async function fetchPoolNewsFund(list) {
+      const items = (list || []).filter(function (s) { return s && s.c; }).slice(0, 24);
+      const B = 4;
+      for (let i = 0; i < items.length; i += B) {
+        const batch = items.slice(i, i + B);
+        await Promise.all(batch.map(function (s) {
+          return new Promise(function (resolve) {
+            let got = 0; const step = function () { if (++got >= 2) resolve(); };
+            fetchNewsEM(s.c, function (r) { if (r) { NEWS_CACHE[s.c] = r; s.news = r; } step(); });
+            fetchFundHoldEM(s.c, function (r) { if (r) { FUND_CACHE[s.c] = r; s.fund = r; } step(); });
+          });
+        }));
+      }
+    }
+
   function mktBuildDetail(s) {
     const rk = s.rk;
     const cs = (rk && rk.c) ? rk.c : null;
@@ -4518,127 +4601,6 @@ const RISK_DATA = {
       sc.src = url;
       document.head.appendChild(sc);
       setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
-    }
-    // ---- 个股真实新闻(东财 np-listapi · 浏览器端 JSONP,全市场任意股票) ----
-    // 返回 { list:[{t,sent,time,src,imp}], score:0-100, count }；网络/接口失败 cb(null) 不造假
-    function fetchNewsEM(code, cb) {
-      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
-      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
-      const cbName = '__emnw' + Math.random().toString(36).slice(2, 9);
-      const url = 'https://np-listapi.eastmoney.com/comm/wap/getNewsByCode?cb=' + cbName + '&code=1.' + code + '&pageSize=15&_=' + Date.now();
-      const sc = document.createElement('script');
-      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
-      window[cbName] = function (resp) {
-        cleanup();
-        try {
-          const list = (resp && resp.data && resp.data.list) ? resp.data.list : [];
-          if (!list.length) { cb(null); return; }
-          const POS = ['增持', '买入', '利好', '预增', '中标', '回购', '增长', '突破', '合作', '签约', '批准', '上调', '扩产', '订单', '扭亏', '超预期', '获批', '大涨', '创新高', '中标', '签约'];
-          const NEG = ['减持', '卖出', '利空', '预减', '下滑', '亏损', '警示', '立案', '处罚', '下调', '风险', '解禁', '商誉', '诉讼', '冻结', '违规', '大跌', '回落', '承压', '推迟', '问询'];
-          const items = []; let sum = 0, cnt = 0;
-          list.slice(0, 15).forEach(function (n) {
-            const t = (n.title || n.t || '') + '';
-            if (!t) return;
-            let s = 0;
-            POS.forEach(function (k) { if (t.indexOf(k) >= 0) s++; });
-            NEG.forEach(function (k) { if (t.indexOf(k) >= 0) s--; });
-            const sent = s > 0 ? 1 : (s < 0 ? -1 : 0);
-            sum += sent; cnt++;
-            const time = n.showTime || n.time || n.date || '';
-            const src = n.mediaName || n.source || n.src || '东财';
-            items.push({ t: t, sent: sent, time: ('' + time).slice(0, 10), src: src, imp: '个股新闻' });
-          });
-          if (!cnt) { cb(null); return; }
-          const score = Math.max(5, Math.min(95, 50 + (sum / cnt) * 35));
-          cb({ list: items, score: score, count: cnt });
-        } catch (e) { cb(null); }
-      };
-      sc.onerror = function () { cleanup(); cb(null); };
-      sc.src = url;
-      document.head.appendChild(sc);
-      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
-    }
-    // ---- 个股公募重仓(东财 datacenter RPT_FUND_STOCKNEW_HOLD · 季报真实,滞后约 1-2 月) ----
-    // 返回 { count:持仓基金数, mv:持股市值(亿元), face:0-100, rows }；失败 cb(null) 不造假
-    function fetchFundHoldEM(code, cb) {
-      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
-      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
-      const cbName = '__emfh' + Math.random().toString(36).slice(2, 9);
-      const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_FUND_STOCKNEW_HOLD&columns=ALL&filter=(SECURITY_CODE%3D%22' + code + '%22)&pageSize=8&sortColumns=HOLD_FUND_NUM&sortTypes=-1&source=WEB&client=WEB&cb=' + cbName;
-      const sc = document.createElement('script');
-      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
-      window[cbName] = function (resp) {
-        cleanup();
-        try {
-          const res = (resp && resp.data) ? resp.data : null;
-          const rows = (res && res.result) ? res.result : (res && res.data ? res.data : []);
-          if (!rows.length) { cb(null); return; }
-          let fundNum = 0, mv = 0;
-          rows.forEach(function (r) {
-            const fn = r.HOLD_FUND_NUM != null ? r.HOLD_FUND_NUM : (r.fundNum != null ? r.fundNum : null);
-            const m = r.MARKET_VALUE != null ? r.MARKET_VALUE : (r.marketValue != null ? r.marketValue : null);
-            fundNum = Math.max(fundNum, fn || 0);
-            if (m != null) mv += (typeof m === 'number' ? m : parseFloat(m) || 0);
-          });
-          const face = Math.max(20, Math.min(90, 45 + (fundNum || 0) * 0.18));
-          cb({ count: fundNum || 0, mv: mv / 1e8, face: face, rows: rows });
-        } catch (e) { cb(null); }
-      };
-      sc.onerror = function () { cleanup(); cb(null); };
-      sc.src = url;
-      document.head.appendChild(sc);
-      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
-    }
-    // ---- 批量拉取候选池真实新闻 + 公募重仓(分批并发,结果写入缓存并挂到 s 上) ----
-    async function fetchPoolNewsFund(list) {
-      const items = (list || []).filter(function (s) { return s && s.c; }).slice(0, 24);
-      const B = 4;
-      for (let i = 0; i < items.length; i += B) {
-        const batch = items.slice(i, i + B);
-        await Promise.all(batch.map(function (s) {
-          return new Promise(function (resolve) {
-            let got = 0; const step = function () { if (++got >= 2) resolve(); };
-            fetchNewsEM(s.c, function (r) { if (r) { NEWS_CACHE[s.c] = r; s.news = r; } step(); });
-            fetchFundHoldEM(s.c, function (r) { if (r) { FUND_CACHE[s.c] = r; s.fund = r; } step(); });
-          });
-        }));
-      }
-    }
-    // ---- 5 面评分:由真实行情/资金流推导(非机构评级) ----
-    function computeLiveFaces(bare, q, rk, inflowYuan, turnover) {
-      let tech = 50;
-      if (rk && rk.c && rk.c.length >= 15) {
-        const cs = rk.c, n = cs.length, last = cs[n - 1];
-        const ma20 = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / Math.min(20, n);
-        const ma60 = cs.slice(-60).reduce(function (a, b) { return a + b; }, 0) / Math.min(60, n);
-        const mom20 = (last / cs[Math.max(0, n - 21)] - 1) * 100;
-        let gain = 0, loss = 0;
-        for (let i = n - 14; i < n; i++) { const d = cs[i] - cs[i - 1]; if (d >= 0) gain += d; else loss -= d; }
-        const rs = loss === 0 ? 99 : (gain / 14) / (loss / 14);
-        const rsi = 100 - 100 / (1 + rs);
-        let sc = 50 + mom20 * 2.2; sc += (ma20 > ma60) ? 10 : -10; sc += (rsi - 50) * 0.4;
-        tech = Math.max(5, Math.min(95, sc));
-      }
-      let flow = 50;
-      if (inflowYuan != null && !isNaN(inflowYuan)) {
-        const yi = inflowYuan / 1e8;
-        flow = Math.max(5, Math.min(95, 50 + Math.sign(yi) * Math.min(45, Math.log10(Math.abs(yi) + 1) * 6)));
-      }
-      let fund = 50;
-      const fc = (typeof FUND_CACHE !== 'undefined') ? FUND_CACHE[bare] : null;
-      if (fc && fc.face != null) {
-        fund = fc.face;   // 真实公募重仓(季报)推导基本面
-      } else {
-        const pe = q.pe, pb = q.pb;
-        if (pe != null && pe > 0) {
-          fund = Math.max(20, Math.min(80, 70 - Math.min(pe, 80) * 0.4));
-          if (pb != null && pb > 0) fund = (fund + Math.max(20, Math.min(80, 65 - Math.min(pb, 20) * 1.5))) / 2;
-        } else if (pe != null && pe < 0) fund = 45;
-      }
-      const pct = q.pct || 0, to = turnover || 0;
-      const sent = Math.max(5, Math.min(95, 50 + pct * 2 + (to - 2) * 1.5));
-      const newsScore = (typeof NEWS_CACHE !== 'undefined' && NEWS_CACHE[bare] != null) ? NEWS_CACHE[bare].score : 50;
-      return { fund: Math.round(fund), tech: Math.round(tech), flow: Math.round(flow), news: Math.round(newsScore), sent: Math.round(sent) };
     }
     function runIntel(qcode, seed) {
       const bare = qcode.replace(/^(sh|sz|us|hk|bj)/i, '');
