@@ -515,6 +515,7 @@
   .intel-nimp { margin-left: auto; color: var(--faint); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; font-style: normal; }
   .intel-sec-sub { font-size: 11px; color: var(--faint); font-weight: 600; margin-left: 6px; }
   .intel-note { font-size: 11.5px; color: var(--faint); line-height: 1.6; background: rgba(245,158,11,.08); border: 1px dashed rgba(245,158,11,.4); border-radius: 8px; padding: 8px 11px; margin-top: 8px; }
+  .intel-live-banner { background: rgba(59,130,246,.08); border: 1px dashed rgba(59,130,246,.45); color: var(--text); font-weight: 500; }
 
   .intel-rp-list { margin-top: 9px; display: flex; flex-direction: column; gap: 6px; }
   .intel-rp { background: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; font-size: 12px; }
@@ -4237,9 +4238,11 @@ const RISK_DATA = {
 
       ]
     };
-    // ---- 真实研报(东方财富 stock_research_report_em 预取,见 INTEL_REAL) ----
-    function buildIntel(s) {
-      const F = s.faces || { fund: 50, tech: 50, flow: 50, news: 50, sent: 50 };
+    // ---- 情报研判:支持全市场实时数据(opts 覆盖离线兜底 INTEL_REAL/SEED_WATCH) ----
+    function buildIntel(s, opts) {
+      opts = opts || {};
+      const F = opts.faces || s.faces || { fund: 50, tech: 50, flow: 50, news: 50, sent: 50 };
+      const live = !!opts.live;
       const faceNames = { fund: '基本面', tech: '技术面', flow: '资金面', news: '新闻面', sent: '情绪面' };
       const faceIcons = { fund: '🏦', tech: '📈', flow: '💰', news: '📰', sent: '🔥' };
       const vText = v => v >= 70 ? '强' : (v >= 45 ? '中' : '弱');
@@ -4248,11 +4251,11 @@ const RISK_DATA = {
         '<div class="intel-fbar"><i style="width:' + F[k] + '%" class="' + (F[k] >= 70 ? 'good' : (F[k] >= 45 ? 'mid' : 'bad')) + '"></i></div>' +
         '<span class="intel-fval">' + F[k] + '</span></div>'
       ).join('');
-      const fScore = faceScore(s);
-      const kScore = kTechScore(s);
-      const nws = INTEL_NEWS[s.c] || [];
-      // === 真实研报(东方财富) ===
-      const real = (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[s.c]) ? INTEL_REAL[s.c] : null;
+      const fScore = faceScore({ faces: F });
+      const kScore = kTechScore({ px10: opts.px10 || s.px10 || [] });
+      const nws = opts.news || (typeof INTEL_NEWS !== 'undefined' ? (INTEL_NEWS[s.c] || []) : []);
+      // === 真实研报:实时优先,INTEL_REAL 离线兜底 ===
+      const real = opts.reports || (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[s.c] ? INTEL_REAL[s.c] : null);
       const reports = real ? real.reports : [];
       const repCount = real ? real.count : 0;
       const buyCount = real ? real.buys : 0;
@@ -4262,30 +4265,34 @@ const RISK_DATA = {
         '<div class="rp-row1"><span class="rp-brk">' + (r.broker || '—') + '</span>' +
         '<span class="rp-date">' + (r.date || '—') + '</span>' +
         '<span class="rp-rate ' + rateClsOf(r.rating) + '">' + (r.rating || '—') + '</span>' +
-        (r.eps != null ? '<span class="rp-tp">26E EPS ' + r.eps + '</span>' : '') +
-        (r.pe != null ? '<span class="rp-cat">26E PE ' + r.pe + '</span>' : '') +
+        (r.eps != null ? '<span class="rp-tp">当年EPS ' + r.eps + '</span>' : '') +
+        (r.pe != null ? '<span class="rp-cat">当年PE ' + r.pe + '</span>' : '') +
         '</div>' +
         '<div class="rp-row2"><span class="rp-logic">' + (r.title || '') + '</span></div>' +
         '</div>'
       ).join('');
       const rpHtml =
-        '<div class="intel-sec"><div class="intel-sec-t">📑 研报覆盖<span class="intel-sec-sub">真实数据 · 东方财富研报接口 · 近3月 ' + repCount + ' 篇 · 买入 ' + buyCount + ' 家</span></div>' +
+        '<div class="intel-sec"><div class="intel-sec-t">📑 研报覆盖<span class="intel-sec-sub">' + (live ? '真实数据 · 东财研报接口(实时拉取)' : '真实数据 · 东方财富研报接口 · 近3月 ' + repCount + ' 篇 · 买入 ' + buyCount + ' 家') + '</span></div>' +
         (reports.length ? '<div class="intel-rp-list">' + rpList + '</div>' : '<div class="intel-news neutral"><b>暂无</b><span>近3月无公开研报覆盖</span></div>') +
         '</div>';
-      // === 机构动向:真实字段暂缺,诚实占位(需接入港交所/基金季报/东方财富资金流) ===
+      // === 机构动向:主力净流入为实时(东财);北向/基金持仓诚实占位 ===
+      const inflowY = (opts.inflowYuan != null) ? opts.inflowYuan / 1e8 : null;
       const instHtml =
-        '<div class="intel-sec"><div class="intel-sec-t">🏛️ 机构动向<span class="intel-sec-sub">演示占位 · 需接入数据源</span></div>' +
-        '<div class="intel-note">主力净流入 / 北向资金 / 基金持仓 等字段需接入真实数据源(港交所沪深港通、基金季报、东方财富资金流),当前为原型演示占位,不代表真实机构动向。</div></div>';
+        '<div class="intel-sec"><div class="intel-sec-t">🏛️ 机构动向<span class="intel-sec-sub">' + (inflowY != null ? '主力净流入实时(东财);北向/基金持仓演示占位' : '演示占位 · 需接入数据源') + '</span></div>' +
+        (inflowY != null
+          ? '<div class="intel-news"><b>主力净流入(实时)</b><span>' + fmtYi(opts.inflowYuan) + (opts.turnover != null ? ' · 换手率 ' + opts.turnover.toFixed(2) + '%' : '') + '</span></div>' +
+            '<div class="intel-note">北向资金 / 基金持仓 等字段需接入真实数据源(港交所沪深港通、基金季报),当前为原型演示占位,不代表真实机构动向。</div>'
+          : '<div class="intel-note">主力净流入 / 北向资金 / 基金持仓 等字段需接入真实数据源(港交所沪深港通、基金季报、东方财富资金流),当前为原型演示占位,不代表真实机构动向。</div>');
       const newsScore = nws.length ? 50 + nws.reduce((a, n) => a + n.sent, 0) * 60 / nws.length : 50;
       const newsHtml =
-        '<div class="intel-sec"><div class="intel-sec-t">📰 新闻情报<span class="intel-sec-sub">' + nws.length + ' 条重点新闻</span></div>' +
+        '<div class="intel-sec"><div class="intel-sec-t">📰 新闻情报<span class="intel-sec-sub">' + (nws.length ? nws.length + ' 条重点新闻(演示)' : '需接入实时数据源') + '</span></div>' +
         (nws.length
           ? nws.map(n => '<div class="intel-news ' + (n.sent > 0 ? 'pos' : 'neg') + '">' +
             '<span class="intel-nmeta"><em class="intel-ntime">' + n.time + '</em><em class="intel-nsrc">' + n.src + '</em></span>' +
             '<span class="intel-ntag">' + (n.sent > 0 ? '利好' : '利空') + '</span>' +
             '<span class="intel-ntext">' + n.t + '</span>' +
             '<em class="intel-nimp">' + n.imp + '</em></div>').join('')
-          : '<div class="intel-news neutral"><b>暂无</b><span>近期无重大公开新闻</span></div>') +
+          : '<div class="intel-news neutral"><b>暂无</b><span>新闻面需接入实时数据源(演示占位)</span></div>') +
         '</div>';
       const verdict = fScore * 0.45 + kScore * 0.2 + newsScore * 0.35;
       const vCls = verdict >= 62 ? 'pos' : (verdict >= 48 ? 'neutral' : 'neg');
@@ -4301,20 +4308,24 @@ const RISK_DATA = {
         else if (downs > ups) { bull = '—'; bear = '机构评级偏谨慎(' + downs + '家卖出/减持),基本面承压'; }
         else { bull = '机构观点分歧,等待催化确认'; bear = '行业竞争与政策不确定性仍存'; }
       } else { bull = '暂无真实研报,无法推导机构观点'; bear = '—'; }
-      const mv = (parseFloat(s.lb) * 100).toFixed(0);
+      const mv = (s.cap != null) ? s.cap : (parseFloat(s.lb) * 100).toFixed(0);
       const ovHtml =
         '<div class="intel-sec"><div class="intel-sec-t">🏢 公司概览</div>' +
-        '<div class="intel-ov-intro">' + s.n + ' 是国内' + s.sec + '领域核心公司,主营' + s.con.replace(' · ', '/') + '等业务,市值约 ' + mv + ' 亿元。</div>' +
+        '<div class="intel-ov-intro">' + s.n + ' 是国内' + (s.sec ? s.sec + '领域' : '') + '核心上市公司,' + (s.con ? '主营' + s.con.replace(' · ', '/') + '等业务,' : '业务多元,') + '市值约 ' + mv + ' 亿元。</div>' +
         '<div class="intel-ov-grid">' +
         '<div class="intel-ov-item"><span class="ov-k">🔑 核心看点</span><span class="ov-v">' + bull + '</span></div>' +
         '<div class="intel-ov-item"><span class="ov-k">⚠️ 风险提示</span><span class="ov-v down">' + bear + '</span></div>' +
         '</div></div>';
+      const liveBanner = live ? '<div class="intel-note intel-live-banner">🛰️ 全市场实时情报:研报与 5 面评分由实时行情 / 东财数据推导,覆盖全部 A 股;主力净流入尝试接东财实时(接口受限时回退占位)。新闻面与北向 / 基金持仓仍为演示占位。</div>' : '';
+      const faceSub = live ? '实时估算 · 行情/资金流/估值推导(非机构评级)' : '原型演示评分(非实时计算)';
+      const chgCls = String(s.chg || '').charAt(0) === '-' ? 'down' : 'up';
       return '<div class="intel-head"><div class="intel-hname">' + s.n + ' <span>' + s.c + '</span></div>' +
-        '<div class="intel-hpx"><span class="' + (s.chg.startsWith('-') ? 'down' : 'up') + '">' + s.px + ' ' + s.chg + '</span><span class="intel-hmeta">' + s.sec + ' · ' + s.con + ' · 市值约 ' + mv + ' 亿</span></div></div>' +
+        '<div class="intel-hpx"><span class="' + chgCls + '">' + s.px + ' ' + s.chg + '</span><span class="intel-hmeta">' + (s.sec || '') + ' · ' + (s.con || '') + ' · 市值约 ' + mv + ' 亿</span></div></div>' +
+        liveBanner +
         '<div class="intel-verdict ' + vCls + '"><span class="iv-chip">综合研判 · ' + vTxt + '</span><span class="iv-desc">' + vDesc + '</span>' +
         '<span class="iv-scores">5面 ' + fScore.toFixed(0) + ' · K线 ' + kScore.toFixed(0) + ' · 新闻 ' + newsScore.toFixed(0) + '</span></div>' +
         ovHtml +
-        '<div class="intel-sec"><div class="intel-sec-t">🎯 5 面评分<span class="intel-sec-sub">原型演示评分(非实时计算)</span></div>' + faces + '</div>' +
+        '<div class="intel-sec"><div class="intel-sec-t">🎯 5 面评分<span class="intel-sec-sub">' + faceSub + '</span></div>' + faces + '</div>' +
         instHtml +
         '<div class="intel-cols">' +
         '<div class="intel-col-left">' + rpHtml + '</div>' +
@@ -4404,6 +4415,125 @@ const RISK_DATA = {
         '<div class="intel-verdict neutral"><span class="iv-chip">实时行情</span><span class="iv-desc">数据来自腾讯财经公开接口,浏览器实时拉取;深度研判(5面/新闻/研报)为演示数据,仅 16 只覆盖股提供</span></div>' +
         '<div class="intel-sec"><div class="intel-sec-t">📊 实时行情快照</div>' + grid + '</div>';
     }
+    function intelLoadingHtml(q) {
+      const up = (q.change == null) ? false : q.change >= 0;
+      const cls = up ? 'up' : 'down';
+      const sign = up ? '+' : '';
+      const tm = q.time ? (q.time.length >= 12 ? q.time.slice(0, 4) + '-' + q.time.slice(4, 6) + '-' + q.time.slice(6, 8) + ' ' + q.time.slice(8, 10) + ':' + q.time.slice(10, 12) : q.time) : '—';
+      return '<div class="intel-head"><div class="intel-hname">' + q.name + ' <span>' + q.code + '</span></div>' +
+        '<div class="intel-hpx"><span class="' + cls + '">' + (q.price != null ? q.price.toFixed(2) : '—') + ' ' + (q.pct != null ? sign + q.pct.toFixed(2) + '%' : '') + '</span><span class="intel-hmeta">实时行情 · 更新 ' + tm + '</span></div></div>' +
+        '<div class="intel-empty">🛰️ 正在拉取实时研报 / 资金流 / K线,生成深度情报…</div>';
+    }
+    // ---- 全市场真实研报(东财 reportapi 浏览器端 JSONP,任意股票) ----
+    function fetchResearchEM(code, cb) {
+      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
+      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
+      const end = new Date(), beg = new Date(end.getTime() - 92 * 86400000);
+      const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const cbName = '__emrp' + Math.random().toString(36).slice(2, 9);
+      const url = 'https://reportapi.eastmoney.com/report/list?industryCode=*&pageSize=10&industry=*&rating=&ratingChange=&beginTime=' + fmt(beg) + '&endTime=' + fmt(end) + '&pageNo=1&fields=&qType=0&orgCode=&code=' + code + '&_=' + Date.now() + '&cb=' + cbName;
+      const sc = document.createElement('script');
+      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
+      window[cbName] = function (resp) {
+        cleanup();
+        try {
+          const list = (resp && resp.data) ? resp.data : [];
+          const reports = list.map(function (r) {
+            return {
+              broker: r.orgSName || r.orgName || '—',
+              rating: r.emRatingName || '—',
+              title: r.title || '',
+              date: (r.publishDate || '').slice(0, 10),
+              eps: (r.predictThisYearEps != null && r.predictThisYearEps !== '') ? parseFloat(r.predictThisYearEps) : null,
+              pe: (r.predictThisYearPe != null && r.predictThisYearPe !== '') ? parseFloat(r.predictThisYearPe) : null
+            };
+          });
+          cb({ count: list.length, buys: reports.filter(function (r) { return r.rating === '买入' || r.rating === '增持'; }).length, reports: reports });
+        } catch (e) { cb(null); }
+      };
+      sc.onerror = function () { cleanup(); cb(null); };
+      sc.src = url;
+      document.head.appendChild(sc);
+      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
+    }
+    // ---- 单股主力净流入 + 换手率(东财 push2 浏览器端 JSONP) ----
+    function fetchMainInflowEM(code, cb) {
+      code = (code || '').replace(/^(sh|sz|us|hk|bj)/i, '');
+      if (!/^\d{4,6}$/.test(code)) { cb(null); return; }
+      const cbName = '__emfi' + Math.random().toString(36).slice(2, 9);
+      const url = 'https://push2.eastmoney.com/api/qt/stock/get?secid=' + emSecid(code) + '&fields=f12,f14,f62,f184&cb=' + cbName;
+      const sc = document.createElement('script');
+      const cleanup = function () { try { delete window[cbName]; } catch (e) {} if (sc.parentNode) sc.parentNode.removeChild(sc); };
+      window[cbName] = function (resp) {
+        cleanup();
+        try {
+          const d = (resp && resp.data) ? resp.data : null;
+          if (!d) { cb(null); return; }
+          const num = v => (typeof v === 'number') ? v : (v != null ? parseFloat(String(v).replace(/,/g, '')) : null);
+          const inflow = num(d.f62), to = num(d.f184);
+          // 东财实时被限流时 f62 可能返回退化的极小值,过滤掉避免显示「1 元」这类荒谬数据
+          if (inflow == null || !isFinite(inflow) || Math.abs(inflow) < 1e4) { cb(null); return; }
+          cb({ inflow: inflow, turnover: (to != null ? to : null) });
+        } catch (e) { cb(null); }
+      };
+      sc.onerror = function () { cleanup(); cb(null); };
+      sc.src = url;
+      document.head.appendChild(sc);
+      setTimeout(function () { if (window[cbName]) { cleanup(); cb(null); } }, 12000);
+    }
+    // ---- 5 面评分:由真实行情/资金流推导(非机构评级) ----
+    function computeLiveFaces(bare, q, rk, inflowYuan, turnover) {
+      let tech = 50;
+      if (rk && rk.c && rk.c.length >= 15) {
+        const cs = rk.c, n = cs.length, last = cs[n - 1];
+        const ma20 = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / Math.min(20, n);
+        const ma60 = cs.slice(-60).reduce(function (a, b) { return a + b; }, 0) / Math.min(60, n);
+        const mom20 = (last / cs[Math.max(0, n - 21)] - 1) * 100;
+        let gain = 0, loss = 0;
+        for (let i = n - 14; i < n; i++) { const d = cs[i] - cs[i - 1]; if (d >= 0) gain += d; else loss -= d; }
+        const rs = loss === 0 ? 99 : (gain / 14) / (loss / 14);
+        const rsi = 100 - 100 / (1 + rs);
+        let sc = 50 + mom20 * 2.2; sc += (ma20 > ma60) ? 10 : -10; sc += (rsi - 50) * 0.4;
+        tech = Math.max(5, Math.min(95, sc));
+      }
+      let flow = 50;
+      if (inflowYuan != null && !isNaN(inflowYuan)) {
+        const yi = inflowYuan / 1e8;
+        flow = Math.max(5, Math.min(95, 50 + Math.sign(yi) * Math.min(45, Math.log10(Math.abs(yi) + 1) * 6)));
+      }
+      let fund = 50;
+      const pe = q.pe, pb = q.pb;
+      if (pe != null && pe > 0) {
+        fund = Math.max(20, Math.min(80, 70 - Math.min(pe, 80) * 0.4));
+        if (pb != null && pb > 0) fund = (fund + Math.max(20, Math.min(80, 65 - Math.min(pb, 20) * 1.5))) / 2;
+      } else if (pe != null && pe < 0) fund = 45;
+      const pct = q.pct || 0, to = turnover || 0;
+      const sent = Math.max(5, Math.min(95, 50 + pct * 2 + (to - 2) * 1.5));
+      return { fund: Math.round(fund), tech: Math.round(tech), flow: Math.round(flow), news: 50, sent: Math.round(sent) };
+    }
+    function runIntel(qcode, seed) {
+      const bare = qcode.replace(/^(sh|sz|us|hk|bj)/i, '');
+      const body = document.getElementById('intelBody');
+      fetchLiveQuote(qcode, function (q) {
+        if (!q || q.price == null) { body.innerHTML = '<div class="intel-empty">未获取到「' + bare + '」实时行情,请检查代码或网络(外部行情接口可能被预览环境拦截)</div>'; return; }
+        // 腾讯 gtimg a[44]/a[45] 总市值/流通市值单位已是「亿元」,不可再除 1e8
+        const cap = q.totalCap != null ? q.totalCap : null;
+        const s0 = { c: bare, n: q.name, px: q.price.toFixed(2), chg: (q.pct >= 0 ? '+' : '') + q.pct.toFixed(2) + '%', sec: seed ? seed.sec : '', con: seed ? seed.con : '', cap: cap, lb: cap != null ? cap.toFixed(2) : '1.0', px10: [] };
+        body.innerHTML = intelLoadingHtml(q);
+        let rep = (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[bare]) ? INTEL_REAL[bare] : null, rk = null, inflow = null, to = null, done = 0, finished = false;
+        const finish = function () {
+          if (finished) return; finished = true;
+          const faces = computeLiveFaces(bare, q, rk, inflow, to);
+          const px10 = (rk && rk.c && rk.c.length >= 10) ? rk.c.slice(-10) : [];
+          body.innerHTML = buildIntel(s0, { reports: rep, faces: faces, inflowYuan: inflow, turnover: to, live: true, px10: px10, news: (typeof INTEL_NEWS !== 'undefined' && INTEL_NEWS[bare]) || null });
+        };
+        fetchResearchEM(bare, function (r) { rep = r || rep; if (++done >= 3) finish(); });
+        loadKlineEM(bare, 120).then(function (k) { rk = k; if (++done >= 3) finish(); });
+        fetchMainInflowEM(bare, function (f) { if (f) { inflow = f.inflow; to = f.turnover; } if (++done >= 3) finish(); });
+        // 东财研报/资金流回调上限 12s,这里给 13s 让慢网络也能拿到真实数据再渲染
+        setTimeout(function () { if (done < 3) { done = 3; finish(); } }, 13000);
+      });
+    }
     function handleIntel() {
       const input = document.getElementById('intelInput');
       const kw = (input.value || '').trim();
@@ -4411,24 +4541,13 @@ const RISK_DATA = {
       if (!kw) { body.innerHTML = '<div class="intel-empty">请输入股票代码或名称</div>'; return; }
       body.innerHTML = '<div class="intel-empty">实时查询中…</div>';
       const stripped = kw.replace(/^(sh|sz|us|hk|bj)/i, '');
-      const hit = CAND.find(s => s.c === kw || s.c === stripped || s.n.toLowerCase().indexOf(kw.toLowerCase()) !== -1);
-      if (hit) { body.innerHTML = buildIntel(hit); input.value = ''; return; }
+      const seed = CAND.find(function (s) { return s.c === kw || s.c === stripped || s.n.toLowerCase().indexOf(kw.toLowerCase()) !== -1; }) || (SEED_WATCH.find(function (x) { return x.c === stripped; }) || null);
       const code = normalizeCode(kw) || normalizeCode(stripped);
-      if (code) {
-        fetchLiveQuote(code, function (q) {
-          if (q && q.price != null) { body.innerHTML = buildLiveIntel(q); }
-          else { body.innerHTML = '<div class="intel-empty">未获取到「' + kw + '」实时行情,请检查代码或网络(外部行情接口可能被预览环境拦截)</div>'; }
-          input.value = '';
-        });
-        return;
-      }
+      if (code) { input.value = ''; runIntel(code, seed); return; }
       resolveName(kw, function (rc) {
         if (!rc) { body.innerHTML = '<div class="intel-empty">未找到「' + kw + '」,请尝试完整名称或 6 位代码</div>'; input.value = ''; return; }
-        fetchLiveQuote(rc, function (q) {
-          if (q && q.price != null) { body.innerHTML = buildLiveIntel(q); }
-          else { body.innerHTML = '<div class="intel-empty">未获取到「' + kw + '」实时行情</div>'; }
-          input.value = '';
-        });
+        input.value = '';
+        runIntel(rc, seed);
       });
     }
 
