@@ -3943,17 +3943,115 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
         '<div class="intel-col-right">' + newsHtml + '</div>' +
         '</div>';
     }
+    // ---- 实时行情(腾讯财经,浏览器内 JSONP,无需密钥) ----
+    function normalizeCode(kw) {
+      kw = (kw || '').trim().toLowerCase();
+      if (!kw) return null;
+      if (/^(sh|sz|us|hk|bj)\d{4,6}$/.test(kw)) return kw;
+      if (/^\d{4,6}$/.test(kw)) {
+        if (kw[0] === '6') return 'sh' + kw;
+        if (kw[0] === '8' || kw[0] === '4') return 'bj' + kw; // 北交所
+        return 'sz' + kw; // 0/3 开头深市
+      }
+      return null;
+    }
+    function fetchLiveQuote(qcode, cb) {
+      const s = document.createElement('script');
+      s.charset = 'gbk';
+      s.src = 'https://qt.gtimg.cn/q=' + qcode;
+      s.onload = function () {
+        try {
+          const raw = window['v_' + qcode];
+          if (!raw) { cb(null); return; }
+          const a = raw.split('~');
+          const num = x => { const v = parseFloat(x); return isNaN(v) ? null : v; };
+          cb({
+            name: a[1] || qcode, code: a[2] || qcode.replace(/^(sh|sz|us|hk|bj)/, ''),
+            price: num(a[3]), prevClose: num(a[4]), open: num(a[5]),
+            high: num(a[33]), low: num(a[34]),
+            change: num(a[31]), pct: num(a[32]),
+            time: a[30] || '', volume: num(a[6]), turnover: num(a[38]),
+            pe: num(a[39]), pb: num(a[46]),
+            totalCap: num(a[44]), floatCap: num(a[45])
+          });
+        } catch (e) { cb(null); }
+      };
+      s.onerror = function () { cb(null); };
+      document.head.appendChild(s);
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 4000);
+    }
+    function resolveName(name, cb) {
+      const s = document.createElement('script');
+      s.charset = 'utf-8';
+      s.src = 'https://smartbox.gtimg.cn/s3/?v=2&q=' + encodeURIComponent(name) + '&t=all&c=all';
+      s.onload = function () {
+        try {
+          const raw = window.v_hint;
+          if (!raw) { cb(null); return; }
+          const parts = raw.split('^');
+          for (let i = 0; i < parts.length; i++) {
+            const f = parts[i].split('~');
+            if (f.length >= 3 && f[2] && f[2].indexOf(name) !== -1) { cb(f[0] + f[1]); return; }
+          }
+          cb(null);
+        } catch (e) { cb(null); }
+      };
+      s.onerror = function () { cb(null); };
+      document.head.appendChild(s);
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 4000);
+    }
+    function buildLiveIntel(q) {
+      const up = (q.change === null) ? false : q.change >= 0;
+      const cls = up ? 'up' : 'down';
+      const sign = up ? '+' : '';
+      const cells = [
+        ['今开', q.open != null ? q.open.toFixed(2) : '—'],
+        ['最高', q.high != null ? q.high.toFixed(2) : '—'],
+        ['最低', q.low != null ? q.low.toFixed(2) : '—'],
+        ['昨收', q.prevClose != null ? q.prevClose.toFixed(2) : '—'],
+        ['成交量', q.volume != null ? (q.volume / 100).toFixed(0) + ' 万手' : '—'],
+        ['换手率', q.turnover != null ? q.turnover.toFixed(2) + '%' : '—'],
+        ['市盈率TTM', q.pe != null ? q.pe.toFixed(2) : '—'],
+        ['市净率', q.pb != null ? q.pb.toFixed(2) : '—'],
+        ['总市值', q.totalCap != null ? q.totalCap.toFixed(0) + ' 亿' : '—'],
+        ['流通市值', q.floatCap != null ? q.floatCap.toFixed(0) + ' 亿' : '—']
+      ];
+      const grid = '<div class="intel-grid">' + cells.map(c =>
+        '<div class="intel-cell"><span class="ic-k">' + c[0] + '</span><span class="ic-v">' + c[1] + '</span></div>'
+      ).join('') + '</div>';
+      const tm = q.time ? (q.time.length >= 12 ? q.time.slice(0, 4) + '-' + q.time.slice(4, 6) + '-' + q.time.slice(6, 8) + ' ' + q.time.slice(8, 10) + ':' + q.time.slice(10, 12) : q.time) : '—';
+      return '<div class="intel-head"><div class="intel-hname">' + q.name + ' <span>' + q.code + '</span></div>' +
+        '<div class="intel-hpx"><span class="' + cls + '">' + (q.price != null ? q.price.toFixed(2) : '—') + ' ' + (q.pct != null ? sign + q.pct.toFixed(2) + '%' : '') + '</span>' +
+        '<span class="intel-hmeta">实时行情 · 更新 ' + tm + '</span></div></div>' +
+        '<div class="intel-verdict neutral"><span class="iv-chip">实时行情</span><span class="iv-desc">数据来自腾讯财经公开接口,浏览器实时拉取;深度研判(5面/新闻/研报)为演示数据,仅 16 只覆盖股提供</span></div>' +
+        '<div class="intel-sec"><div class="intel-sec-t">📊 实时行情快照</div>' + grid + '</div>';
+    }
     function handleIntel() {
       const input = document.getElementById('intelInput');
       const kw = (input.value || '').trim();
       const body = document.getElementById('intelBody');
       if (!kw) { body.innerHTML = '<div class="intel-empty">请输入股票代码或名称</div>'; return; }
-      const exact = CAND.filter(s => s.c === kw);
-      const fuzzy = CAND.filter(s => s.n.toLowerCase().includes(kw.toLowerCase()));
-      const hit = exact.length ? exact[0] : (fuzzy.length ? fuzzy[0] : null);
-      if (!hit) { body.innerHTML = '<div class="intel-empty">未找到「' + kw + '」,请尝试完整名称或 6 位代码</div>'; return; }
-      body.innerHTML = buildIntel(hit);
-      input.value = '';
+      body.innerHTML = '<div class="intel-empty">实时查询中…</div>';
+      const stripped = kw.replace(/^(sh|sz|us|hk|bj)/i, '');
+      const hit = CAND.find(s => s.c === kw || s.c === stripped || s.n.toLowerCase().indexOf(kw.toLowerCase()) !== -1);
+      if (hit) { body.innerHTML = buildIntel(hit); input.value = ''; return; }
+      const code = normalizeCode(kw) || normalizeCode(stripped);
+      if (code) {
+        fetchLiveQuote(code, function (q) {
+          if (q && q.price != null) { body.innerHTML = buildLiveIntel(q); }
+          else { body.innerHTML = '<div class="intel-empty">未获取到「' + kw + '」实时行情,请检查代码或网络(外部行情接口可能被预览环境拦截)</div>'; }
+          input.value = '';
+        });
+        return;
+      }
+      resolveName(kw, function (rc) {
+        if (!rc) { body.innerHTML = '<div class="intel-empty">未找到「' + kw + '」,请尝试完整名称或 6 位代码</div>'; input.value = ''; return; }
+        fetchLiveQuote(rc, function (q) {
+          if (q && q.price != null) { body.innerHTML = buildLiveIntel(q); }
+          else { body.innerHTML = '<div class="intel-empty">未获取到「' + kw + '」实时行情</div>'; }
+          input.value = '';
+        });
+      });
     }
 
     document.addEventListener('click', e => {
