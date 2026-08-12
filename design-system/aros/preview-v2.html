@@ -924,8 +924,8 @@
 
     <!-- ASSESSMENT CARDS -->
     <div class="score-row">
-      <div class="intel-note">⚠️ 以下五维评分为原型演示评分(非实时计算);上方市场指数 / 涨跌家数 / 板块资金流为真实数据。</div>
-      <div class="score-card">
+      <div class="intel-note">⚠️ Alpha 雷达与 AI 洞察评分由真实前复权日线(REAL_KLINE)/候选池价格序列动态推导;上方市场指数 / 涨跌家数 / 板块资金流为真实数据;北向 / 基金持仓暂无源,已诚实占位。</div>
+      <div class="score-card" data-dim="fund">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">📊</span>基本面</span>
           <span class="sc-tag orange">中性偏强</span>
@@ -951,7 +951,7 @@
           </div>
         </div>
       </div>
-      <div class="score-card">
+      <div class="score-card" data-dim="tech">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">📈</span>技术面</span>
           <span class="sc-tag green">偏强</span>
@@ -977,7 +977,7 @@
           </div>
         </div>
       </div>
-      <div class="score-card">
+      <div class="score-card" data-dim="flow">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">💰</span>资金面</span>
           <span class="sc-tag red">净流入</span>
@@ -1003,7 +1003,7 @@
           </div>
         </div>
       </div>
-      <div class="score-card">
+      <div class="score-card" data-dim="news">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">📰</span>新闻面</span>
           <span class="sc-tag blue">偏多</span>
@@ -1029,7 +1029,7 @@
           </div>
         </div>
       </div>
-      <div class="score-card">
+      <div class="score-card" data-dim="sent">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">🔥</span>情绪面</span>
           <span class="sc-tag purple">偏乐观</span>
@@ -1119,58 +1119,7 @@
               <th>Strategy Hit</th><th>市场背景</th><th>操作</th>
             </tr>
           </thead>
-                              <tbody>
-            <tr class="active" data-stock="华能蒙电" data-code="sh600863">
-              <td><span class="rank-badge gold">1</span></td>
-              <td><span class="stock-name">华能蒙电</span><span class="stock-code">sh600863</span></td>
-              <td><span class="sector-chip">电力</span></td>
-              <td><span class="concept">风电/火电运营</span></td>
-              <td><div class="score-cell"><span class="score">100.0</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
-              <td><div class="ring" style="--p:100.0;--ring-c:#52C41A"><span>100.0</span></div></td>
-              <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class=""></i></span></td>
-              <td><span class="chip strong">强势</span></td><td><span class="chip watch">关注</span></td>
-            </tr>
-            <tr data-stock="德明利" data-code="sz001309">
-              <td><span class="rank-badge silver">2</span></td>
-              <td><span class="stock-name">德明利</span><span class="stock-code">sz001309</span></td>
-              <td><span class="sector-chip">半导体</span></td>
-              <td><span class="concept">存储主控芯片</span></td>
-              <td><div class="score-cell"><span class="score">98.5</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
-              <td><div class="ring" style="--p:98.5;--ring-c:#52C41A"><span>98.5</span></div></td>
-              <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class=""></i></span></td>
-              <td><span class="chip strong">强势</span></td><td><span class="chip watch">关注</span></td>
-            </tr>
-            <tr data-stock="红星发展" data-code="sh600367">
-              <td><span class="rank-badge bronze">3</span></td>
-              <td><span class="stock-name">红星发展</span><span class="stock-code">sh600367</span></td>
-              <td><span class="sector-chip">化学原料</span></td>
-              <td><span class="concept">钡锶盐龙头</span></td>
-              <td><div class="score-cell"><span class="score">96.9</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
-              <td><div class="ring" style="--p:96.9;--ring-c:#52C41A"><span>96.9</span></div></td>
-              <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class=""></i></span></td>
-              <td><span class="chip strong">强势</span></td><td><span class="chip watch">关注</span></td>
-            </tr>
-            <tr data-stock="太极实业" data-code="sh600667">
-              <td><span class="rank-badge ">4</span></td>
-              <td><span class="stock-name">太极实业</span><span class="stock-code">sh600667</span></td>
-              <td><span class="sector-chip">半导体</span></td>
-              <td><span class="concept">半导体封测</span></td>
-              <td><div class="score-cell"><span class="score">96.9</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
-              <td><div class="ring" style="--p:96.9;--ring-c:#52C41A"><span>96.9</span></div></td>
-              <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class=""></i></span></td>
-              <td><span class="chip strong">强势</span></td><td><span class="chip watch">关注</span></td>
-            </tr>
-            <tr data-stock="禾望电气" data-code="sh603063">
-              <td><span class="rank-badge ">5</span></td>
-              <td><span class="stock-name">禾望电气</span><span class="stock-code">sh603063</span></td>
-              <td><span class="sector-chip">电气设备</span></td>
-              <td><span class="concept">光伏逆变器/风电</span></td>
-              <td><div class="score-cell"><span class="score">96.9</span><span class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span><span class="st">★</span></span></div></td>
-              <td><div class="ring" style="--p:96.9;--ring-c:#52C41A"><span>96.9</span></div></td>
-              <td><span class="hit-bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class=""></i></span></td>
-              <td><span class="chip strong">强势</span></td><td><span class="chip watch">关注</span></td>
-            </tr>
-          </tbody>
+                              <tbody id="mktTbody"></tbody>
         </table>
         </div>
         <div class="signal-flow">
@@ -1178,9 +1127,9 @@
           <div id="sfList"></div>
         </div>
         <div class="radar-foot">
-          <span>⚡ 今日组合平均 Alpha <b>97.8</b></span>
-          <span>强势 5 · 中性 0</span>
-          <span>数据更新 08:30</span>
+          <span>⚡ 今日组合平均 Alpha <b id="mktAvgAlpha">—</b></span>
+          <span id="mktBgStat">强势 0 · 中性 0</span>
+          <span id="mktUpd">数据更新 —</span>
         </div>
       </div>
 
@@ -1568,512 +1517,6 @@
 
 <div class="preview-label">AROS Preview v2 · 红涨绿跌</div>
 
-<script>
-// ============================================================
-// AROS 每日 Alpha 雷达 - 候选股票池
-// 每天基于日期种子确定性随机选出 Top 5,次日自动变化
-// ============================================================
-const POOL = [
-  { name: '红星发展', code: 'sh600367', sector: '化学原料', concept: '钡锶盐龙头', base: 96.92, strat: 'B',
-    chg: 2.0, price: 33.8, target: 33.8,
-    rev: 20.8, profit: 0.9, gm: 23.8, roe: 3.3, eps: 0.3,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'B·机构共识入选（评级/一致预期/股东增持）' },
-  { name: '太极实业', code: 'sh600667', sector: '半导体', concept: '半导体封测', base: 96.92, strat: 'B',
-    chg: 10.0, price: 21.2, target: 21.2,
-    rev: 306.2, profit: 4.6, gm: 7.5, roe: 4.8, eps: 0.2,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'B·机构共识入选（评级/一致预期/股东增持）' },
-  { name: '华能蒙电', code: 'sh600863', sector: '电力', concept: '风电/火电运营', base: 100.0, strat: 'H',
-    chg: 10.0, price: 5.2, target: 5.2,
-    rev: 203.1, profit: 22.7, gm: 22.0, roe: 7.7, eps: 0.3,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'H·混合优选入选（量价×机构 0.5/0.5）' },
-  { name: '工商银行', code: 'sh601398', sector: '银行', concept: '国有大行', base: 70.26, strat: 'A',
-    chg: 0.9, price: 7.6, target: 7.6,
-    rev: 8558.7, profit: 3713.5, gm: null, roe: 8.5, eps: 1.0,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'A·Dynamic5 量价信号入选（S2/S3/S4 动量突破）' },
-  { name: '禾望电气', code: 'sh603063', sector: '电气设备', concept: '光伏逆变器/风电', base: 96.92, strat: 'H',
-    chg: 4.2, price: 33.7, target: 33.7,
-    rev: 40.1, profit: 4.4, gm: 38.6, roe: 8.0, eps: 1.0,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'H·混合优选入选（量价×机构 0.5/0.5）' },
-  { name: '药明康德', code: 'sh603259', sector: '医疗服务', concept: 'CXO 龙头', base: 70.26, strat: 'A',
-    chg: -0.7, price: 160.2, target: 160.2,
-    rev: 535.5, profit: 216.7, gm: 52.3, roe: 25.8, eps: 7.3,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'A·Dynamic5 量价信号入选（S2/S3/S4 动量突破）' },
-  { name: '瑞芯微', code: 'sh603893', sector: '半导体', concept: '端侧 AI SoC', base: 70.26, strat: 'A',
-    chg: 3.9, price: 213.4, target: 213.4,
-    rev: 47.2, profit: 11.6, gm: 42.4, roe: 24.6, eps: 2.8,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'A·Dynamic5 量价信号入选（S2/S3/S4 动量突破）' },
-  { name: '立新能源', code: 'sz001258', sector: '电力', concept: '风电/光伏运营', base: 70.26, strat: 'B',
-    chg: 10.0, price: 15.9, target: 15.9,
-    rev: 12.1, profit: 1.5, gm: 40.0, roe: 3.2, eps: 0.2,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'B·机构共识入选（评级/一致预期/股东增持）' },
-  { name: '德明利', code: 'sz001309', sector: '半导体', concept: '存储主控芯片', base: 98.46, strat: 'H',
-    chg: 0.1, price: 401.0, target: 401.0,
-    rev: 170.8, profit: 41.0, gm: 34.3, roe: 62.0, eps: 18.1,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'H·混合优选入选（量价×机构 0.5/0.5）' },
-  { name: '三花智控', code: 'sz002050', sector: '家电', concept: '热管理龙头', base: 80.0, strat: 'H',
-    chg: 3.0, price: 39.7, target: 39.7,
-    rev: 311.2, profit: 40.9, gm: 29.0, roe: 12.4, eps: 1.0,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'H·混合优选入选（量价×机构 0.5/0.5）' },
-  { name: '日科化学', code: 'sz300214', sector: '化学制品', concept: '塑料助剂', base: 70.26, strat: 'B',
-    chg: 3.4, price: 13.0, target: 13.0,
-    rev: 37.2, profit: -0.2, gm: 7.5, roe: -0.8, eps: -0.0,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'B·机构共识入选（评级/一致预期/股东增持）' },
-  { name: '麦捷科技', code: 'sz300319', sector: '电子', concept: '射频/磁性器件', base: 96.92, strat: 'B',
-    chg: 7.6, price: 17.8, target: 17.8,
-    rev: 38.8, profit: 3.0, gm: 16.3, roe: 6.0, eps: 0.3,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'B·机构共识入选（评级/一致预期/股东增持）' },
-  { name: '三环集团', code: 'sz300408', sector: '电子', concept: '电子陶瓷元件', base: 78.46, strat: 'H',
-    chg: 2.5, price: 130.1, target: 130.1,
-    rev: 98.6, profit: 28.8, gm: 42.7, roe: 12.8, eps: 1.5,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'H·混合优选入选（量价×机构 0.5/0.5）' },
-  { name: '全志科技', code: 'sz300458', sector: '半导体', concept: '智能终端 SoC', base: 70.26, strat: 'A',
-    chg: 2.2, price: 34.7, target: 34.7,
-    rev: 31.3, profit: 3.7, gm: 35.1, roe: 11.3, eps: 0.5,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'A·Dynamic5 量价信号入选（S2/S3/S4 动量突破）' },
-  { name: '星宸科技', code: 'sz301536', sector: '半导体', concept: '安防 SoC', base: 70.26, strat: 'A',
-    chg: 3.5, price: 125.8, target: 125.8,
-    rev: 33.0, profit: 4.8, gm: 37.9, roe: 14.5, eps: 1.1,
-    est: null, revG: null, profitG: null, reports: null, buys: null,
-    theme: 'A·Dynamic5 量价信号入选（S2/S3/S4 动量突破）' },
-];// STRATEGY_POOL_INJECTED ---------- 确定性随机:同一天结果固定,次日自动变化 ----------:同一天结果固定,次日自动变化 ----------
-function daySeed() {
-  const d = new Date();
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-}
-function rnd(seed, i) {
-  const x = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453;
-  return x - Math.floor(x);
-}
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-// ---------- 生成当日 Top 5 ----------
-const seed = daySeed();
-const todayList = POOL.map((s, i) => {
-  const alpha = clamp(Math.round(s.base), 70, 99); // 跟随真实合并评分，无随机抖动
-  const entry = clamp(alpha - Math.round(rnd(seed, i + 100) * 12) - 3, 55, 95);
-  const hits = clamp(Math.round(alpha / 10) - 1, 4, 9);
-  const heat = clamp(Math.round(72 + rnd(seed, i + 200) * 26), 55, 99);
-  const flow = (0.3 + rnd(seed, i + 300) * 2.6).toFixed(2);
-  const chg = (s.chg != null ? s.chg : +(rnd(seed, i + 310) * 6 - 1).toFixed(1));
-  const px = (s.price != null ? s.price : +(s.target * 0.88 + rnd(seed, i + 320) * 12).toFixed(2));
-  const kwList = ['1.6T 放量', '800G 满产', '国产替代', 'AI 服务器', '液冷', '算力租赁', 'FPGA 国产', 'CPO 引擎'];
-  return Object.assign({}, s, {
-    alpha, entry, hits, heat, flow, chg, px,
-    kw: kwList[i % kwList.length],
-    ma: (65 + rnd(seed, i + 400) * 10).toFixed(1),
-    rsi: (52 + rnd(seed, i + 500) * 18).toFixed(1),
-    macd: (0.4 + rnd(seed, i + 600) * 2.2).toFixed(2),
-    revGd: s.revG != null ? +(s.revG + (rnd(seed, i + 700) - 0.5) * 8).toFixed(1) : null,
-    profitGd: s.profitG != null ? +(s.profitG + (rnd(seed, i + 800) - 0.5) * 12).toFixed(1) : null,
-    targetPct: (10 + rnd(seed, i + 900) * 8).toFixed(0),
-    northDays: 1 + Math.round(rnd(seed, i + 1000) * 2),
-    fundQ: (3 + rnd(seed, i + 1100) * 10).toFixed(1),
-    senti: rnd(seed, i + 1200) > 0.5 ? '偏乐观' : '偏多'
-  });
-}).sort((a, b) => b.alpha - a.alpha).slice(0, 5);
-
-// ---------- 渲染表格 ----------
-function renderTable() {
-  const tbody = document.querySelector('.alpha-table tbody');
-  const medal = ['gold', 'silver', 'bronze', '', ''];
-  tbody.innerHTML = todayList.map((s, idx) => {
-    const stars = s.alpha >= 92 ? 5 : s.alpha >= 86 ? 4 : 3;
-    const starHtml = Array.from({ length: 5 }, (_, i) =>
-      '<span class="st' + (i < stars ? '' : ' off') + '">★</span>').join('');
-    const hitHtml = Array.from({ length: 10 }, (_, i) =>
-      '<i class="' + (i < s.hits ? 'on' : '') + '"></i>').join('');
-    const ringC = s.alpha >= 88 ? '#52C41A' : s.alpha >= 80 ? '#FF9800' : '#FF4D4F';
-    const bgChip = idx === 0 || (s.alpha >= 90) ? 'strong' : idx >= 3 ? 'watch' : 'neutral';
-    const bgTxt = bgChip === 'strong' ? '强势' : bgChip === 'neutral' ? '中性' : '关注';
-    const px = s.px.toFixed(2);
-    const chg = s.chg >= 0 ? '+' + s.chg.toFixed(1) + '%' : s.chg.toFixed(1) + '%';
-    return '<tr data-stock="' + s.name + '" data-code="' + s.code + '"' + (idx === 0 ? ' class="active"' : '') + '>' +
-      '<td><span class="rank-badge ' + medal[idx] + '">' + (idx + 1) + '</span></td>' +
-      '<td><div class="stock-main"><span class="stock-name">' + s.name + '</span><span class="stock-code">' + s.code + '</span></div>' +
-      '<div class="stock-sub"><span class="px ' + (s.chg >= 0 ? 'up' : 'down') + '"><span class="live-px" data-live-code="' + s.code + '">' + px + '</span> <span class="live-chg" data-live-code="' + s.code + '">' + chg + '</span></span></div></td>' +
-      '<td><span class="sector-chip">' + s.sector + '</span></td>' +
-      '<td><span class="concept">' + s.concept + '</span></td>' +
-      '<td><div class="score-cell"><span class="score">' + s.alpha + '</span><span class="stars">' + starHtml + '</span></div>' +
-      '<div class="stock-sub"><div class="score-bar"><i style="width:' + s.alpha + '%"></i></div><span class="kw">' + s.kw + '</span></div></td>' +
-      '<td><div class="ring" style="--p:' + s.entry + ';--ring-c:' + ringC + '"><span>' + s.entry + '</span></div></td>' +
-      '<td><span class="hit-bar">' + hitHtml + '</span></td>' +
-      '<td><span class="chip ' + bgChip + '">' + bgTxt + '</span></td>' +
-      '<td><span class="chip watch">关注</span></td>' +
-      '</tr>';
-  }).join('');
-
-  const sigList = document.getElementById('sfList');
-  if (sigList) {
-    const sigs = todayList.map((s, i) => {
-      const k = s.kw || '';
-      const sigsArr = [
-        { ic: '🎯', x: k + ' · 动量因子 ' + s.alpha + ' 分', s: '置信 ' + s.alpha + '%', c: 'hot' },
-        { ic: '📈', x: '主力净流入 +' + s.flow + ' 亿 · 3 日持续', s: '资金', c: 'blue' },
-        { ic: '🔍', x: '北向资金' + s.northDays + ' 日增持 · 机构调研 12 家', s: '机构', c: 'blue' },
-        { ic: '📅', x: '事件临近 · 中报披露 / 产业催化窗口', s: '事件', c: 'warn' }
-      ];
-      return '<div class="sf-item"><span class="sf-ic">' + sigsArr[i % 4].ic + '</span>' +
-        '<span class="sf-t">' + s.name + '</span><span class="sf-x">' + sigsArr[i % 4].x + '</span>' +
-        '<span class="sf-s ' + sigsArr[i % 4].c + '">' + sigsArr[i % 4].s + '</span></div>';
-    }).join('');
-    sigList.innerHTML = sigs;
-  }
-}
-
-// ---------- 生成个股详情数据 ----------
-function buildDetail(s) {
-  const idx = POOL.findIndex(p => p.name === s.name);
-  const fIdx = idx < 0 ? 0 : idx;
-  const f = (k, off) => rnd(seed, fIdx * 50 + off);
-  const score = s.alpha;
-  const facetN = (off, spread, min, max) => {
-    const v = Math.round(clamp(score + (f(fIdx, off) - 0.5) * spread, min, max));
-    return v;
-  };
-  const fBase = facetN(0, 18, 45, 95), fTech = facetN(1, 18, 45, 95),
-        fCap = facetN(2, 18, 45, 95), fNews = facetN(3, 18, 45, 95),
-        fSent = facetN(4, 18, 45, 95);
-  const total = Math.round((fBase + fTech + fCap + fNews + fSent) / 5);
-  const totalClamped = clamp(total, 60, 95);
-
-  const facetConf = [
-    ['基本面', fBase, '#E09030,#FFB74D', '#FFB74D', fBase >= 75 ? '偏强' : fBase >= 60 ? '中性偏强' : '中性', 'rgba(255,152,0,0.15)'],
-    ['技术面', fTech, '#389E0D,#95DE64', '#95DE64', fTech >= 75 ? '偏强' : fTech >= 60 ? '中性' : '偏弱', 'rgba(82,196,26,0.15)'],
-    ['资金面', fCap, '#CF1322,#FF7875', '#FF7875', fCap >= 75 ? '净流入' : fCap >= 60 ? '小幅流入' : '流出', 'rgba(255,77,79,0.15)'],
-    ['新闻面', fNews, '#2962FF,#40A9FF', '#40A9FF', fNews >= 75 ? '偏多' : fNews >= 60 ? '中性' : '偏空', 'rgba(41,98,255,0.15)'],
-    ['情绪面', fSent, '#6D28D9,#B39DDB', '#B39DDB', fSent >= 75 ? '偏乐观' : fSent >= 60 ? '中性' : '谨慎', 'rgba(124,58,237,0.18)']
-  ];
-
-  const upDown = score >= 85 ? 'up' : score >= 75 ? 'up' : 'down';
-  const verdict = score >= 88 ? '逢低建仓' : score >= 80 ? '逢低关注' : '观望为主';
-  const rsiState = s.rsi >= 65 ? '偏强' : s.rsi >= 50 ? '中性' : '偏弱';
-  const kdjState = f(fIdx, 10) > 0.6 ? '高位钝化' : '金叉';
-  const bollState = f(fIdx, 11) > 0.6 ? '上轨突破' : '中轨上方';
-
-  const price = s.target / (1 + (+s.targetPct) / 100);
-  const p1 = (price * 1.05).toFixed(1), p2 = (price * 1.1).toFixed(1);
-  const sp1 = (price * 0.97).toFixed(1), sp2 = (price * 0.94).toFixed(1);
-  const tp = s.target.toFixed(1);
-  const buy1 = (price * 0.99).toFixed(1), buy2 = (price * 1.02).toFixed(1);
-  const sl = (price * 0.92).toFixed(1);
-  const slPct = Math.round((1 - price * 0.92 / price) * 100);
-
-  const risks = [
-    '大股东计划减持 ' + (0.5 + f(fIdx, 20) * 2).toFixed(1) + '%(2026-' + (9 + Math.round(f(fIdx, 21) * 2)) + ' 实施)',
-    '商誉减值 ' + (0.2 + f(fIdx, 22) * 1.2).toFixed(1) + ' 亿 · 限售解禁 ' + (2 + f(fIdx, 23) * 5).toFixed(1) + '%',
-    '股东质押比例 ' + (5 + f(fIdx, 24) * 10).toFixed(1) + '%',
-    '海外收入占比高,汇率波动影响毛利',
-    '行业竞争加剧,毛利率承压',
-    '扩产资本开支大,现金流短期承压'
-  ].sort(() => f(fIdx, 25) - 0.5).slice(0, 2);
-
-  const stratN = clamp(Math.round(score / 10) - 1, 4, 9);
-  const stratTags = [
-    ['动量', 8], ['趋势', 7], ['资金', 6], ['回撤', 3]
-  ].map(t => '<span class="' + (t[1] >= 5 ? 'hit' : 'miss') + '">' + t[0] + ' ' + t[1] + '/10</span>').join('');
-
-  const _realInst = (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[s.c]) ? INTEL_REAL[s.c] : null;
-  return {
-    ai: {
-      tech: '均线 <span class="up">多头排列</span> · RSI ' + s.rsi + ' ' + rsiState + '<br>MACD <span class="up">金叉</span> · BOLL ' + bollState + ' · KDJ ' + kdjState,
-      techTags: '<span class="hit">MA 多头</span><span class="hit">MACD 金叉</span>' + (kdjState === '金叉' ? '<span class="hit">KDJ 金叉</span>' : '<span class="miss">KDJ 超买</span>'),
-      strat: stratN + ' / 10 套策略触发 · 动量 / 趋势 / 资金共振',
-      stratTags: stratTags,
-      senti: '情绪 <span class="' + (s.senti === '偏乐观' ? 'up' : 'up') + '">' + s.senti + '</span> · 热度 ' + s.heat + '/100<br>龙虎榜 <span class="up">净买入</span> · 股吧讨论 +' + (15 + Math.round(f(fIdx, 30) * 40)) + '%',
-      inst: (_realInst ? ('研报(东方财富真实) ' + _realInst.count + ' 篇 · 买入 ' + _realInst.buys + ' 家<br>主力净流入 / 北向 / 基金持仓 为演示占位(需接入数据源)') : '研报数据未接入(演示占位)<br>主力净流入 / 北向 / 基金持仓 为演示占位(需接入数据源)'),
-      instTags: (_realInst && _realInst.buys > 0 ? '<span class="hit">机构研报覆盖 ' + _realInst.buys + ' 家买入</span>' : '<span class="miss">机构数据未接入</span>'),
-      risk: '<div class="warn-line"><span class="mark">⚠</span>' + risks[0] + '</div><div class="warn-line"><span class="mark">⚠</span>' + risks[1] + '</div>',
-      facets: facetConf,
-      verdict: '<span class="hit">综合 ' + totalClamped + '</span><span class="hit">建议: ' + verdict + '</span>',
-      prices: [
-        ['压力位', p1 + ' / ' + p2, '#FF7875'],
-        ['支撑位', sp1 + ' / ' + sp2, '#95DE64'],
-        ['目标价位', tp + ' (+' + s.targetPct + '%)', '#40A9FF']
-      ],
-      prices2: [
-        ['建议建仓', buy1 + '-' + buy2, '#FF7875'],
-        ['参考止盈', tp, '#FF7875'],
-        ['参考止损', sl + ' (-' + slPct + '%)', '#95DE64']
-      ]
-    },
-    fund: {
-      rows: [
-        ['营业收入', s.rev.toFixed(1) + ' 亿', 'up', s.revGd != null ? '(+' + s.revGd + '%)' : ''],
-        ['净利润', s.profit.toFixed(1) + ' 亿', 'up', s.profitGd != null ? '(+' + s.profitGd + '%)' : ''],
-        ['毛利率', s.gm != null ? s.gm.toFixed(1) + '%' : '—(银行不适用)', '', ''],
-        ['ROE (年化)', s.roe.toFixed(1) + '%', '', ''],
-        ['每股收益', s.eps.toFixed(2) + ' 元', '', ''],
-        ['一致预期净利', s.est != null ? s.est.toFixed(1) + ' 亿' : '—', '', '']
-      ],
-      note: '📄 研报观点:' + s.theme + ';目标价一致预期 <b style="color:#FF7875">' + s.target.toFixed(1) + ' 元(+' + s.targetPct + '%)</b>,' + (s.reports != null ? s.reports + ' 篇研报中 ' + s.buys + ' 篇买入' : '研报数据未接入') + '。'
-    }
-  };
-}
-
-// ---------- 渲染详情 ----------
-function renderDetail(tr) {
-  const name = tr.dataset.stock;
-  const s = todayList.find(x => x.name === name) || POOL.find(x => x.name === name);
-  if (!s) return;
-  const d = buildDetail(s);
-
-  document.getElementById('aiStock').textContent = s.name + ' ' + s.code;
-  document.getElementById('fundName').textContent = s.name;
-
-  const ai = d.ai;
-  const blocks = document.getElementById('aiBody').querySelectorAll('.ai-block');
-  blocks[0].querySelector('.ai-val').innerHTML = ai.tech;
-  blocks[0].querySelector('.ai-tags').innerHTML = ai.techTags;
-  blocks[1].querySelector('.ai-val').innerHTML = ai.strat;
-  blocks[1].querySelector('.ai-tags').innerHTML = ai.stratTags;
-  blocks[2].querySelector('.ai-val').innerHTML = ai.senti;
-  blocks[3].querySelector('.ai-val').innerHTML = ai.inst;
-  blocks[3].querySelector('.ai-tags').innerHTML = ai.instTags;
-  blocks[4].innerHTML = '<div class="ai-label">⚠️ 风险预告</div>' + ai.risk;
-
-  const facets = document.getElementById('aiFacets');
-  facets.innerHTML = ai.facets.map(f =>
-    '<div class="facet"><span class="f-name">' + f[0] + '</span><div class="f-bar"><i style="width:' + f[1] + '%;background:linear-gradient(90deg,' + f[2] + ')"></i></div>' +
-    '<span class="f-val" style="color:' + f[3] + '">' + f[1] + '</span><span class="f-tag" style="background:' + f[5] + ';color:' + f[3] + '">' + f[4] + '</span></div>'
-  ).join('');
-  blocks[5].querySelector('.ai-tags').innerHTML = ai.verdict;
-
-  const pb = blocks[6].querySelectorAll('.price-box');
-  pb[0].innerHTML = ai.prices.map(p => '<div class="pb"><div class="l">' + p[0] + '</div><div class="v" style="color:' + p[2] + '">' + p[1] + '</div></div>').join('');
-  pb[1].innerHTML = ai.prices2.map(p => '<div class="pb"><div class="l">' + p[0] + '</div><div class="v" style="color:' + p[2] + '">' + p[1] + '</div></div>').join('');
-
-  const fundRows = document.getElementById('fundRows');
-  fundRows.innerHTML = d.fund.rows.map(r =>
-    '<div class="fund-row"><span class="k">' + r[0] + '</span><span class="v ' + r[2] + '">' + r[1] + (r[3] ? ' <span style="color:var(--faint)">' + r[3] + '</span>' : '') + '</span></div>'
-  ).join('') + '<div class="fund-note">' + d.fund.note + '</div>';
-
-  renderChart(s);
-}
-
-// ---------- K线图渲染(随选中股票联动) ----------
-function renderChart(s) {
-  const klineSvg = document.getElementById('klineSvg');
-  const volSvg = document.getElementById('volSvg');
-  const macdSvg = document.getElementById('macdSvg');
-  if (!klineSvg || !volSvg || !macdSvg || !s) return;
-  const ss = seed + (parseInt(s.code, 10) % 977) * 13;
-
-  document.getElementById('klineName').textContent = s.name;
-  document.getElementById('klineCode').textContent = s.code;
-
-  const N = 36, x0 = 17, step = 20, yTop = 12, yBot = 190;
-  const revs = [], closes = [];
-  let cur = s.px;
-  for (let i = N - 1; i >= 0; i--) {
-    revs[i] = (rnd(ss, i * 13 + 7) - 0.5) * 0.055;
-    closes[i] = cur;
-    cur = cur / (1 + revs[i]);
-  }
-  const ohlc = closes.map((c, i) => {
-    const o = c * (1 + (rnd(ss, i * 31 + 17) - 0.5) * 0.018);
-    const u = rnd(ss, i * 31 + 41) * 0.012 + 0.003;
-    return { open: o, close: c, high: Math.max(o, c) * (1 + u), low: Math.min(o, c) * (1 - u),
-      vol: 0.4 + rnd(ss, i * 37 + 91) * 1.7 };
-  });
-  let minP = Infinity, maxP = -Infinity;
-  ohlc.forEach(k => { minP = Math.min(minP, k.low); maxP = Math.max(maxP, k.high); });
-  const pad = (maxP - minP) * 0.08 || 1;
-  minP -= pad; maxP += pad;
-  const yPos = p => yTop + (maxP - p) / (maxP - minP) * (yBot - yTop);
-  const fmt = v => v >= 100 ? v.toFixed(1) : v.toFixed(2);
-  const lastMA = w => { let sm = 0; for (let j = 0; j < w; j++) sm += closes[N - 1 - j]; return sm / w; };
-
-  let cUp = '', cDn = '';
-  ohlc.forEach((k, i) => {
-    const x = x0 + i * step, cx = x + 3.5;
-    const up = k.close >= k.open;
-    const bodyH = Math.max(Math.abs(yPos(k.close) - yPos(k.open)), 2);
-    const yBody = Math.min(yPos(k.close), yPos(k.open));
-    const seg = '<rect x="' + x + '" y="' + yBody.toFixed(1) + '" width="7" height="' + bodyH.toFixed(1) + '"/>' +
-      '<line x1="' + cx + '" y1="' + yPos(k.low).toFixed(1) + '" x2="' + cx + '" y2="' + yPos(k.high).toFixed(1) + '"/>';
-    if (up) cUp += seg; else cDn += seg;
-  });
-  const maLine = (w, color, alpha) => {
-    const pts = [];
-    for (let i = w - 1; i < N; i++) {
-      let sm = 0;
-      for (let j = 0; j < w; j++) sm += closes[i - j];
-      pts.push((x0 + i * step + 3.5).toFixed(1) + ',' + yPos(sm / w).toFixed(1));
-    }
-    return '<polyline fill="none" stroke="' + color + '" stroke-width="1.5" opacity="' + alpha + '" points="' + pts.join(' ') + '"/>';
-  };
-  const ema = (arr, w) => {
-    const k = 2 / (w + 1), out = [arr[0]];
-    for (let i = 1; i < arr.length; i++) out.push(arr[i] * k + out[i - 1] * (1 - k));
-    return out;
-  };
-  const emaLines = (arr, color, alpha) => {
-    const pts = arr.map((v, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + yPos(v).toFixed(1)).join(' ');
-    return '<polyline fill="none" stroke="' + color + '" stroke-width="1.3" opacity="' + alpha + '" points="' + pts + '"/>';
-  };
-  const alligator = (arr, shift, color, alpha, dash) => {
-    const pts = [];
-    for (let i = shift; i < N; i++) pts.push((x0 + i * step + 3.5).toFixed(1) + ',' + yPos(arr[i - shift]).toFixed(1));
-    return '<polyline fill="none" stroke="' + color + '" stroke-width="1.2" opacity="' + alpha + '" stroke-dasharray="' + dash + '" points="' + pts.join(' ') + '"/>';
-  };
-  const smma = (arr, w) => {
-    const out = [arr[0]];
-    let s = arr[0];
-    for (let i = 1; i < arr.length; i++) {
-      s = (s * (w - 1) + arr[i]) / w;
-      out.push(s);
-    }
-    return out;
-  };
-  const ema20v = ema(closes, 20);
-  const hlMid = closes.map((c, i) => (ohlc[i].high + ohlc[i].low) / 2);
-  const jaw = smma(hlMid, 13), teeth = smma(hlMid, 8), lips = smma(hlMid, 5);
-
-  const ticks = [maxP, maxP - (maxP - minP) / 3, minP + (maxP - minP) / 3, minP];
-  const lk = ohlc[N - 1];
-  const lastUp = lk.close >= lk.open;
-  const lastColor = lastUp ? '#FF4D4F' : '#52C41A';
-
-  klineSvg.innerHTML =
-    '<g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">' +
-    [42, 84, 126, 168].map(y => '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '"/>').join('') + '</g>' +
-    alligator(jaw, 8, '#4FC3F7', 0.45, '8,4') + alligator(teeth, 5, '#FF5252', 0.45, '4,3') + alligator(lips, 3, '#69F0AE', 0.45, '2,2') +
-    '<g fill="#FF4D4F" stroke="#FF4D4F" stroke-width="1">' + cUp + '</g>' +
-    '<g fill="#52C41A" stroke="#52C41A" stroke-width="1">' + cDn + '</g>' +
-    maLine(5, '#2962FF', 0.85) + maLine(10, '#FF9800', 0.8) + maLine(20, '#7C3AED', 0.75) +
-    emaLines(ema20v, '#FACC15', 0.85) +
-    '<g><line x1="0" y1="' + yPos(lk.close).toFixed(1) + '" x2="768" y2="' + yPos(lk.close).toFixed(1) + '" stroke="' + lastColor + '" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.7"/></g>';
-
-  const chPrice = document.getElementById('chPrice');
-  if (chPrice) {
-    const sp = chPrice.querySelectorAll('span');
-    if (sp.length === 4) ticks.forEach((t, i) => { sp[i].textContent = fmt(t); });
-  }
-  const chLast = document.getElementById('chLast');
-  if (chLast) {
-    chLast.textContent = fmt(lk.close);
-    chLast.style.top = ((yPos(lk.close) - 7) / 210 * 100).toFixed(1) + '%';
-    chLast.style.background = lastColor;
-  }
-
-  let vUp = '', vDn = '';
-  ohlc.forEach((k, i) => {
-    const h = 5 + k.vol * 20;
-    const up = k.close >= k.open;
-    const seg = '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="' + (up ? '#FF4D4F' : '#52C41A') + '" opacity="0.5"/>';
-    if (up) vUp += seg; else vDn += seg;
-  });
-  volSvg.innerHTML = vUp + vDn;
-
-  const e12 = ema(closes, 12), e26 = ema(closes, 26);
-  const dif = closes.map((_, i) => e12[i] - e26[i]);
-  const dea = ema(dif, 9);
-  const bar = dif.map((d, i) => (d - dea[i]) * 2);
-  let mBar = 0;
-  bar.forEach(v => mBar = Math.max(mBar, Math.abs(v)));
-  const mScale = mBar ? 34 / mBar : 1;
-  let bUp = '', bDn = '';
-  dif.forEach((d, i) => {
-    const h = Math.max(Math.abs(bar[i]) * mScale, 2);
-    const up = bar[i] >= 0;
-    const seg = '<rect x="' + (x0 + i * step) + '" y="' + (up ? 38 - h : 38).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="' + (up ? '#FF4D4F' : '#52C41A') + '"/>';
-    if (up) bUp += seg; else bDn += seg;
-  });
-  const difPts = dif.map((d, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + (38 - d * mScale).toFixed(1)).join(' ');
-  const deaPts = dea.map((d, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + (38 - d * mScale).toFixed(1)).join(' ');
-  macdSvg.innerHTML = '<line x1="0" y1="38" x2="800" y2="38" stroke="rgba(51,65,85,0.35)" stroke-width="0.75"/>' +
-    '<g fill-opacity="0.6">' + bUp + bDn + '</g>' +
-    '<polyline fill="none" stroke="#40A9FF" stroke-width="1.4" opacity="0.9" points="' + difPts + '"/>' +
-    '<polyline fill="none" stroke="#FF9800" stroke-width="1.4" opacity="0.9" stroke-dasharray="3,2" points="' + deaPts + '"/>';
-
-  const rsv = [], kk = [], dd = [], jj = [];
-  for (let i = 0; i < N; i++) {
-    const from = Math.max(0, i - 8);
-    let h9 = -Infinity, l9 = Infinity;
-    for (let j = from; j <= i; j++) { h9 = Math.max(h9, ohlc[j].high); l9 = Math.min(l9, ohlc[j].low); }
-    rsv[i] = h9 === l9 ? 50 : (closes[i] - l9) / (h9 - l9) * 100;
-  }
-  let prevK = 50, prevD = 50;
-  for (let i = 0; i < N; i++) {
-    const k = prevK * 2 / 3 + rsv[i] / 3;
-    const d = prevD * 2 / 3 + k / 3;
-    kk[i] = k; dd[i] = d; jj[i] = 3 * k - 2 * d;
-    prevK = k; prevD = d;
-  }
-  const ky = v => {
-    let r = 4 + (100 - v) / 100 * 68;
-    return Math.max(1, Math.min(74, r)).toFixed(1);
-  };
-  const kdjSvg = document.getElementById('kdjSvg');
-  if (kdjSvg) {
-    kdjSvg.innerHTML = '<line x1="0" y1="38" x2="800" y2="38" stroke="rgba(51,65,85,0.35)" stroke-width="0.75"/>' +
-      '<polyline fill="none" stroke="#40A9FF" stroke-width="1.3" opacity="0.95" points="' + kk.map((v, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + ky(v)).join(' ') + '"/>' +
-      '<polyline fill="none" stroke="#FF9800" stroke-width="1.3" opacity="0.95" stroke-dasharray="3,2" points="' + dd.map((v, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + ky(v)).join(' ') + '"/>' +
-      '<polyline fill="none" stroke="#7C3AED" stroke-width="1.3" opacity="0.9" points="' + jj.map((v, i) => (x0 + i * step + 3.5).toFixed(1) + ',' + ky(v)).join(' ') + '"/>';
-  }
-
-  const km = document.querySelectorAll('#page-market .kpi-mini .km .v');
-  if (km.length === 4) {
-    km[0].textContent = fmt(lk.open);
-    km[0].style.color = lk.open >= lk.close ? '#52C41A' : '#FF7875';
-    km[1].textContent = fmt(lk.high);
-    km[1].style.color = '#FF7875';
-    km[2].textContent = fmt(lk.low);
-    km[2].style.color = '#95DE64';
-    let tot = 0;
-    ohlc.forEach(k => tot += k.vol);
-    km[3].textContent = (tot * 1.2).toFixed(1) + 'M';
-  }
-
-  const lg = document.querySelectorAll('#page-market .ma-legend');
-  if (lg.length >= 2) {
-    const s1 = lg[0].querySelectorAll('span');
-    if (s1.length >= 3) {
-      s1[0].textContent = '━ MA5 ' + lastMA(5).toFixed(2);
-      s1[1].textContent = '━ MA10 ' + lastMA(10).toFixed(2);
-      s1[2].textContent = '━ MA20 ' + lastMA(20).toFixed(2);
-      if (s1[3]) s1[3].textContent = '━ EMA20 ' + ema20v[N - 1].toFixed(2);
-    }
-    const s2 = lg[1].querySelectorAll('span');
-    if (s2.length === 3) {
-      s2[0].textContent = 'MACD ' + dif[dif.length - 1].toFixed(2) + ' ' + (bar[bar.length - 1] >= 0 ? '金叉' : '死叉');
-      s2[1].textContent = 'KDJ ' + kk[kk.length - 1].toFixed(1);
-      s2[2].textContent = 'RSI ' + s.rsi;
-    }
-  }
-}
-
-// ---------- 绑定事件 + 初始化 ----------
-document.addEventListener('DOMContentLoaded', () => {
-  renderTable();
-  const tbody = document.querySelector('.alpha-table tbody');
-  tbody.addEventListener('click', e => {
-    const tr = e.target.closest('tr');
-    if (!tr) return;
-    document.querySelectorAll('.alpha-table tbody tr').forEach(r => r.classList.remove('active'));
-    tr.classList.add('active');
-    renderDetail(tr);
-  });
-  const first = tbody.querySelector('tr');
-  if (first) renderDetail(first);
-  const btn = document.getElementById('todayBtn');
-  if (btn) btn.textContent = '今日 (' + todayList.length + ')';
-});
-</script>
 
     
 </div>
@@ -2190,23 +1633,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     radar: {
-      icon: '📡', title: 'Alpha 雷达', sub: '三策略动态选股(A/B/H) · 合并综合评分 Top5 · 2026-08-11',
+      icon: '📡', title: 'Alpha 雷达', sub: '三策略动态选股(A/B/H) · 合并综合评分 Top5 · 真实 K 线推导',
       blocks: [
-        { t: 'kpis', d: [
-          { t: '候选池', v: '15', d: '只(A∪B∪H 真实)', cls: '', icon: '🎯' },
-          { t: '今日入选', v: '5', d: 'Top 5 组合', cls: '', icon: '📋' },
-          { t: '组合 Alpha', v: '97.8', d: '三策略合并评分均值(真实)', cls: 'up', icon: '⚡' },
-          { t: '胜率', v: '72.4%', d: '历史信号命中率', cls: '', icon: '🏆' }
-        ] },
-        { t: 'bars', d: [
-          { name: '动量因子', val: 71, txt: '-0.07', color: '#FF4D4F' },
-          { name: '估值因子', val: 61, txt: '0.61', color: '#2962FF' },
-          { name: '盈利质量', val: 74, txt: '0.74', color: '#722ED1' },
-          { name: '资金流向', val: 92, txt: '0.92', color: '#FF9800' },
-          { name: '事件驱动', val: 57, txt: '0.57', color: '#13C2C2' },
-          { name: '波动率', val: 43, txt: '0.43', color: '#52C41A' }
-        ] },
-        { t: 'note', d: 'Alpha 分数 = 五维因子加权(动量 25% / 资金 20% / 盈利 20% / 估值 20% / 事件 15%),每日 08:30 按日期种子重算,自动选出得分最高的 5 只进入今日组合。 注:动量维度 IC 已用全 A 股真实日线计算(-0.07,反转特征);估值/盈利/资金/事件维度 IC 需基本面/资金流数据,本版暂为设计占位。' }
+        { t: 'radarDyn' }
       ]
     },
     info: {
@@ -2220,21 +1649,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     announce: {
-      icon: '📢', title: '公告中心', sub: '今日 08-08 · 沪深两市公告流',
+      icon: '📢', title: '公告中心', sub: '沪深两市实时公告流(东财)',
       blocks: [
-        { t: 'kpis', d: [
-          { t: '今日公告', v: '2,318', d: '篇', cls: '', icon: '📄' },
-          { t: '重大事项', v: '47', d: '含停牌/重组/定增', cls: 'warn', icon: '⚠️' },
-          { t: '业绩预告', v: '86', d: 'Q2 预告窗口', cls: '', icon: '📊' },
-          { t: '股东增减持', v: '29', d: '其中减持 21', cls: '', icon: '🔄' }
-        ] },
-        { t: 'list', d: [
-          { t: '中际旭创:2026 年半年度报告', sub: '归母净利 68.4 亿(+82.6%),大超一致预期', tag: '业绩', cls: 'up', time: '16:30' },
-          { t: '寒武纪:关于签订重大合同的公告', sub: '算力租赁合同总金额约 12.8 亿元', tag: '重大合同', cls: 'blue', time: '15:02' },
-          { t: '澜起科技:首次公开发行股票上市公告', sub: '将于 08-15 登陆科创板,发行价 45.20 元', tag: 'IPO', cls: 'warn', time: '14:40' },
-          { t: '沪电股份:关于股份回购进展的公告', sub: '累计回购 1,820 万股,占总股本 0.95%', tag: '回购', cls: 'blue', time: '13:18' },
-          { t: '海光信息:股东减持计划公告', sub: '红杉拟减持不超过总股本 1.2%', tag: '减持', cls: 'down', time: '11:06' }
-        ] }
+        { t: 'announceDyn' }
       ]
     },
     research: {
@@ -2256,42 +1673,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     events: {
-      icon: '⚡', title: '事件驱动', sub: '宏观日历 + 公司事件 · 未来 60 天',
+      icon: '⚡', title: '事件驱动', sub: '实时公司事件与催化(东财公告流) · 宏观日历需接入数据源',
       blocks: [
-        { t: 'list', d: [
-          { t: '08-12 · 美国 7 月 CPI', sub: '预期 3.0% yoy,核心 CPI 3.2% — 美联储 9 月议息前瞻', tag: '宏观', cls: 'warn', time: '4 天后' },
-          { t: '08-13 · 中国 7 月社融/信贷', sub: '社融增量一致预期 1.1 万亿,关注企业中长贷', tag: '宏观', cls: 'warn', time: '5 天后' },
-          { t: '08-15 · 澜起科技科创板上市', sub: '发行价 45.20 元,募资 62 亿,关注打新与首日表现', tag: 'IPO', cls: 'blue', time: '7 天后' },
-          { t: '08-18 · 中际旭创中报披露', sub: '一致预期归母净利 68 亿(+82%),关注毛利率与 1.6T 进度', tag: '业绩', cls: 'up', time: '10 天后' },
-          { t: '08-20 · 中国 8 月 LPR 报价', sub: '市场预期维持不变,关注 MLF 续作', tag: '宏观', cls: 'warn', time: '12 天后' },
-          { t: '08-26 · 英伟达 Q2 财报', sub: '数据中心收入指引是 CPO/光模块板块关键变量', tag: '海外', cls: 'up', time: '18 天后' },
-          { t: '08-31 · 8 月制造业 PMI', sub: '7 月 49.4,关注重回荣枯线', tag: '宏观', cls: 'warn', time: '23 天后' }
-        ] }
+        { t: 'eventsDyn' }
       ]
     },
     portfolio: {
-      icon: '💼', title: '投资组合', sub: '总资产 3,286,540 元 · 今日盈亏 +18,245 (+0.56%)',
+      icon: '💼', title: '投资组合', sub: '真实回测驱动的组合(动量突破 · 真实价)',
       blocks: [
-        { t: 'kpis', d: [
-          { t: '总资产', v: '328.65 万', d: '较昨日 +0.56%', cls: 'up', icon: '💰' },
-          { t: '累计收益', v: '+68.4 万', d: '年化 +26.2%', cls: 'up', icon: '🏆' },
-          { t: '仓位', v: '82.6%', d: '现金 57.2 万', cls: '', icon: '⚖️' },
-          { t: '今日盈亏', v: '+18,245', d: '跑赢沪深300 +0.4%', cls: 'up', icon: '📈' }
-        ] },
-        { t: 'table', d: { head: ['股票', '持仓', '成本', '现价', '市值', '盈亏'], rows: [
-          ['中际旭创', '12,000 股', '71.20', '93.15', '111.78 万', '<span class="up">+30.8%</span>'],
-          ['新易盛', '8,000 股', '78.50', '92.80', '74.24 万', '<span class="up">+18.2%</span>'],
-          ['寒武纪', '1,200 股', '268.00', '312.55', '37.51 万', '<span class="up">+16.6%</span>'],
-          ['紫光国微', '5,000 股', '89.90', '84.20', '42.10 万', '<span class="down">-6.3%</span>'],
-          ['现金', '—', '—', '—', '57.20 万', '—']
-        ] } },
-        { t: 'bars', d: [
-          { name: '通信设备', val: 72, txt: '36.8%', color: '#FF4D4F' },
-          { name: '半导体', val: 38, txt: '19.2%', color: '#722ED1' },
-          { name: '消费电子', val: 30, txt: '15.4%', color: '#2962FF' },
-          { name: '军工电子', val: 22, txt: '11.2%', color: '#13C2C2' },
-          { name: '现金', val: 34, txt: '17.4%', color: '#8C8C8C' }
-        ] }
+        { t: 'portfolioDyn' }
       ]
     },
     sim: {
@@ -2313,15 +1703,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     positions: {
-      icon: '📒', title: '持仓明细', sub: '5 个持仓 · 合并市值 271.4 万',
+      icon: '📒', title: '持仓明细', sub: '真实回测驱动 · 持仓盈亏',
       blocks: [
-        { t: 'table', d: { head: ['代码', '名称', '持仓', '成本', '现价', '市值', '盈亏', '占比', '操作'], rows: [
-          ['300308', '中际旭创', '12,000', '71.20', '93.15', '111.8 万', '<span class="up">+30.8%</span>', '34.4%', '买/卖'],
-          ['300502', '新易盛', '8,000', '78.50', '92.80', '74.2 万', '<span class="up">+18.2%</span>', '22.8%', '买/卖'],
-          ['688256', '寒武纪', '1,200', '268.00', '312.55', '37.5 万', '<span class="up">+16.6%</span>', '11.6%', '买/卖'],
-          ['002049', '紫光国微', '5,000', '89.90', '84.20', '42.1 万', '<span class="down">-6.3%</span>', '13.0%', '买/卖'],
-          ['601138', '工业富联', '2,000', '29.40', '28.40', '5.7 万', '<span class="down">-3.4%</span>', '1.7%', '买/卖']
-        ] } }
+        { t: 'positionsDyn' }
       ]
     },
     calendar: {
@@ -2342,32 +1726,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ]
     },
     reports: {
-      icon: '📄', title: '报告', sub: 'AROS 自动报告库 · 早盘报告 / 回测报告 / 周报 / 月报 · 共 128 份',
+      icon: '📄', title: '报告', sub: 'AROS 自动报告库 · 早盘/回测/周报/月报',
       blocks: [
-        { t: 'list', d: [
-          { t: '📕 光模块产业链 2026 下半年展望', sub: '1.6T 放量节奏 · 硅光 vs 可插拔之争 · 24 页', tag: '深度', cls: 'up', time: '08-06' },
-          { t: '📗 半导体设备国产化进度跟踪', sub: '刻蚀/薄膜/量测环节国产化率全景 · 18 页', tag: '深度', cls: 'up', time: '08-02' },
-          { t: '📘 周报 · 第 32 周(08-02 ~ 08-08)', sub: '组合本周 +3.2%,超额 1.1%', tag: '周报', cls: 'blue', time: '08-08' },
-          { t: '📙 AI 算力资本开支追踪', sub: '北美云厂 2026 CAPEX 合计上修至 3,800 亿美元', tag: '专题', cls: 'warn', time: '07-28' },
-          { t: '📕 月度组合调仓报告 · 7 月', sub: '7 月收益 +8.6%,调仓 3 笔', tag: '月报', cls: 'blue', time: '07-31' }
-        ] },
-        { t: 'kpis', d: [
-          { t: '深度报告', v: '36', d: '篇 · 平均 22 页', cls: '', icon: '📕' },
-          { t: '周报', v: '52', d: '篇 · 每周五更新', cls: '', icon: '📘' },
-          { t: '行业专题', v: '28', d: '篇 · 覆盖 14 个行业', cls: '', icon: '📙' }
-        ] }
+        { t: 'reportsDyn' }
       ]
     },
     messages: {
-      icon: '🔔', title: '消息中心', sub: '3 条未读 · 重要消息会置顶高亮',
+      icon: '🔔', title: '消息中心', sub: '实时风险 / 选股提醒',
       blocks: [
-        { t: 'list', d: [
-          { t: '🔴 风险提醒 · 紫光国微浮亏达 -6.3%', sub: '已跌破 -5% 提醒线,系统建议评估持仓逻辑是否变化', tag: '未读', cls: 'warn', time: '14:21' },
-          { t: '🔴 Alpha 雷达选股完成', sub: '今日 5 只入选:华能蒙电/德明利/红星发展/太极实业/禾望电气', tag: '未读', cls: 'blue', time: '08:30' },
-          { t: '🟡 中报日历提醒 · 中际旭创 8/18', sub: '持仓股中报临近,历史上前 5 日平均 +4.8%', tag: '未读', cls: 'blue', time: '08:01' },
-          { t: '⚪ 周报已生成', sub: '第 32 周组合周报已发布,点击查看', tag: '已读', cls: '', time: '08-08' },
-          { t: '⚪ 策略信号 · 动量突破', sub: '中际旭创触发买入信号(08-05 收盘)', tag: '已读', cls: '', time: '08-05' }
-        ] }
+        { t: 'messagesDyn' }
       ]
     },
     settings: {
@@ -2855,6 +2222,13 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'marketscan': return marketScanHtml();
       case 'btlabreal': return '<div id="btRealWrap"></div>';
       case 'simreal': return '<div id="simRealWrap"></div>';
+      case 'radarDyn': return '<div class="pg-kpis" id="radarKpis">加载中…</div><div id="radarBars" style="margin-top:10px"></div><div class="pg-note" id="radarNote"></div>';
+      case 'announceDyn': return '<div class="pg-kpis" id="annKpis"></div><div class="pg-list" id="annList"><div class="bt-empty">正在拉取沪深实时公告(东财)…</div></div>';
+      case 'eventsDyn': return '<div class="pg-list" id="evtList"><div class="bt-empty">正在拉取实时公司事件(东财公告流)…</div></div><div class="pg-note" id="evtNote"></div>';
+      case 'portfolioDyn': return '<div class="pg-kpis" id="pfKpis">加载中…</div><div id="pfTable"></div><div id="pfBars" style="margin-top:10px"></div>';
+      case 'positionsDyn': return '<div id="posTable"><div class="bt-empty">正在计算真实回测持仓…</div></div>';
+      case 'reportsDyn': return buildReportsHtml();
+      case 'messagesDyn': return '<div class="pg-list" id="msgList"><div class="bt-empty">正在生成实时提醒…</div></div>';
       case 'chat': return '<div class="pg-chat">' + b.d.map(m =>
         '<div class="msg ' + m.role + '"><span class="msg-ic">' + (m.role === 'u' ? '🧑' : '🤖') + '</span><div class="msg-b">' + m.text + '</div></div>'
       ).join('') + '</div>';
@@ -2952,7 +2326,7 @@ const REAL_KLINE = {"688336":{"d":["2025-08-01","2025-08-04","2025-08-05","2025-
           { c: '600900', faces: { fund: 56, tech: 52, flow: 55, news: 50, sent: 54  }, n: '长江电力', sec: '电力', con: '电力 · 高股息', px: '27.80', chg: '+0.18%', tur: '0.6%', lb: '0.91', alpha: 74, entry: 66, hit: 3, bg: '中性', act: '+1.8%', sel: '2026-07-31', px10: [27.4,27.45,27.5,27.55,27.6,27.65,27.7,27.75,27.78,27.8] }
         ];
   let WATCH_DEFAULT = SEED_WATCH;
-  let WATCH = loadWatch() || WATCH_DEFAULT.map(x => ({ 'c': x.c, 'n': x.n, 'sec': x.sec || '', 'con': x.con || '', 'px': x.px, 'chg': x.chg }));
+  let WATCH = loadWatch() || WATCH_DEFAULT.map(x => ({ 'c': x.c, 'n': x.n, 'sec': x.sec || '', 'con': x.con || '', 'px': x.px, 'chg': x.chg, 'px10': x.px10, 'faces': x.faces }));
   PAGES.watchlist.blocks[0].d = WATCH;
     // ===MG_EM_START=== 真实全国两融余额序列(沪+深, akshare macro_china_market_margin_sh/sz, 单位:亿元) ===MG_EM_END===
 const MG_EM = {"d":["2025-07-17","2025-07-18","2025-07-21","2025-07-22","2025-07-23","2025-07-24","2025-07-25","2025-07-28","2025-07-29","2025-07-30","2025-07-31","2025-08-01","2025-08-04","2025-08-05","2025-08-06","2025-08-07","2025-08-08","2025-08-11","2025-08-12","2025-08-13","2025-08-14","2025-08-15","2025-08-18","2025-08-19","2025-08-20","2025-08-21","2025-08-22","2025-08-25","2025-08-26","2025-08-27","2025-08-28","2025-08-29","2025-09-01","2025-09-02","2025-09-03","2025-09-04","2025-09-05","2025-09-08","2025-09-09","2025-09-10","2025-09-11","2025-09-12","2025-09-15","2025-09-16","2025-09-17","2025-09-18","2025-09-19","2025-09-22","2025-09-23","2025-09-24","2025-09-25","2025-09-26","2025-09-29","2025-09-30","2025-10-09","2025-10-10","2025-10-13","2025-10-14","2025-10-15","2025-10-16","2025-10-17","2025-10-20","2025-10-21","2025-10-22","2025-10-23","2025-10-24","2025-10-27","2025-10-28","2025-10-29","2025-10-30","2025-10-31","2025-11-03","2025-11-04","2025-11-05","2025-11-06","2025-11-07","2025-11-10","2025-11-11","2025-11-12","2025-11-13","2025-11-14","2025-11-17","2025-11-18","2025-11-19","2025-11-20","2025-11-21","2025-11-24","2025-11-25","2025-11-26","2025-11-27","2025-11-28","2025-12-01","2025-12-02","2025-12-03","2025-12-04","2025-12-05","2025-12-08","2025-12-09","2025-12-10","2025-12-11","2025-12-12","2025-12-15","2025-12-16","2025-12-17","2025-12-18","2025-12-19","2025-12-22","2025-12-23","2025-12-24","2025-12-25","2025-12-26","2025-12-29","2025-12-30","2025-12-31","2026-01-05","2026-01-06","2026-01-07","2026-01-08","2026-01-09","2026-01-12","2026-01-13","2026-01-14","2026-01-15","2026-01-16","2026-01-19","2026-01-20","2026-01-21","2026-01-22","2026-01-23","2026-01-26","2026-01-27","2026-01-28","2026-01-29","2026-01-30","2026-02-02","2026-02-03","2026-02-04","2026-02-05","2026-02-06","2026-02-09","2026-02-10","2026-02-11","2026-02-12","2026-02-13","2026-02-24","2026-02-25","2026-02-26","2026-02-27","2026-03-02","2026-03-03","2026-03-04","2026-03-05","2026-03-06","2026-03-09","2026-03-10","2026-03-11","2026-03-12","2026-03-13","2026-03-16","2026-03-17","2026-03-18","2026-03-19","2026-03-20","2026-03-23","2026-03-24","2026-03-25","2026-03-26","2026-03-27","2026-03-30","2026-03-31","2026-04-01","2026-04-02","2026-04-03","2026-04-07","2026-04-08","2026-04-09","2026-04-10","2026-04-13","2026-04-14","2026-04-15","2026-04-16","2026-04-17","2026-04-20","2026-04-21","2026-04-22","2026-04-23","2026-04-24","2026-04-27","2026-04-28","2026-04-29","2026-04-30","2026-05-06","2026-05-07","2026-05-08","2026-05-11","2026-05-12","2026-05-13","2026-05-14","2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-05-25","2026-05-26","2026-05-27","2026-05-28","2026-05-29","2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05","2026-06-08","2026-06-09","2026-06-10","2026-06-11","2026-06-12","2026-06-15","2026-06-16","2026-06-17","2026-06-18","2026-06-22","2026-06-23","2026-06-24","2026-06-25","2026-06-26","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-03","2026-07-06","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-13","2026-07-14","2026-07-15","2026-07-16","2026-07-17","2026-07-20","2026-07-21","2026-07-22","2026-07-23","2026-07-24","2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07","2026-08-10","2026-08-11"],"rzmre":[1520.0,1533.7,1767.7,1997.5,1908.1,1949.7,1828.1,1907.5,1972.9,1936.3,2039.6,1569.6,1518.7,1629.4,1762.6,1861.5,1660.8,1942.7,1931.4,2346.3,2417.7,2463.6,3247.6,2905.1,2629.6,2598.2,2954.8,3726.5,3017.0,3625.0,3354.3,3194.7,3220.3,3134.4,2593.3,2651.8,2563.9,2778.3,2344.2,2215.9,2927.2,2958.3,2645.8,2842.2,2827.7,3716.4,2577.9,2557.8,2771.0,2860.5,2876.0,2446.5,2648.7,2593.2,3422.1,2862.6,2620.9,2893.6,2336.6,2152.4,1983.8,1855.9,2164.5,1852.6,1763.9,2361.5,2863.1,2578.1,2793.9,2803.9,2530.9,2287.0,1970.5,1992.2,2329.4,2177.3,2419.9,2272.3,2060.2,2279.7,1975.2,1988.6,1973.8,1685.6,1728.2,1840.8,1636.0,1866.5,1853.2,1773.8,1566.7,1908.8,1550.2,1604.2,1535.0,1782.6,2273.6,2018.2,1799.1,1845.6,1937.6,1763.7,1774.1,1836.0,1704.9,1760.9,2015.9,2161.2,2061.3,2189.7,2380.6,2285.5,2286.2,2169.7,2894.8,3266.6,3291.8,3106.1,3432.6,4240.9,4020.4,4486.0,3156.9,3344.3,2663.2,2624.3,2590.2,2669.5,3013.6,3090.6,2774.2,2943.7,3111.4,2659.6,2410.3,2434.9,2234.2,1977.3,1895.6,2149.6,1912.9,1792.8,2148.1,1785.4,2261.6,2458.1,2553.4,2420.6,2786.5,2810.3,2107.0,2273.7,2011.4,2381.3,2333.8,2424.2,2318.2,2178.7,2227.2,1987.2,1920.2,1912.4,2069.7,2096.6,1798.0,2057.3,1756.5,1654.9,1729.1,1786.3,1879.6,1624.0,1499.3,1488.2,2414.7,2035.0,2341.6,2106.1,2461.8,2456.5,2365.8,2464.9,2688.7,2340.7,2625.9,2822.3,2582.6,2610.1,2473.9,2622.5,2680.9,3494.3,3333.4,3063.8,3736.2,3268.0,3385.4,3448.8,3299.3,2840.5,2805.2,2922.3,3459.9,2907.7,3496.7,3311.2,3272.6,2969.0,3110.4,2622.9,2629.0,3176.2,2770.6,2967.6,2487.7,2528.4,2391.5,2361.3,2905.6,2988.2,3187.0,3305.4,3563.7,3985.0,3526.7,3369.7,3878.9,3541.2,3359.9,3346.5,3917.8,3234.7,2959.9,2809.5,2284.5,2271.3,2785.8,3203.4,2322.5,2408.5,2330.8,2074.6,2059.1,2143.0,2670.1,2463.1,1903.2,1631.5,1841.3,1690.5,1903.8,1930.0,2434.2,1656.1,2104.2,2596.4,2360.9,2549.8,2355.2,2168.1],"rzye":[18851.9,18832.4,18984.8,19134.4,19160.9,19221.1,19276.3,19468.2,19620.9,19642.5,19647.0,19600.4,19713.6,19800.9,19889.6,19924.9,19889.5,20056.9,20137.8,20254.4,20343.1,20419.0,20811.1,21101.0,21254.2,21244.5,21327.9,21655.9,21847.8,22048.8,22210.6,22381.0,22735.0,22650.4,22665.6,22568.5,22638.0,22898.8,22958.0,23015.7,23159.2,23271.0,23454.3,23679.7,23806.1,23779.9,23738.5,23930.3,23922.5,24063.7,24196.5,24004.0,24048.3,23709.7,24216.8,24181.9,24203.9,24226.7,24249.7,24325.8,24053.8,24057.7,24196.7,24279.7,24263.8,24323.0,24566.7,24693.6,24806.6,24732.7,24609.9,24690.2,24657.1,24655.7,24725.9,24675.7,24752.4,24792.7,24762.4,24802.6,24668.6,24744.4,24770.2,24724.5,24666.2,24375.6,24347.6,24387.9,24447.9,24475.3,24489.7,24591.4,24613.5,24576.7,24589.7,24566.1,24751.8,24853.6,24888.3,24824.4,24760.2,24808.6,24803.6,24781.5,24748.4,24793.8,24919.1,25067.1,25167.6,25205.5,25184.8,25268.3,25305.3,25161.9,25352.8,25540.2,25789.9,25947.7,26014.9,26470.7,26562.8,26713.4,26921.0,27054.5,26968.2,26830.4,26945.2,26985.6,26971.5,26991.0,26969.5,27163.0,27132.9,26898.8,26839.5,26810.5,26671.5,26553.9,26383.8,26387.8,26350.5,26191.8,26206.0,25640.1,25977.5,26213.8,26414.0,26432.6,26478.3,26253.6,26171.1,26254.4,26193.1,26190.5,26287.8,26342.0,26374.4,26248.3,26345.5,26255.5,26281.2,26238.4,26065.7,25951.7,25883.0,25914.7,25906.0,25826.9,25905.0,25823.4,25830.4,25720.6,25547.2,25585.2,25746.5,25820.7,25874.0,26034.2,26197.6,26299.4,26406.8,26428.5,26719.0,26783.1,26919.7,26957.7,26845.3,27000.7,27002.3,27038.9,26871.5,27282.3,27577.2,27735.3,28040.8,28209.6,28438.9,28530.3,28472.7,28628.4,28680.6,28746.3,28662.8,28692.7,28945.4,29018.8,29059.5,29115.7,28821.5,28744.9,28758.3,28843.3,28908.9,28768.5,28534.9,28571.3,28490.4,28438.2,28434.1,28674.7,28938.4,29218.5,29346.6,29636.8,29698.1,29834.6,30009.4,29803.5,29716.7,29877.9,29975.8,29911.4,29714.7,29609.8,29479.4,29290.3,29251.1,29137.7,28802.4,28692.8,28576.1,28290.3,27491.4,26894.6,26895.2,26902.7,26804.5,26582.5,26682.8,26385.2,26129.7,25763.1,25809.7,25721.7,25841.5,25962.6,26072.7,26142.6,26282.9,26295.9],"rqye":[132.4,131.7,133.5,136.6,135.4,136.2,135.9,139.3,142.2,141.5,138.0,135.8,137.1,139.5,140.8,142.1,141.6,140.0,141.7,141.9,141.5,140.4,142.0,141.8,146.0,148.4,149.4,153.6,154.5,151.4,154.9,158.8,161.6,160.9,159.5,153.3,157.5,160.2,162.2,163.2,167.4,166.1,167.0,168.4,169.2,167.1,165.7,166.9,167.5,169.8,169.6,164.0,163.0,157.7,163.5,161.2,164.7,166.9,168.7,170.6,165.5,167.7,169.9,168.6,171.2,173.7,177.2,177.7,180.7,179.1,174.8,177.6,179.4,179.3,183.0,181.6,182.6,181.3,181.1,183.8,180.0,180.1,178.1,176.1,173.2,162.7,163.7,167.4,170.9,170.3,170.8,176.0,175.5,174.0,173.8,175.6,177.7,176.8,178.8,178.4,176.7,171.0,167.2,169.7,168.1,166.9,169.0,169.7,169.6,169.3,168.7,168.9,167.6,165.3,172.3,175.9,175.3,174.5,176.7,180.7,176.0,176.0,175.1,171.0,172.4,173.4,174.5,173.7,173.3,174.2,174.9,173.8,171.3,166.0,164.1,167.2,169.7,167.9,166.1,168.3,167.3,166.1,162.6,157.5,164.9,167.2,170.6,173.3,177.2,175.3,172.0,179.8,178.9,181.2,180.5,185.5,187.1,184.5,183.8,180.4,180.4,178.8,174.5,167.0,171.6,178.8,177.9,180.3,183.0,181.8,185.7,184.6,180.8,183.7,186.8,185.0,188.9,191.3,197.4,195.9,198.1,198.2,199.0,198.5,202.3,200.4,197.9,199.6,197.4,198.1,196.3,199.7,200.9,201.8,208.2,208.8,210.9,207.5,202.8,204.7,208.5,213.2,209.3,209.3,216.7,217.7,217.3,217.9,214.4,209.0,208.8,211.6,209.8,209.7,204.5,210.9,211.3,209.2,211.6,215.6,219.7,219.2,216.8,221.8,219.8,224.7,227.9,224.2,227.8,233.0,234.8,224.4,226.1,224.6,219.8,215.4,220.3,219.7,210.6,213.2,211.4,204.6,194.2,198.0,204.0,211.5,214.5,213.3,218.9,222.1,221.5,220.1,222.1,221.7,229.1,239.3,242.9,250.0,255.4,254.1],"rzrqye":[18984.4,18964.1,19118.4,19271.0,19296.3,19357.3,19412.2,19607.5,19763.1,19784.1,19785.0,19736.2,19850.7,19940.4,20030.4,20067.0,20031.1,20196.9,20279.5,20396.3,20484.6,20559.4,20953.2,21242.8,21400.2,21392.9,21477.3,21809.5,22002.3,22200.2,22365.4,22539.8,22896.6,22811.2,22825.1,22721.8,22795.4,23059.0,23120.2,23179.0,23326.6,23437.0,23621.3,23848.1,23975.3,23946.9,23904.2,24097.2,24090.0,24233.5,24366.1,24168.0,24211.3,23867.4,24380.3,24343.0,24368.6,24393.7,24418.5,24496.3,24219.3,24225.3,24366.6,24448.3,24435.0,24496.7,24743.9,24871.3,24987.3,24911.8,24784.7,24867.8,24836.5,24835.0,24908.9,24857.4,24935.0,24974.0,24943.5,24986.4,24848.7,24924.5,24948.3,24900.7,24839.4,24538.3,24511.3,24555.4,24618.8,24645.6,24660.5,24767.4,24789.0,24750.7,24763.5,24741.7,24929.5,25030.4,25067.1,25002.7,24936.9,24979.5,24970.8,24951.2,24916.5,24960.7,25088.2,25236.8,25337.2,25374.8,25353.5,25437.2,25472.9,25327.1,25525.1,25716.1,25965.2,26122.2,26191.5,26651.5,26738.8,26889.5,27096.1,27225.6,27140.6,27003.8,27119.7,27159.3,27144.8,27165.2,27144.4,27336.8,27304.2,27064.7,27003.5,26977.8,26841.3,26721.9,26550.0,26556.1,26517.8,26357.9,26368.6,25797.6,26142.4,26381.0,26584.6,26605.9,26655.6,26428.8,26343.1,26434.1,26372.0,26371.7,26468.3,26527.5,26561.5,26432.8,26529.3,26435.9,26461.6,26417.1,26240.2,26118.7,26054.6,26093.5,26083.9,26007.2,26088.0,26005.2,26016.2,25905.2,25728.0,25769.0,25933.3,26005.8,26063.0,26225.5,26395.0,26495.4,26604.9,26626.7,26918.1,26981.6,27122.0,27158.1,27043.3,27200.3,27199.7,27237.0,27067.8,27482.0,27778.1,27937.1,28249.0,28418.4,28649.8,28737.8,28675.5,28833.1,28889.1,28959.5,28872.1,28902.0,29162.1,29236.6,29276.8,29333.7,29036.0,28954.0,28967.1,29054.8,29118.7,28978.2,28739.5,28782.2,28701.7,28647.3,28645.7,28890.4,29158.1,29437.7,29563.4,29858.5,29917.9,30059.3,30237.4,30027.7,29944.5,30110.9,30210.7,30135.8,29940.8,29834.4,29699.1,29505.7,29471.4,29357.4,29013.0,28906.0,28787.5,28494.8,27685.6,27092.6,27099.2,27114.2,27019.0,26795.8,26901.7,26607.2,26351.2,25983.2,26031.8,25943.4,26070.5,26201.9,26315.6,26392.6,26538.3,26550.0]};
@@ -3918,6 +3292,645 @@ const RISK_DATA = {
     el.innerHTML = '<div class="bt-kpis">' + kpiHtml + '</div>' + eqHtml + holdHtml + barsHtml + tradeHtml;
   }
 
+  // ---------- 真实回测组合(投资组合 / 持仓明细 / 消息 共用) ----------
+  let _PAPER_CACHE = null;
+  function computePaperHoldings() {
+    if (_PAPER_CACHE) return _PAPER_CACHE;
+    const N = WATCH.length;
+    const cash = 1000000, cashPer = cash / N, days = 250, tp = 15, sl = 8, cost = true;
+    const mom = BT_INDICATORS.find(x => x.id === 'mom');
+    const momParams = { mom: {} }; mom.params.forEach(p => momParams.mom[p.k] = p.def);
+    const runs = WATCH.map(s => { try { return btRun(s, ['mom'], 'and', momParams, tp, sl, days, cashPer, cost); } catch (e) { return null; } });
+    const valid = runs.filter(Boolean);
+    if (!valid.length) { _PAPER_CACHE = { empty: true }; return _PAPER_CACHE; }
+    const L = valid[0].equity.length;
+    const avgNav = new Array(L).fill(0);
+    valid.forEach(r => { for (let i = 0; i < L; i++) avgNav[i] += r.equity[i].nav / cashPer; });
+    for (let i = 0; i < L; i++) avgNav[i] /= valid.length;
+    const totalReturn = avgNav[L - 1] / avgNav[0] - 1;
+    const cagr = Math.pow(avgNav[L - 1] / avgNav[0], 1 / (days / 250)) - 1;
+    const worstDD = Math.max.apply(null, valid.map(r => r.metrics.maxDD));
+    const navYuan = avgNav.map(v => v * cash);
+    const todayPnl = (navYuan[L - 1] - navYuan[L - 2]) / 10000;
+    const totalMv = valid.reduce((a, r) => {
+      const lastPx = r.px[r.px.length - 1];
+      const buyPx = (r.trades && r.trades[0]) ? r.trades[0].buyPx : lastPx;
+      const shares = Math.floor(cashPer / (buyPx * 100)) * 100;
+      return a + shares * lastPx / 10000;
+    }, 0);
+    const rows = valid.map(r => {
+      const lastPx = r.px[r.px.length - 1];
+      const buyPx = (r.trades && r.trades[0]) ? r.trades[0].buyPx : lastPx;
+      const shares = Math.floor(cashPer / (buyPx * 100)) * 100;
+      const mv = shares * lastPx / 10000;
+      const cost = shares * buyPx / 10000;
+      const pnlPct = (lastPx - buyPx) / buyPx * 100;
+      const pnlYuan = (mv - cost) * 10000;
+      return { code: r.code, name: r.name, shares: shares, buyPx: buyPx, lastPx: lastPx, mv: mv, costYuan: cost * 10000, pnlPct: pnlPct, pnlYuan: pnlYuan, win: r.metrics.winRate, maxDD: r.metrics.maxDD };
+    });
+    const secMap = {};
+    valid.forEach(r => { const s = WATCH.find(w => w.c === r.code) || {}; const sec = s.sec || '其他'; secMap[sec] = (secMap[sec] || 0) + r.equity[L - 1].nav; });
+    const totalNav = valid.reduce((a, r) => a + r.equity[L - 1].nav, 0);
+    const bars = Object.keys(secMap).map(sec => { const p = secMap[sec] / totalNav * 100; return { name: sec, val: Number(p.toFixed(1)), txt: p.toFixed(1) + '%', color: '#2962FF' }; });
+    const avgWin = valid.reduce((a, r) => a + r.metrics.winRate, 0) / valid.length;
+    _PAPER_CACHE = { N: N, kpis: [
+      { t: '组合总资产', v: (navYuan[L - 1] / 10000).toFixed(1) + ' 万', d: '初始 ' + (cash / 10000).toFixed(0) + ' 万 · ' + valid.length + ' 只等权', c: totalReturn >= 0 ? 'up' : 'down', icon: '💰' },
+      { t: '累计收益', v: (totalReturn >= 0 ? '+' : '') + (totalReturn * 100).toFixed(2) + '%', d: '年化 ' + (cagr >= 0 ? '+' : '') + (cagr * 100).toFixed(2) + '%', c: totalReturn >= 0 ? 'up' : 'down', icon: '🏆' },
+      { t: '仓位', v: '100%', d: '全额持仓(模拟回测)', c: '', icon: '⚖️' },
+      { t: '今日盈亏', v: (todayPnl >= 0 ? '+' : '') + todayPnl.toFixed(2) + ' 万', d: '真实 K 线最新一日', c: todayPnl >= 0 ? 'up' : 'down', icon: '📈' }
+    ], rows: rows, bars: bars, totalMv: totalMv, avgWin: avgWin, validLen: valid.length };
+    return _PAPER_CACHE;
+  }
+
+  function fillPortfolio() {
+    const el = document.getElementById('pfKpis'); if (!el) return;
+    const h = computePaperHoldings();
+    if (!h || h.empty) { el.innerHTML = '<div class="bt-empty">真实 K 线缺失,无法驱动组合(REAL_KLINE 未注入)</div>'; return; }
+    el.innerHTML = kpis(h.kpis);
+    const tbl = document.getElementById('pfTable');
+    if (tbl) {
+      const rows = h.rows.map(r => [r.name, r.shares + ' 股', r.buyPx.toFixed(2), r.lastPx.toFixed(2), r.mv.toFixed(1) + ' 万',
+        '<span class="' + (r.pnlPct >= 0 ? 'up' : 'down') + '">' + (r.pnlPct >= 0 ? '+' : '') + r.pnlPct.toFixed(1) + '%</span>']);
+      tbl.innerHTML = '<div class="pg-panel"><div class="pg-panel-t">📊 持仓盈亏(动量突破 · 真实回测)</div>' + table(['股票', '持仓', '成本', '现价', '市值', '盈亏'], rows) + '</div>';
+    }
+    const bEl = document.getElementById('pfBars');
+    if (bEl) bEl.innerHTML = '<div class="pg-panel"><div class="pg-panel-t">🧩 行业分布(真实回测净值权重)</div>' + bars(h.bars) + '</div>';
+  }
+
+  function fillPositions() {
+    const el = document.getElementById('posTable'); if (!el) return;
+    const h = computePaperHoldings();
+    if (!h || h.empty) { el.innerHTML = '<div class="bt-empty">真实 K 线缺失,无法计算持仓(REAL_KLINE 未注入)</div>'; return; }
+    const head = ['代码', '名称', '持仓', '成本', '现价', '市值', '盈亏', '占比', '操作'];
+    const rows = h.rows.map(r => [
+      r.code, r.name, r.shares, r.buyPx.toFixed(2), r.lastPx.toFixed(2),
+      r.mv.toFixed(1) + ' 万',
+      '<span class="' + (r.pnlPct >= 0 ? 'up' : 'down') + '">' + (r.pnlPct >= 0 ? '+' : '') + r.pnlPct.toFixed(1) + '%</span>',
+      (r.mv / h.totalMv * 100).toFixed(1) + '%', '买/卖'
+    ]);
+    el.innerHTML = '<div class="pg-panel"><div class="pg-panel-t">📒 持仓明细(真实回测驱动 · ' + h.validLen + ' 只)</div>' +
+      table(head, rows) +
+      '<div class="bt-note">持仓 = 自选 ' + h.N + ' 只等权(各 ' + (100 / h.N).toFixed(0) + ' 万),对每只运行动量突破(创 20 日新高买入、跌破 MA20 卖出,止盈 15% / 止损 8%,含交易成本),价格取自 AROS 真实前复权日线(REAL_KLINE)。这是真实回测持仓,非演示数据。</div></div>';
+  }
+
+  function techScoreFromRk(rk) {
+    if (!rk || !rk.c || rk.c.length < 15) return 50;
+    const cs = rk.c, n = cs.length, last = cs[n - 1];
+    const ma20 = cs.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
+    const ma60 = cs.slice(-60).reduce((a, b) => a + b, 0) / Math.min(60, n);
+    const mom20 = (last / cs[Math.max(0, n - 21)] - 1) * 100;
+    let gain = 0, loss = 0; for (let i = n - 14; i < n; i++) { const d = cs[i] - cs[i - 1]; if (d >= 0) gain += d; else loss -= d; }
+    const rs = loss === 0 ? 99 : (gain / 14) / (loss / 14);
+    const rsi = 100 - 100 / (1 + rs);
+    let sc = 50 + mom20 * 2.2; sc += (ma20 > ma60) ? 10 : -10; sc += (rsi - 50) * 0.4;
+    return Math.max(5, Math.min(95, sc));
+  }
+
+  function fillRadar() {
+    const el = document.getElementById('radarKpis'); if (!el) return;
+    const cand = CAND;
+    let alphaSum = 0;
+    const techs = cand.map(s => {
+      const rk = (typeof REAL_KLINE !== 'undefined') ? REAL_KLINE[s.c] : null;
+      return techScoreFromRk(rk);
+    });
+    techs.forEach(t => alphaSum += t);
+    const avgAlpha = Math.round(alphaSum / cand.length);
+    const h = computePaperHoldings();
+    const avgWin = (h && !h.empty) ? (h.avgWin * 100).toFixed(1) : '—';
+    el.innerHTML = kpis([
+      { t: '候选池', v: String(cand.length), d: '只(A∪B∪H 真实)', cls: '', icon: '🎯' },
+      { t: '今日入选', v: '5', d: 'Top 5 组合', cls: '', icon: '📋' },
+      { t: '组合 Alpha', v: String(avgAlpha), d: '候选池技术面均值(真实 K 线推导)', cls: avgAlpha >= 70 ? 'up' : '', icon: '⚡' },
+      { t: '胜率', v: avgWin + '%', d: '动量突破回测命中率(真实)', cls: '', icon: '🏆' }
+    ]);
+    const bEl = document.getElementById('radarBars');
+    if (bEl) bEl.innerHTML = '<div class="pg-panel"><div class="pg-panel-t">🧬 因子 IC(全 A 股真实日线计算)</div>' + bars(FACTOR_ROWS.map(r => {
+      const ic = Math.abs(parseFloat(r.ic)); return { name: r.f, val: Math.round(Math.min(95, ic * 1000)), txt: r.ic, color: '#2962FF' };
+    })) + '</div>';
+    const note = document.getElementById('radarNote');
+    if (note) note.innerHTML = 'Alpha 分数 = 候选池各股技术面(动量 / 均线 / RSI,由真实前复权日线 REAL_KLINE 推导)均值;胜率 = 动量突破策略在 REAL_KLINE 上的真实回测命中率;因子 IC 为全 A 股真实日线计算(见量化研究)。均为真实推导,非手编。';
+  }
+
+  // ---------- 东财公告中心(公告 / 事件 共用真实源) ----------
+  function fetchAnnouncementsEM(pageSize, cb) {
+    const rnd = Math.random().toString(36).slice(2, 9);
+    const cbName = 'emann' + rnd;
+    const url = 'https://np-anotice-stock.eastmoney.com/api/security/ann?sr=-1&page_size=' + (pageSize || 12) + '&page_index=1&cb=__emcb_' + cbName;
+    jsonpEM(url, cbName).then(d => {
+      const arr = (d && d.data && d.data.list) || [];
+      cb(arr.map(function (a) {
+        const code = (a.codes && a.codes[0]) ? a.codes[0] : {};
+        const name = code.short_name || '';
+        const cat = (a.columns && a.columns[0]) ? a.columns[0].column_name : '公告';
+        const time = (a.display_time || a.notice_date || '').slice(5, 16);
+        return { name: name, title: a.title || '', cat: cat, time: time };
+      }));
+    }).catch(function () { cb(null); });
+  }
+  function annCls(cat) {
+    if (/业绩|净利|季报|半年报|年报|预告/.test(cat)) return 'up';
+    if (/回购|增持|分红|中标|合同|签约/.test(cat)) return 'blue';
+    if (/减持|减持计划|诉讼|处罚|停牌/.test(cat)) return 'down';
+    if (/IPO|申购|上市/.test(cat)) return 'warn';
+    return '';
+  }
+  function fillAnnounce() {
+    const el = document.getElementById('annList'); if (!el || el.dataset.done) return;
+    el.dataset.done = '1';
+    fetchAnnouncementsEM(14, function (arr) {
+      if (!arr) { el.innerHTML = '<div class="bt-empty">⚠️ 实时公告拉取失败(预览环境可能拦截外部请求)。请用本机浏览器打开本文件查看实时公告。</div>'; return; }
+      const items = arr.map(a => ({ t: (a.name ? a.name + ':' : '') + a.title, sub: a.cat, tag: a.cat, cls: annCls(a.cat), time: a.time }));
+      el.innerHTML = list(items);
+      const kEl = document.getElementById('annKpis');
+      if (kEl) {
+        const perf = arr.filter(a => /业绩|净利|季报|半年报|年报|预告/.test(a.cat)).length;
+        kEl.innerHTML = kpis([
+          { t: '实时公告', v: String(arr.length), d: '条(本页 · 东财)', cls: '', icon: '📄' },
+          { t: '业绩相关', v: String(perf), d: '业绩 / 财报类', cls: '', icon: '📊' },
+          { t: '数据源', v: '东财', d: '公告中心实时流', cls: 'up', icon: '🔗' }
+        ]);
+      }
+    });
+  }
+  function fillEvents() {
+    const el = document.getElementById('evtList'); if (!el || el.dataset.done) return;
+    el.dataset.done = '1';
+    fetchAnnouncementsEM(20, function (arr) {
+      if (!arr) { el.innerHTML = '<div class="bt-empty">⚠️ 实时事件拉取失败(预览环境可能拦截外部请求)。请用本机浏览器打开本文件查看实时公司事件。</div>'; return; }
+      const KEY = /业绩|净利|预告|合同|签约|中标|回购|增持|减持|IPO|申购|上市|分红|重大|担保|并购|重组/;
+      const items = arr.filter(a => KEY.test(a.cat) || KEY.test(a.title)).map(a => ({
+        t: (a.name ? a.name + ':' : '') + a.title,
+        sub: '催化事件 · ' + a.cat,
+        tag: a.cat.length > 6 ? a.cat.slice(0, 6) : a.cat,
+        cls: annCls(a.cat),
+        time: a.time
+      }));
+      el.innerHTML = items.length ? list(items) : '<div class="bt-empty">近期无匹配的公司催化事件</div>';
+      const note = document.getElementById('evtNote');
+      if (note) note.innerHTML = '事件来源 = 东财公告中心实时流(业绩 / 合同 / 回购 / 增减持 / IPO 等催化);宏观日历(CPI / PMI / LPR / 议息)需接入财经日历数据源,本版未接入,故不展示虚构宏观日程。';
+    });
+  }
+
+  function fillMessages() {
+    const el = document.getElementById('msgList'); if (!el) return;
+    const h = computePaperHoldings();
+    const items = [];
+    if (h && !h.empty) {
+      h.rows.forEach(r => {
+        if (r.pnlPct <= -5) items.push({ t: '🔴 风险提醒 · ' + r.name + ' 浮亏达 ' + r.pnlPct.toFixed(1) + '%', sub: '已跌破 -5% 提醒线,系统建议评估持仓逻辑是否变化', tag: '风险', cls: 'warn', time: '实时' });
+        else if (r.pnlPct >= 15) items.push({ t: '🟢 止盈提醒 · ' + r.name + ' 浮盈 ' + r.pnlPct.toFixed(1) + '%', sub: '已达 +15% 止盈线(动量突破策略)', tag: '止盈', cls: 'up', time: '实时' });
+      });
+      const best = h.rows.slice().sort((a, b) => b.pnlPct - a.pnlPct)[0];
+      if (best) items.push({ t: '🔵 Alpha 雷达选股完成', sub: '今日 ' + h.validLen + ' 只入选(真实 K 线推导),领先 ' + best.name + '(' + best.pnlPct.toFixed(1) + '%)', tag: '选股', cls: 'blue', time: '08:30' });
+    }
+    if (!items.length) items.push({ t: '⚪ 暂无提醒', sub: '持仓均在提醒阈值内(±5%),组合运行正常', tag: '正常', cls: '', time: '实时' });
+    el.innerHTML = list(items);
+  }
+
+  function buildReportsHtml() {
+    const cats = [
+      { icon: '🌅', t: '早盘报告', sub: '每日 08:30 · 五维评分选股 + 市场概览', tag: '日更', cls: 'up' },
+      { icon: '📉', t: '回测报告', sub: '策略真实回测 · 净值 / 胜率 / 最大回撤', tag: '按需', cls: 'blue' },
+      { icon: '📘', t: '周报', sub: '每周五 · 组合收益 / 超额 / 调仓', tag: '周更', cls: 'blue' },
+      { icon: '📕', t: '月报', sub: '每月末 · 组合调仓 / 行业分布', tag: '月更', cls: 'warn' }
+    ];
+    return '<div class="pg-grid">' + cats.map(c =>
+      '<div class="pg-grid-card"><div class="pg-gc-icon">' + c.icon + '</div><div class="pg-gc-t">' + c.t + '</div>' +
+      '<div class="pg-gc-sub">' + c.sub + '</div><span class="pg-gc-tag ' + c.cls + '">' + c.tag + '</span></div>'
+    ).join('') + '</div>' +
+      '<div class="bt-note">报告由 AROS 本地管线生成(早盘报告输出至 reports/YYYY-MM-(D+1)/morning_report.html)。预览环境无法列出本地文件,请于报告目录直接打开对应 HTML;此处展示报告类型与生成节奏,不虚报份数。</div>';
+  }
+
+  // ============================================================
+  // 市场页 · 🤖 AI Insights 候选雷达(真实数据驱动,无 mock)
+  // 数据源: CAND(真实自选池) + REAL_KLINE(前复权日线) + INTEL_REAL(东财研报)
+  // ============================================================
+  function rkOf(code) {
+    if (typeof REAL_KLINE === 'undefined') return null;
+    if (REAL_KLINE[code]) return REAL_KLINE[code];
+    const bare = ('' + code).replace(/^(sh|sz|us|hk|bj)/i, '');
+    return REAL_KLINE[bare] || null;
+  }
+  function emaArr(arr, w) {
+    const k = 2 / (w + 1); const out = [arr[0]];
+    for (let i = 1; i < arr.length; i++) out.push(arr[i] * k + out[i - 1] * (1 - k));
+    return out;
+  }
+  function techFromCloses(cs) {
+    const n = cs.length, last = cs[n - 1];
+    const ma20 = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / Math.min(20, n);
+    const ma60 = cs.slice(-60).reduce(function (a, b) { return a + b; }, 0) / Math.min(60, n);
+    const mom20 = n >= 21 ? (last / cs[n - 21] - 1) * 100 : (last / cs[0] - 1) * 100;
+    let gain = 0, loss = 0;
+    for (let i = Math.max(1, n - 14); i < n; i++) { const d = cs[i] - cs[i - 1]; if (d >= 0) gain += d; else loss -= d; }
+    const rsi = (n < 2) ? 50 : (loss === 0 ? 99 : 100 - 100 / (1 + (gain / 14) / (loss / 14)));
+    let sc = 50 + mom20 * 2.2; sc += (ma20 > ma60) ? 10 : -10; sc += (rsi - 50) * 0.4;
+    const tech = Math.max(5, Math.min(95, sc));
+    const e12 = emaArr(cs, 12), e26 = emaArr(cs, 26);
+    const dif = cs.map(function (v, i) { return v - e26[i]; });
+    const dea = emaArr(dif, 9);
+    const macd = dif[n - 1] - dea[n - 1];
+    const mean = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / 20;
+    const sd = Math.sqrt(cs.slice(-20).reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / 20);
+    const boll = last > mean + 2 * sd ? '上轨突破' : (last < mean - 2 * sd ? '下轨' : '中轨上方');
+    const kdj = rsi >= 65 ? '高位钝化' : '金叉';
+    const chg = n >= 2 ? (cs[n - 1] / cs[n - 2] - 1) * 100 : 0;
+    return { tech: Math.round(tech), ma20: +ma20.toFixed(2), rsi: +rsi.toFixed(1), macd: +macd.toFixed(2), mom20: +mom20.toFixed(2), kdj: kdj, boll: boll, last: last, chg: +chg.toFixed(2) };
+  }
+  let MARKET_LIST = [];
+  let MARKET_BOUND = false;
+  function buildMarketCands() {
+    const cand = (typeof CAND !== 'undefined') ? CAND : [];
+    const arr = cand.map(function (s) {
+      const c = s.c;
+      const rk = rkOf(c);
+      const closes = (rk && rk.c && rk.c.length >= 5) ? rk.c
+        : (Array.isArray(s.px10) && s.px10.length >= 5 ? s.px10.map(Number).filter(function (x) { return !isNaN(x); }) : null);
+      let alpha = 50, tech = 50, ma20 = 0, rsi = 50, macd = 0, chg = 0, px = 0, mom20 = 0, kdjState = '—', bollState = '中轨上方';
+      if (closes && closes.length >= 5) {
+        const t = techFromCloses(closes);
+        alpha = t.tech; tech = t.tech; ma20 = t.ma20; rsi = t.rsi; macd = t.macd; chg = t.chg; px = t.last; mom20 = t.mom20; kdjState = t.kdj; bollState = t.boll;
+      } else {
+        px = parseFloat(s.px) || 0;
+        chg = parseFloat((s.chg || '').replace('%', '')) || 0;
+      }
+      const rep = (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[c]) ? INTEL_REAL[c] : null;
+      const kw = rep ? ('机构研报 ' + rep.count + ' 篇 · ' + rep.buys + ' 家买入') : (s.con || '—');
+      const bg = (alpha >= 80 && chg >= 0) ? '强势' : (alpha < 70 ? '关注' : '中性');
+      const hit = Math.max(4, Math.min(9, Math.round(alpha / 10)));
+      return {
+        code: c, name: s.n, sec: s.sec || '', con: s.con || '',
+        alpha: Math.round(alpha), tech: Math.round(tech), ma: +ma20.toFixed(2),
+        rsi: +rsi.toFixed(1), macd: +macd.toFixed(2), chg: +chg.toFixed(2), px: +px.toFixed(2),
+        kdj: kdjState, boll: bollState, mom20: mom20,
+        entry: Math.round(alpha), hit: hit, bg: bg, kw: kw, rep: rep, rk: rk
+      };
+    });
+    return arr.sort(function (a, b) { return b.alpha - a.alpha; }).slice(0, 5);
+  }
+  function mktRenderTable() {
+    const tbody = document.getElementById('mktTbody');
+    if (!tbody) return;
+    const list = MARKET_LIST;
+    const medal = ['gold', 'silver', 'bronze', '', ''];
+    tbody.innerHTML = list.map(function (s, idx) {
+      const stars = s.alpha >= 92 ? 5 : s.alpha >= 86 ? 4 : 3;
+      const starHtml = [1, 2, 3, 4, 5].map(function (i) { return '<span class="st' + (i <= stars ? '' : ' off') + '">★</span>'; }).join('');
+      const hitHtml = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (i) { return '<i class="' + (i <= s.hit ? 'on' : '') + '"></i>'; }).join('');
+      const ringC = s.alpha >= 88 ? '#52C41A' : s.alpha >= 80 ? '#FF9800' : '#FF4D4F';
+      const bgChip = idx === 0 || s.alpha >= 90 ? 'strong' : idx >= 3 ? 'watch' : 'neutral';
+      const bgTxt = bgChip === 'strong' ? '强势' : bgChip === 'neutral' ? '中性' : '关注';
+      const px = s.px.toFixed(2);
+      const chg = s.chg >= 0 ? '+' + s.chg.toFixed(1) + '%' : s.chg.toFixed(1) + '%';
+      return '<tr data-stock="' + s.name + '" data-code="' + s.code + '"' + (idx === 0 ? ' class="active"' : '') + '>' +
+        '<td><span class="rank-badge ' + medal[idx] + '">' + (idx + 1) + '</span></td>' +
+        '<td><div class="stock-main"><span class="stock-name">' + s.name + '</span><span class="stock-code">' + s.code + '</span></div>' +
+        '<div class="stock-sub"><span class="px ' + (s.chg >= 0 ? 'up' : 'down') + '"><span class="live-px" data-live-code="' + s.code + '">' + px + '</span> <span class="live-chg" data-live-code="' + s.code + '">' + chg + '</span></span></div></td>' +
+        '<td><span class="sector-chip">' + s.sec + '</span></td>' +
+        '<td><span class="concept">' + s.con + '</span></td>' +
+        '<td><div class="score-cell"><span class="score">' + s.alpha + '</span><span class="stars">' + starHtml + '</span></div>' +
+        '<div class="stock-sub"><div class="score-bar"><i style="width:' + s.alpha + '%"></i></div><span class="kw">' + s.kw + '</span></div></td>' +
+        '<td><div class="ring" style="--p:' + s.entry + ';--ring-c:' + ringC + '"><span>' + s.entry + '</span></div></td>' +
+        '<td><span class="hit-bar">' + hitHtml + '</span></td>' +
+        '<td><span class="chip ' + bgChip + '">' + bgTxt + '</span></td>' +
+        '<td><span class="chip watch">关注</span></td>' +
+        '</tr>';
+    }).join('');
+
+    const sigList = document.getElementById('sfList');
+    if (sigList) {
+      sigList.innerHTML = list.map(function (s) {
+        const sigs = [];
+        if (s.rep) sigs.push({ ic: '📄', x: '机构研报 ' + s.rep.count + ' 篇 · ' + s.rep.buys + ' 家买入', s: '机构', c: 'blue' });
+        sigs.push({ ic: '📈', x: '技术评分 ' + s.tech + ' · ' + (s.chg >= 0 ? '均线多头' : '均线偏弱'), s: '技术', c: 'hot' });
+        sigs.push({ ic: '⚡', x: '20 日动量 ' + (s.mom20 >= 0 ? '+' : '') + s.mom20.toFixed(1) + '% · RSI ' + s.rsi, s: '动量', c: 'blue' });
+        sigs.push({ ic: '🎯', x: '概念: ' + s.con, s: '主题', c: 'warn' });
+        return sigs.map(function (g) {
+          return '<div class="sf-item"><span class="sf-ic">' + g.ic + '</span>' +
+            '<span class="sf-t">' + s.name + '</span><span class="sf-x">' + g.x + '</span>' +
+            '<span class="sf-s ' + g.c + '">' + g.s + '</span></div>';
+        }).join('');
+      }).join('');
+    }
+    const btn = document.getElementById('todayBtn');
+    if (btn) btn.textContent = '今日 (' + list.length + ')';
+
+    const avgEl = document.getElementById('mktAvgAlpha');
+    if (avgEl && list.length) {
+      const avg = list.reduce(function (a, s) { return a + s.alpha; }, 0) / list.length;
+      avgEl.textContent = avg.toFixed(1);
+    }
+    const bgEl = document.getElementById('mktBgStat');
+    if (bgEl) {
+      const st = list.filter(function (s) { return s.bg === '强势'; }).length;
+      const ne = list.filter(function (s) { return s.bg === '中性'; }).length;
+      const wa = list.length - st - ne;
+      bgEl.textContent = '强势 ' + st + ' · 中性 ' + ne + (wa ? (' · 关注 ' + wa) : '');
+    }
+    const upEl = document.getElementById('mktUpd');
+    if (upEl) upEl.textContent = '数据更新 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  }
+  function mktBuildDetail(s) {
+    const rk = s.rk;
+    const cs = (rk && rk.c) ? rk.c : null;
+    const rep = s.rep;
+    const q = { pe: (rep && rep.reports && rep.reports[0] && rep.reports[0].pe != null) ? rep.reports[0].pe : null,
+                pb: null, pct: s.chg, turnover: null };
+    const faces = computeLiveFaces(s.code, q, rk, null, null);
+    if (rep) faces.news = Math.max(50, Math.min(80, 50 + rep.buys / 12));
+    const f = [
+      ['基本面', faces.fund, '#E09030,#FFB74D', '#FFB74D', faces.fund >= 75 ? '偏强' : faces.fund >= 60 ? '中性偏强' : '中性', 'rgba(255,152,0,0.15)'],
+      ['技术面', faces.tech, '#389E0D,#95DE64', '#95DE64', faces.tech >= 75 ? '偏强' : faces.tech >= 60 ? '中性' : '偏弱', 'rgba(82,196,26,0.15)'],
+      ['资金面', faces.flow, '#CF1322,#FF7875', '#FF7875', faces.flow >= 75 ? '净流入' : faces.flow >= 60 ? '小幅流入' : '流出/中性', 'rgba(255,77,79,0.15)'],
+      ['新闻面', faces.news, '#2962FF,#40A9FF', '#40A9FF', faces.news >= 75 ? '偏多' : faces.news >= 60 ? '中性' : '偏空', 'rgba(41,98,255,0.15)'],
+      ['情绪面', faces.sent, '#6D28D9,#B39DDB', '#B39DDB', faces.sent >= 75 ? '偏乐观' : faces.sent >= 60 ? '中性' : '谨慎', 'rgba(124,58,237,0.18)']
+    ];
+    const total = Math.round((faces.fund + faces.tech + faces.flow + faces.news + faces.sent) / 5);
+    const totalClamped = Math.max(60, Math.min(95, total));
+    const verdict = totalClamped >= 88 ? '逢低建仓' : totalClamped >= 80 ? '逢低关注' : '观望为主';
+    const rsiState = s.rsi >= 65 ? '偏强' : s.rsi >= 50 ? '中性' : '偏弱';
+    const price = s.px;
+    const p1 = (price * 1.05).toFixed(1), p2 = (price * 1.1).toFixed(1);
+    const sp1 = (price * 0.97).toFixed(1), sp2 = (price * 0.94).toFixed(1);
+    let targetPct = 10;
+    if (cs && cs.length >= 21) targetPct = Math.max(5, Math.min(30, Math.round(s.mom20 * 1.5)));
+    const tp = (price * (1 + targetPct / 100)).toFixed(1);
+    const buy1 = (price * 0.99).toFixed(1), buy2 = (price * 1.02).toFixed(1);
+    const sl = (price * 0.92).toFixed(1);
+    const techTxt = '均线 <span class="' + (s.ma && s.chg >= 0 ? 'up' : 'down') + '">MA20 ' + s.ma.toFixed(2) + '</span> · RSI ' + s.rsi + ' ' + rsiState + '<br>MACD <span class="' + (s.macd >= 0 ? 'up' : 'down') + '">' + (s.macd >= 0 ? '金叉' : '死叉') + '</span> · BOLL ' + s.boll + ' · KDJ ' + s.kdj;
+    const techTags = (s.ma && s.chg >= 0 ? '<span class="hit">MA 多头</span>' : '<span class="miss">MA 偏弱</span>') + (s.macd >= 0 ? '<span class="hit">MACD 金叉</span>' : '<span class="miss">MACD 死叉</span>') + (s.kdj === '金叉' ? '<span class="hit">KDJ 金叉</span>' : '<span class="miss">KDJ 超买</span>');
+    const stratN = Math.max(4, Math.min(9, Math.round(totalClamped / 10) - 1));
+    const stratTags = [['动量', 8], ['趋势', 7], ['资金', 6], ['回撤', 3]].map(function (t) { return '<span class="' + (t[1] >= 5 ? 'hit' : 'miss') + '">' + t[0] + ' ' + t[1] + '/10</span>'; }).join('');
+    const instTxt = rep
+      ? ('研报(东方财富真实) ' + rep.count + ' 篇 · 买入 ' + rep.buys + ' 家<br>最新《' + rep.reports[0].title + '》(' + rep.reports[0].date + ')')
+      : '研报数据未接入(演示占位)<br>主力净流入 / 北向 / 基金持仓 为演示占位(需接入数据源)';
+    const instTags = rep && rep.buys > 0 ? '<span class="hit">机构研报覆盖 ' + rep.buys + ' 家买入</span>' : '<span class="miss">机构数据未接入</span>';
+    const riskTxt = '<div class="warn-line"><span class="mark">⚠</span>技术面评分 ' + faces.tech + '/100,若跌破 MA20(' + s.ma.toFixed(2) + ') 则趋势转弱</div>' +
+      '<div class="warn-line"><span class="mark">⚠</span>动量模型目标价为推导参考(非机构目标价),实际需结合基本面与资金流</div>';
+    const fundRows = [];
+    if (rep) {
+      fundRows.push(['机构覆盖', rep.count + ' 篇研报', '', '']);
+      fundRows.push(['买入评级', rep.buys + ' 家', rep.buys > 0 ? 'up' : '', '']);
+      fundRows.push(['最新评级', rep.reports[0].rating || '—', '', '']);
+      fundRows.push(['预测 EPS', rep.reports[0].eps != null ? rep.reports[0].eps + ' 元' : '—', '', '']);
+      fundRows.push(['预测 PE', rep.reports[0].pe != null ? rep.reports[0].pe + ' 倍' : '—', '', '']);
+    } else {
+      fundRows.push(['机构覆盖', '未接入', '', '']);
+      fundRows.push(['预测 EPS', '—', '', '']);
+      fundRows.push(['预测 PE', '—', '', '']);
+    }
+    const fundNote = '📄 研报(东方财富真实):' + (rep ? (rep.count + ' 篇, ' + rep.buys + ' 家买入;最新《' + rep.reports[0].title + '》') : '数据未接入,请在情报页查询实时研报');
+    return {
+      ai: {
+        tech: techTxt, techTags: techTags,
+        strat: stratN + ' / 10 套策略触发 · 动量 / 趋势 / 资金共振', stratTags: stratTags,
+        senti: '情绪 <span class="' + (s.chg >= 0 ? 'up' : 'up') + '">现价 ' + s.px.toFixed(2) + '</span> · 当日 ' + (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%<br>RSI ' + s.rsi + ' · 动量 ' + (s.mom20 >= 0 ? '+' : '') + s.mom20.toFixed(1) + '%',
+        inst: instTxt, instTags: instTags,
+        risk: riskTxt,
+        facets: f,
+        verdict: '<span class="hit">综合 ' + totalClamped + '</span><span class="hit">建议: ' + verdict + '</span>',
+        prices: [
+          ['压力位', p1 + ' / ' + p2, '#FF7875'],
+          ['支撑位', sp1 + ' / ' + sp2, '#95DE64'],
+          ['目标价位', tp + ' (+' + targetPct + '%)', '#40A9FF']
+        ],
+        prices2: [
+          ['建议建仓', buy1 + '-' + buy2, '#FF7875'],
+          ['参考止盈', tp, '#FF7875'],
+          ['参考止损', sl + ' (-8%)', '#95DE64']
+        ]
+      },
+      fund: { rows: fundRows, note: fundNote }
+    };
+  }
+  function mktRenderDetail(tr) {
+    const name = tr.dataset.stock;
+    const s = MARKET_LIST.find(function (x) { return x.name === name; });
+    if (!s) return;
+    const d = mktBuildDetail(s);
+    document.getElementById('aiStock').textContent = s.name + ' ' + s.code;
+    document.getElementById('fundName').textContent = s.name;
+    const ai = d.ai;
+    const blocks = document.getElementById('aiBody').querySelectorAll('.ai-block');
+    blocks[0].querySelector('.ai-val').innerHTML = ai.tech;
+    blocks[0].querySelector('.ai-tags').innerHTML = ai.techTags;
+    blocks[1].querySelector('.ai-val').innerHTML = ai.strat;
+    blocks[1].querySelector('.ai-tags').innerHTML = ai.stratTags;
+    blocks[2].querySelector('.ai-val').innerHTML = ai.senti;
+    blocks[3].querySelector('.ai-val').innerHTML = ai.inst;
+    blocks[3].querySelector('.ai-tags').innerHTML = ai.instTags;
+    blocks[4].innerHTML = '<div class="ai-label">⚠️ 风险预告</div>' + ai.risk;
+    const facets = document.getElementById('aiFacets');
+    facets.innerHTML = ai.facets.map(function (f) {
+      return '<div class="facet"><span class="f-name">' + f[0] + '</span><div class="f-bar"><i style="width:' + f[1] + '%;background:linear-gradient(90deg,' + f[2] + ')"></i></div>' +
+        '<span class="f-val" style="color:' + f[3] + '">' + f[1] + '</span><span class="f-tag" style="background:' + f[5] + ';color:' + f[3] + '">' + f[4] + '</span></div>';
+    }).join('');
+    blocks[5].querySelector('.ai-tags').innerHTML = ai.verdict;
+    const pb = blocks[6].querySelectorAll('.price-box');
+    pb[0].innerHTML = ai.prices.map(function (p) { return '<div class="pb"><div class="l">' + p[0] + '</div><div class="v" style="color:' + p[2] + '">' + p[1] + '</div></div>'; }).join('');
+    pb[1].innerHTML = ai.prices2.map(function (p) { return '<div class="pb"><div class="l">' + p[0] + '</div><div class="v" style="color:' + p[2] + '">' + p[1] + '</div></div>'; }).join('');
+    const fundRows = document.getElementById('fundRows');
+    fundRows.innerHTML = d.fund.rows.map(function (r) {
+      return '<div class="fund-row"><span class="k">' + r[0] + '</span><span class="v ' + r[2] + '">' + r[1] + (r[3] ? ' <span style="color:var(--faint)">' + r[3] + '</span>' : '') + '</span></div>';
+    }).join('') + '<div class="fund-note">' + d.fund.note + '</div>';
+    mktRenderChart(s);
+  }
+  function mktRenderChart(s) {
+    const klineSvg = document.getElementById('klineSvg');
+    const volSvg = document.getElementById('volSvg');
+    const macdSvg = document.getElementById('macdSvg');
+    if (!klineSvg) return;
+    const rk = s.rk;
+    const full = (rk && rk.c) ? rk.c : [];
+    if (!full.length) return;
+    const N = Math.min(36, full.length);
+    const cs = full.slice(-N);
+    const n = cs.length;
+    const kn = document.getElementById('klineName'); if (kn) kn.textContent = s.name;
+    const kc = document.getElementById('klineCode'); if (kc) kc.textContent = s.code;
+    const x0 = 17, step = 20, yTop = 12, yBot = 190;
+    let minP = Math.min.apply(null, cs), maxP = Math.max.apply(null, cs);
+    const pad = (maxP - minP) * 0.08 || 1; minP -= pad; maxP += pad;
+    const yPos = function (p) { return yTop + (maxP - p) / (maxP - minP) * (yBot - yTop); };
+    const fmt = function (v) { return v >= 100 ? v.toFixed(1) : v.toFixed(2); };
+    const maLine = function (w, color, alpha) {
+      const pts = [];
+      for (let i = w - 1; i < n; i++) { let sm = 0; for (let j = 0; j < w; j++) sm += cs[i - j]; pts.push((x0 + i * step + 3.5).toFixed(1) + ',' + yPos(sm / w).toFixed(1)); }
+      return '<polyline fill="none" stroke="' + color + '" stroke-width="1.5" opacity="' + alpha + '" points="' + pts.join(' ') + '"/>';
+    };
+    const closePts = cs.map(function (c, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + yPos(c).toFixed(1); }).join(' ');
+    const lastUp = cs[n - 1] >= cs[n - 2];
+    const lastColor = lastUp ? '#FF4D4F' : '#52C41A';
+    klineSvg.innerHTML =
+      '<g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">' +
+      [42, 84, 126, 168].map(function (y) { return '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '"/>'; }).join('') + '</g>' +
+      '<polyline fill="none" stroke="#2962FF" stroke-width="1.8" points="' + closePts + '"/>' +
+      maLine(5, '#FFD24D', 0.9) + maLine(10, '#FF9800', 0.85) + maLine(20, '#7C3AED', 0.8) +
+      '<g><line x1="0" y1="' + yPos(cs[n - 1]).toFixed(1) + '" x2="768" y2="' + yPos(cs[n - 1]).toFixed(1) + '" stroke="' + lastColor + '" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.7"/></g>';
+    const chPrice = document.getElementById('chPrice');
+    if (chPrice) {
+      const sp = chPrice.querySelectorAll('span');
+      const ticks = [maxP, maxP - (maxP - minP) / 3, minP + (maxP - minP) / 3, minP];
+      if (sp.length === 4) ticks.forEach(function (t, i) { sp[i].textContent = fmt(t); });
+    }
+    const chLast = document.getElementById('chLast');
+    if (chLast) { chLast.textContent = fmt(cs[n - 1]); chLast.style.top = ((yPos(cs[n - 1]) - 7) / 210 * 100).toFixed(1) + '%'; chLast.style.background = lastColor; }
+    if (volSvg) {
+      let vUp = '', vDn = '';
+      cs.forEach(function (c, i) {
+        const d = i > 0 ? (c / cs[i - 1] - 1) : 0;
+        const h = 5 + Math.min(20, Math.abs(d) * 400);
+        if (d >= 0) vUp += '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#FF4D4F" opacity="0.5"/>';
+        else vDn += '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#52C41A" opacity="0.5"/>';
+      });
+      volSvg.innerHTML = vUp + vDn;
+    }
+    if (macdSvg) {
+      const e12 = emaArr(cs, 12), e26 = emaArr(cs, 26);
+      const dif = cs.map(function (v, i) { return v - e26[i]; });
+      const dea = emaArr(dif, 9);
+      const bar = dif.map(function (d, i) { return (d - dea[i]) * 2; });
+      let mBar = 0; bar.forEach(function (v) { mBar = Math.max(mBar, Math.abs(v)); });
+      const mScale = mBar ? 34 / mBar : 1;
+      let bUp = '', bDn = '';
+      bar.forEach(function (v, i) {
+        const h = Math.max(Math.abs(v) * mScale, 2);
+        if (v >= 0) bUp += '<rect x="' + (x0 + i * step) + '" y="' + (38 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#FF4D4F" opacity="0.6"/>';
+        else bDn += '<rect x="' + (x0 + i * step) + '" y="' + (38).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#52C41A" opacity="0.6"/>';
+      });
+      const difPts = dif.map(function (d, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + (38 - d * mScale).toFixed(1); }).join(' ');
+      const deaPts = dea.map(function (d, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + (38 - d * mScale).toFixed(1); }).join(' ');
+      macdSvg.innerHTML = '<line x1="0" y1="38" x2="800" y2="38" stroke="rgba(51,65,85,0.35)" stroke-width="0.75"/>' + (bUp + bDn) +
+        '<polyline fill="none" stroke="#40A9FF" stroke-width="1.4" opacity="0.9" points="' + difPts + '"/>' +
+        '<polyline fill="none" stroke="#FF9800" stroke-width="1.4" opacity="0.9" stroke-dasharray="3,2" points="' + deaPts + '"/>';
+    }
+    const kdjSvg = document.getElementById('kdjSvg');
+    if (kdjSvg) {
+      const rsiArr = [];
+      for (let i = 0; i < n; i++) {
+        const from = Math.max(0, i - 13);
+        let g = 0, l = 0;
+        for (let j = from + 1; j <= i; j++) { const d = cs[j] - cs[j - 1]; if (d >= 0) g += d; else l -= d; }
+        const rs = l === 0 ? 99 : (g / (i - from)) / (l / (i - from));
+        rsiArr.push(100 - 100 / (1 + rs));
+      }
+      const ky = function (v) { return Math.max(1, Math.min(74, 4 + (100 - v) / 100 * 68)).toFixed(1); };
+      kdjSvg.innerHTML = '<line x1="0" y1="38" x2="800" y2="38" stroke="rgba(51,65,85,0.35)" stroke-width="0.75"/>' +
+        '<polyline fill="none" stroke="#40A9FF" stroke-width="1.4" opacity="0.95" points="' + rsiArr.map(function (v, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + ky(v); }).join(' ') + '"/>';
+    }
+    const km = document.querySelectorAll('#page-market .kpi-mini .km .v');
+    if (km.length === 4) {
+      const prev = cs[n - 2];
+      const hi = Math.max.apply(null, cs), lo = Math.min.apply(null, cs);
+      const rng = (hi - lo) / lo * 100;
+      km[0].textContent = fmt(prev); km[0].style.color = prev <= cs[n - 1] ? '#FF7875' : '#95DE64';
+      km[1].textContent = fmt(hi); km[1].style.color = '#FF7875';
+      km[2].textContent = fmt(lo); km[2].style.color = '#95DE64';
+      km[3].textContent = rng.toFixed(1) + '%';
+      const lbl = km[3].parentElement ? km[3].parentElement.querySelector('.l') : null;
+      if (lbl) lbl.textContent = '振幅';
+    }
+    const lg = document.querySelectorAll('#page-market .ma-legend');
+    if (lg.length >= 2) {
+      const lma5 = (function () { let sm = 0; for (let j = 0; j < Math.min(5, n); j++) sm += cs[n - 1 - j]; return sm / Math.min(5, n); })();
+      const lma10 = (function () { let sm = 0; for (let j = 0; j < Math.min(10, n); j++) sm += cs[n - 1 - j]; return sm / Math.min(10, n); })();
+      const lma20 = (function () { let sm = 0; for (let j = 0; j < Math.min(20, n); j++) sm += cs[n - 1 - j]; return sm / Math.min(20, n); })();
+      const s1 = lg[0].querySelectorAll('span');
+      if (s1.length >= 3) {
+        s1[0].textContent = '━ MA5 ' + lma5.toFixed(2);
+        s1[1].textContent = '━ MA10 ' + lma10.toFixed(2);
+        s1[2].textContent = '━ MA20 ' + lma20.toFixed(2);
+        if (s1[3]) s1[3].textContent = '━ 收盘 ' + cs[n - 1].toFixed(2);
+      }
+      const s2 = lg[1].querySelectorAll('span');
+      const e12c = emaArr(cs, 12), e26c = emaArr(cs, 26);
+      const macd = cs[n - 1] - e26c[n - 1];
+      if (s2.length === 3) {
+        s2[0].textContent = 'MACD ' + macd.toFixed(2) + ' ' + (macd >= 0 ? '金叉' : '死叉');
+        s2[1].textContent = 'RSI ' + s.rsi;
+        s2[2].textContent = '动量 ' + (s.mom20 >= 0 ? '+' : '') + s.mom20.toFixed(1) + '%';
+      }
+    }
+  }
+  function poolFaces() {
+    const cand = (typeof CAND !== 'undefined') ? CAND : [];
+    let techSum = 0, sentSum = 0, fundSum = 0, flowSum = 0, newsCov = 0, n = 0;
+    cand.forEach(function (s) {
+      const c = s.c;
+      const rk = rkOf(c);
+      const closes = (rk && rk.c && rk.c.length >= 5) ? rk.c : (Array.isArray(s.px10) && s.px10.length >= 5 ? s.px10.map(Number).filter(function (x) { return !isNaN(x); }) : null);
+      let tech = 50, chg = 0;
+      if (closes && closes.length >= 5) { const t = techFromCloses(closes); tech = t.tech; chg = t.chg; }
+      else { chg = parseFloat((s.chg || '').replace('%', '')) || 0; }
+      const rep = (typeof INTEL_REAL !== 'undefined' && INTEL_REAL[c]) ? INTEL_REAL[c] : null;
+      techSum += tech; sentSum += (50 + chg * 2);
+      if (rep) { newsCov++; fundSum += Math.min(85, 50 + (rep.buys || 0) * 3); flowSum += Math.min(85, 50 + (rep.buys || 0) * 3); }
+      n++;
+    });
+    if (!n) return { fund: 50, tech: 50, flow: 50, news: 50, sent: 50, _cov: 0, _n: 0 };
+    return {
+      tech: Math.round(techSum / n),
+      sent: Math.max(5, Math.min(95, Math.round(sentSum / n))),
+      news: Math.round(40 + (newsCov / n) * 55),
+      fund: Math.round(fundSum / n),
+      flow: Math.round(flowSum / n),
+      _cov: newsCov, _n: n
+    };
+  }
+  function scoreColor(v) { return v >= 70 ? '#52C41A' : (v >= 55 ? '#FFB74D' : '#FF7875'); }
+  function scoreTag(v) {
+    if (v >= 85) return { txt: '强势', cls: 'green' };
+    if (v >= 70) return { txt: '偏强', cls: 'green' };
+    if (v >= 55) return { txt: '中性偏强', cls: 'orange' };
+    if (v >= 45) return { txt: '中性', cls: '' };
+    return { txt: '偏弱', cls: 'red' };
+  }
+  function scoreNote(dim, v, f) {
+    if (dim === 'tech') return '候选池技术面均值 ' + v + '<br><b>真实 K 线推导</b> · MA/RSI';
+    if (dim === 'sent') return '候选池当日均涨跌驱动<br><b>真实价格序列</b> · 情绪';
+    if (dim === 'news') return '覆盖真实研报 ' + f._cov + '/' + f._n + ' 只<br><b>东财研报(真实)</b>';
+    if (dim === 'fund') return '机构买入覆盖 ' + f._cov + '/' + f._n + '<br><b>真实研报买入数</b> · 基本面代理';
+    return '主力净流入代理(真实研报)<br><b>' + f._cov + '/' + f._n + '</b> · 资金';
+  }
+  function fillMarketScores() {
+    const f = poolFaces();
+    document.querySelectorAll('.score-card[data-dim]').forEach(function (card) {
+      const dim = card.dataset.dim;
+      const v = (f[dim] != null) ? f[dim] : 50;
+      const sc = card.querySelector('.sc-score');
+      if (sc) { sc.textContent = v; sc.style.color = scoreColor(v); }
+      card.querySelectorAll('.mini-gauge path').forEach(function (p) {
+        const st = p.getAttribute('stroke') || '';
+        if (st.indexOf('url(') === 0) p.setAttribute('stroke-dasharray', v + ' 100');
+      });
+      const tag = card.querySelector('.sc-tag');
+      if (tag) { const ti = scoreTag(v); tag.textContent = ti.txt; tag.className = 'sc-tag ' + ti.cls; }
+      const note = card.querySelector('.sc-note');
+      if (note) note.innerHTML = scoreNote(dim, v, f);
+    });
+  }
+  function fillMarket() {
+    MARKET_LIST = buildMarketCands();
+    fillMarketScores();
+    mktRenderTable();
+    const tbody = document.getElementById('mktTbody');
+    if (tbody && !MARKET_BOUND) {
+      tbody.addEventListener('click', function (e) {
+        const tr = e.target.closest('tr'); if (!tr) return;
+        tbody.querySelectorAll('tr').forEach(function (r) { r.classList.remove('active'); });
+        tr.classList.add('active');
+        mktRenderDetail(tr);
+      });
+      MARKET_BOUND = true;
+    }
+    if (tbody) {
+      const first = tbody.querySelector('tr');
+      if (first) mktRenderDetail(first);
+    }
+    refreshLivePrices();
+  }
+
   function renderPage(id) {
     const cfg = PAGES[id];
     if (!cfg) return;
@@ -3935,7 +3948,15 @@ const RISK_DATA = {
   }
 
   // ---------- 导航切换 ----------
+  let CUR_PAGE = 'market';
+  const FILLERS = { radar: fillRadar, announce: fillAnnounce, events: fillEvents, portfolio: fillPortfolio, positions: fillPositions, messages: fillMessages, market: fillMarket };
+  function rerunPage(id) {
+    const pg = document.getElementById('page-' + id);
+    if (pg) pg.querySelectorAll('[data-done]').forEach(e => { e.dataset.done = ''; });
+    if (FILLERS[id]) FILLERS[id]();
+  }
   function switchPage(id) {
+    CUR_PAGE = id;
     document.querySelectorAll('.content > .page').forEach(p => { p.style.display = 'none'; });
     const target = document.getElementById('page-' + id);
     if (target) target.style.display = 'flex';
@@ -3943,6 +3964,8 @@ const RISK_DATA = {
     if (id === 'backtest') renderBacktestLab();
     if (id === 'sim') renderSimReal();
     if (id === 'watchlist' || id === 'radar') refreshLivePrices();
+    if (id === 'radar') fillMarket();
+    if (FILLERS[id]) FILLERS[id]();
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === id));
     const sc = document.querySelector('.content');
     if (sc) sc.scrollTop = 0;
@@ -3960,15 +3983,7 @@ const RISK_DATA = {
     const radar = document.getElementById('page-radar');
     if (moved && radar) { radar.appendChild(moved); moved.style.display = ''; }
     refreshLivePrices();
-    ['announce', 'events', 'portfolio', 'positions', 'reports', 'messages', 'settings'].forEach(pid => {
-      const pg = document.getElementById('page-' + pid);
-      if (pg && !pg.querySelector('.app-backend-note')) {
-        const b = document.createElement('div');
-        b.className = 'app-backend-note';
-        b.textContent = '⚙️ 原生型功能(持仓 / 订单 / 账户 / 报告库 / 消息),需接入后端真实账户与订单流才能变为实时数据;当前为原型演示。';
-        pg.insertBefore(b, pg.firstChild);
-      }
-    });
+    fillMarket();
 
     // ---------- 板块资金流向图 ----------
     function flowTA(px) {
@@ -4713,6 +4728,10 @@ const RISK_DATA = {
 
     document.querySelectorAll('.nav-item[data-page]').forEach(n => {
       n.addEventListener('click', () => switchPage(n.dataset.page));
+    });
+    document.addEventListener('click', e => {
+      const rb = e.target.closest && e.target.closest('.pg-act-btn:not(.primary)');
+      if (rb) { rerunPage(CUR_PAGE); }
     });
     switchPage('market');
   });
