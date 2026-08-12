@@ -924,7 +924,7 @@
 
     <!-- ASSESSMENT CARDS -->
     <div class="score-row">
-      <div class="intel-note">⚠️ Alpha 雷达与 AI 洞察评分由真实前复权日线(REAL_KLINE)/候选池价格序列动态推导;上方市场指数 / 涨跌家数 / 板块资金流为真实数据;北向 / 基金持仓暂无源,已诚实占位。</div>
+      <div class="intel-note">✅ 标的池 = 东方财富实时主力净流入榜 top 30(动态,随行情变化,零写死);Alpha / 技术面 / 五维技术面均由真实前复权日线(运行时 push2his 拉取)推导;上方市场指数 / 涨跌家数 / 板块资金流为真实数据;北向 / 基金持仓暂无源,已诚实占位。</div>
       <div class="score-card" data-dim="fund">
         <div class="sc-head">
           <span class="sc-title"><span class="ic">📊</span>基本面</span>
@@ -1119,8 +1119,9 @@
               <th>Strategy Hit</th><th>市场背景</th><th>操作</th>
             </tr>
           </thead>
-                              <tbody id="mktTbody"></tbody>
+                              <tbody id="mktTbody"><tr><td colspan="9" class="ms-empty">实时拉取动态标的池与真实行情中…</td></tr></tbody>
         </table>
+        <div class="intel-note" id="mktPoolNote" style="margin:8px 0 0;">实时数据加载中…</div>
         </div>
         <div class="signal-flow">
           <div class="sf-head"><span>⚡ 今日信号流</span><span class="sf-live">LIVE · 08:30</span></div>
@@ -1962,6 +1963,39 @@
     const PZ = 500;
     return 'https://push2.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f62,f184,f6';
   }
+  // ---------- Alpha 雷达动态标的池(东方财富实时排名,零写死) ----------
+  let MARKET_POOL = [];
+  let POOL_READY = false;
+  let POOL_FALLBACK = false;
+  function poolEMUrl() {
+    // 全市场 A 股 · 主力净流入榜 top 30(含行业/现价/涨跌幅/主力净流入/换手)
+    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f62,f184,f6,f100';
+  }
+  function fetchPool() {
+    if (POOL_READY) return Promise.resolve(MARKET_POOL);
+    return jsonpEM(poolEMUrl(), 'pool').then(function (d) {
+      const diff = (d && d.data && d.data.diff) || [];
+      if (!diff.length) throw new Error('empty');
+      MARKET_POOL = diff.map(function (x) {
+        const inflowYi = (x.f62 != null) ? x.f62 / 1e8 : 0;
+        return {
+          c: x.f12, n: x.f14, sec: x.f100 || '', con: '主力净流入',
+          px: (x.f2 != null) ? x.f2.toFixed(2) : '—',
+          chg: (x.f3 != null) ? ((x.f3 >= 0 ? '+' : '') + x.f3.toFixed(2) + '%') : '0.00%',
+          mainInflow: x.f62, inflowYi: inflowYi, turnover: x.f184, amount: x.f6, px10: []
+        };
+      });
+      POOL_READY = true; POOL_FALLBACK = false;
+      return MARKET_POOL;
+    }).catch(function () {
+      // 网络被拦截时保留既有 WATCH(用户本地自选 / SEED 兜底),不制造假数据
+      POOL_READY = true; POOL_FALLBACK = true;
+      return MARKET_POOL;
+    });
+  }
+  function setDynamicPool() {
+    if (MARKET_POOL.length) CAND = MARKET_POOL;
+  }
   function msSortLabel(k, dir) {
     if (k === 'f3') return dir === 'asc' ? '跌幅榜' : '涨幅榜';
     const m = { f184: '换手率榜', f6: '成交额榜', f62: '主力净流入榜' };
@@ -2455,7 +2489,7 @@ const RISK_DATA = {
   }
 };
 
-  const CAND = WATCH;
+  let CAND = WATCH;
 
   const FACTOR_ROWS = [
     { f: '动量突破', cat: '动量', ic: '-0.071', icir: '-0.45', dir: '负向', ok: true, ind: 'mom', map: '动量突破 mom' },
@@ -3540,11 +3574,13 @@ const RISK_DATA = {
   }
   let MARKET_LIST = [];
   let MARKET_BOUND = false;
-  function buildMarketCands() {
+  async function buildMarketCands() {
     const cand = (typeof CAND !== 'undefined') ? CAND : [];
+    // 拉取标的池真实前复权日线(东方财富 push2his),喂 RK_FULL,零写死
+    try { await ensureKlines(cand.map(function (s) { return s.c; }), 120, 10); } catch (e) {}
     const arr = cand.map(function (s) {
       const c = s.c;
-      const rk = rkOf(c);
+      const rk = RK_FULL[c] || null;            // 真实日线(运行时拉取),覆盖预注入 REAL_KLINE
       const closes = (rk && rk.c && rk.c.length >= 5) ? rk.c
         : (Array.isArray(s.px10) && s.px10.length >= 5 ? s.px10.map(Number).filter(function (x) { return !isNaN(x); }) : null);
       let alpha = 50, tech = 50, ma20 = 0, rsi = 50, macd = 0, chg = 0, px = 0, mom20 = 0, kdjState = '—', bollState = '中轨上方';
@@ -3858,7 +3894,7 @@ const RISK_DATA = {
     let techSum = 0, sentSum = 0, fundSum = 0, flowSum = 0, newsCov = 0, n = 0;
     cand.forEach(function (s) {
       const c = s.c;
-      const rk = rkOf(c);
+      const rk = RK_FULL[c] || null;            // 真实日线(运行时拉取)
       const closes = (rk && rk.c && rk.c.length >= 5) ? rk.c : (Array.isArray(s.px10) && s.px10.length >= 5 ? s.px10.map(Number).filter(function (x) { return !isNaN(x); }) : null);
       let tech = 50, chg = 0;
       if (closes && closes.length >= 5) { const t = techFromCloses(closes); tech = t.tech; chg = t.chg; }
@@ -3910,8 +3946,10 @@ const RISK_DATA = {
       if (note) note.innerHTML = scoreNote(dim, v, f);
     });
   }
-  function fillMarket() {
-    MARKET_LIST = buildMarketCands();
+  async function fillMarket() {
+    await fetchPool();            // 动态标的池(东方财富实时主力净流入榜 top 30)
+    setDynamicPool();             // CAND 切换为实时池,失败则保留本地自选 / SEED
+    MARKET_LIST = await buildMarketCands();   // 真实前复权日线推导 alpha / 技术面
     fillMarketScores();
     mktRenderTable();
     const tbody = document.getElementById('mktTbody');
@@ -3929,6 +3967,11 @@ const RISK_DATA = {
       if (first) mktRenderDetail(first);
     }
     refreshLivePrices();
+    // 网络被拦截时的诚实提示,不显示假数据
+    const note = document.getElementById('mktPoolNote');
+    if (note) note.textContent = POOL_FALLBACK
+      ? '⚠️ 实时标的池拉取失败(预览环境可能拦截外部请求),已回退到本地自选 / 默认池;请用本机浏览器打开本文件查看实时动态池。'
+      : '✅ 标的池 = 东方财富实时主力净流入榜 top 30(动态,随行情变化);Alpha / 技术面 / 五维技术面 = 真实前复权日线推导。';
   }
 
   function renderPage(id) {
