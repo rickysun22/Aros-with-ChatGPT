@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """Build & inject RISK_DATA into AROS preview (风险监控 real-data module).
 Re-runnable: overwrites the const RISK_DATA block before `const CAND = WATCH;`.
 Data snapshot: 2026-08-11, sourced from westock MCP
   data_market_overview(type=all) + data_quote(usDJI,usIXIC,hkHSI).
 """
-import json, re, sys
+
+import json
+import re
 
 HTML = r"C:/aros/design-system/aros/preview-v2.html"
 ANCHOR = "  const CAND = WATCH;"
@@ -52,7 +53,9 @@ MA60 = 3995.96
 # 大盘情绪: driven by 涨股比 (higher up-ratio = more bullish)
 sent_score = round(clamp((RATIO_UP - 20) / (60 - 20) * 100))
 # 资金量能: 成交额 vs 5日均 (放量利好, 缩量利空)
-fund_score = round(map_piece(MONEY_5D, [(80, 15), (85, 25), (90, 35), (95, 45), (100, 60), (105, 70), (115, 85)]))
+fund_score = round(
+    map_piece(MONEY_5D, [(80, 15), (85, 25), (90, 35), (95, 45), (100, 60), (105, 70), (115, 85)])
+)
 # 外围影响: avg of US/HK moves
 ext_vals = [DJI, IXIC, HK]
 ext_avg = sum(ext_vals) / len(ext_vals)
@@ -81,7 +84,9 @@ RISK_DATA = {
     "summary": "市场广度极差、量能萎缩、外围偏弱、估值偏高 —— 当前风险偏多环境,建议控制仓位、防范回调,等待广度修复与放量信号。",
     "dims": {
         "sentiment": {
-            "name": "大盘情绪", "score": sent_score, "level": "偏空",
+            "name": "大盘情绪",
+            "score": sent_score,
+            "level": "偏空",
             "status": "涨股比 29.1%,超 2/3 个股下跌,涨停 54 / 跌停 0,广度极差",
             "metrics": [
                 {"t": "涨股比", "v": "29.1%"},
@@ -91,7 +96,9 @@ RISK_DATA = {
             ],
         },
         "fund": {
-            "name": "资金量能", "score": fund_score, "level": "偏弱",
+            "name": "资金量能",
+            "score": fund_score,
+            "level": "偏弱",
             "status": "两市成交 2.32 万亿,缩量至 5 日均的 91.4%(10 日 96.4%),资金观望;北向自 2024-08 起暂停披露",
             "metrics": [
                 {"t": "成交额", "v": "2.32 万亿"},
@@ -101,7 +108,9 @@ RISK_DATA = {
             ],
         },
         "margin": {
-            "name": "两融余额", "score": margin_score, "level": "今日未披露",
+            "name": "两融余额",
+            "score": margin_score,
+            "level": "今日未披露",
             "status": "westock 两融接口今日未返回有效数据,该维度暂不参与评分(诚实留白)",
             "metrics": [
                 {"t": "融资余额", "v": "未披露"},
@@ -110,8 +119,11 @@ RISK_DATA = {
             ],
         },
         "external": {
-            "name": "外围影响", "score": ext_score, "level": "偏弱",
-            "status": "外围普跌:港股 -1.10%% · 纳指 -0.62%% · 道指 -0.21%%,风险偏好回落(均值 %.2f%%)" % ext_avg,
+            "name": "外围影响",
+            "score": ext_score,
+            "level": "偏弱",
+            "status": "外围普跌:港股 -1.10%% · 纳指 -0.62%% · 道指 -0.21%%,风险偏好回落(均值 %.2f%%)"
+            % ext_avg,
             "metrics": [
                 {"t": "恒生", "v": "%.2f%%" % HK},
                 {"t": "纳指", "v": "%.2f%%" % IXIC},
@@ -129,13 +141,22 @@ RISK_DATA = {
     ],
     "extra": {
         "valuation": {"pe": PE, "pePct10y": PE_PCT_10Y, "level": "高估"},
-        "technical": {"rsi6": RSI6, "macd": str(DIF), "trendLong": TREND_LONG,
-                      "ma": "收盘 %.0f < MA60 %.0f" % (CLOSE, MA60)},
+        "technical": {
+            "rsi6": RSI6,
+            "macd": str(DIF),
+            "trendLong": TREND_LONG,
+            "ma": "收盘 %.0f < MA60 %.0f" % (CLOSE, MA60),
+        },
     },
 }
 
 # ---------- inject ----------
-js = "    const RISK_DATA = " + json.dumps(RISK_DATA, ensure_ascii=False, indent=2) + ";\n\n" + ANCHOR
+js = (
+    "    const RISK_DATA = "
+    + json.dumps(RISK_DATA, ensure_ascii=False, indent=2)
+    + ";\n\n"
+    + ANCHOR
+)
 src = open(HTML, encoding="utf-8").read()
 if "const RISK_DATA =" in src:
     # idempotent: replace existing block

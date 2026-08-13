@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import sys
 from datetime import date, timedelta
-
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -83,8 +82,14 @@ def main(reset: bool = False) -> None:
                 amount = round(float(vol * close / 100), 2)  # 百元手估算,仅演示
                 bars.append(
                     DailyBar(
-                        code=code, date=d, open=open_, high=high,
-                        low=low, close=close, volume=float(vol), amount=amount,
+                        code=code,
+                        date=d,
+                        open=open_,
+                        high=high,
+                        low=low,
+                        close=close,
+                        volume=float(vol),
+                        amount=amount,
                     )
                 )
                 prev = close

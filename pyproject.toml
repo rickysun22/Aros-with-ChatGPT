@@ -49,6 +49,12 @@ line-length = 100
 select = ["E", "F", "I", "W", "UP", "B"]
 ignore = ["B008"]  # typer uses function calls in decorator defaults
 
+[tool.ruff.lint.per-file-ignores]
+# 一次性数据注入/构建脚本,放宽格式与风格规则
+"inject_*.py" = ["E501", "E401", "E701", "E702", "E731", "UP031", "UP015", "B023"]
+"build_risk.py" = ["E501", "E701", "E702", "E731", "UP031", "UP015", "B023"]
+"seed_demo.py" = ["E401", "I001"]
+
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "src"

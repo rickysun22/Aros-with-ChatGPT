@@ -14,6 +14,7 @@ This is a manual tool — the scheduled daily loop does its own incremental sync
 inside ``run_daily``; call this when you need a bounded, one-shot backfill
 (e.g. a fresh clone, or after changing the lookback window).
 """
+
 from __future__ import annotations
 
 import sys

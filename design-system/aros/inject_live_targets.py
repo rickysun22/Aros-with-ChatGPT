@@ -1,12 +1,15 @@
-# -*- coding: utf-8 -*-
 """把后端 live_sim 生成的 targets_*.json 注入 preview-v2.html 的 LIVE_TARGETS 常量。
 
 同时从本地 qfq_cache 读取 A/B/H 选股的真实前复权日线，并尝试从东财 stock/get
 拉取行业(f100)/概念(f104)，一并注入。这样前端即使浏览器端 JSONP 被拦截，也能
 用后端已准备好的真实数据渲染 Alpha 雷达表。
 """
-import json, os, re, time
-import urllib.parse, urllib.request
+
+import json
+import re
+import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 LIVE = Path("C:/aros/reports/_data/live_sim")
@@ -36,11 +39,14 @@ def em_secid(code: str) -> str:
 
 def em_stock_meta(code: str) -> dict:
     """从东财 push2 stock/get 取行业/概念。失败优雅回退。"""
-    params = urllib.parse.urlencode({
-        "fltt": "2", "invt": "2",
-        "fields": "f57,f58,f100,f104,f127",
-        "secid": em_secid(code),
-    })
+    params = urllib.parse.urlencode(
+        {
+            "fltt": "2",
+            "invt": "2",
+            "fields": "f57,f58,f100,f104,f127",
+            "secid": em_secid(code),
+        }
+    )
     url = f"https://push2.eastmoney.com/api/qt/stock/get?{params}"
     req = urllib.request.Request(
         url,
@@ -122,7 +128,9 @@ for code in all_codes:
     m.setdefault("sec", "")
     m.setdefault("con", "")
     meta[bare] = m
-    print(f"[inject] {bare} sec={m['sec'][:16]:<16} con={m['con'][:30]:<30} k={len(klines[bare].get('c') or [])}")
+    print(
+        f"[inject] {bare} sec={m['sec'][:16]:<16} con={m['con'][:30]:<30} k={len(klines[bare].get('c') or [])}"
+    )
 
 out = {
     "sel_date": data.get("sel_date", latest.stem.split("_")[-1]),
@@ -134,7 +142,9 @@ out = {
 
 js = (
     "  // ===LIVE_TARGETS_START===\n"
-    "  // A/B/H 三策略真实选股结果(含后端预取行业/概念/K线),来源: " + str(latest).replace("\\", "/") + "\n"
+    "  // A/B/H 三策略真实选股结果(含后端预取行业/概念/K线),来源: "
+    + str(latest).replace("\\", "/")
+    + "\n"
     "  const LIVE_TARGETS = " + json.dumps(out, ensure_ascii=False, indent=2) + ";\n"
     "  // ===LIVE_TARGETS_END===\n"
 )

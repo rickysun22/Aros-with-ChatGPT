@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 # 让 `src` 包可被绝对导入 (core / data / indicators / factors)
@@ -30,14 +30,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+import pandas as pd  # noqa: E402
 from fastapi import FastAPI, HTTPException, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-import pandas as pd  # noqa: E402
 
 from core.config import get_config  # noqa: E402
 from data.manager import DataManager  # noqa: E402
-from indicators.engine import IndicatorEngine  # noqa: E402
 from factors.engine import FactorEngine  # noqa: E402
+from indicators.engine import IndicatorEngine  # noqa: E402
 
 app = FastAPI(title="AROS API", version="0.1.0")
 
@@ -75,11 +75,13 @@ def _df_to_records(df: pd.DataFrame) -> list[dict]:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             df[col] = df[col].dt.strftime("%Y-%m-%d")
         elif pd.api.types.is_object_dtype(df[col]):
-            df[col] = df[col].apply(
-                lambda v: v.isoformat() if hasattr(v, "isoformat") else v
-            )
+            df[col] = df[col].apply(lambda v: v.isoformat() if hasattr(v, "isoformat") else v)
     df = df.where(pd.notnull(df), None)
     return df.to_dict(orient="records")
+
+
+def _iso_date(value) -> str:
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
 def _as_date(value: str | None, default) -> date:
@@ -87,8 +89,8 @@ def _as_date(value: str | None, default) -> date:
         return default
     try:
         return date.fromisoformat(value)
-    except ValueError:
-        raise HTTPException(400, f"日期格式应为 YYYY-MM-DD,收到: {value!r}")
+    except ValueError as err:
+        raise HTTPException(400, f"日期格式应为 YYYY-MM-DD,收到: {value!r}") from err
 
 
 # ---- 路由 --------------------------------------------------------------
@@ -197,7 +199,8 @@ def indices(
     df["pct"] = (df["close"].pct_change() * 100).round(2)
     recs = _df_to_records(df)
     last = recs[-1] if recs else None
-    return {"empty": False, "code": code, "name": _INDEX_NAMES.get(code, code), "bars": recs, "last": last}
+    name = _INDEX_NAMES.get(code, code)
+    return {"empty": False, "code": code, "name": name, "bars": recs, "last": last}
 
 
 @app.get("/api/market")
@@ -215,14 +218,17 @@ def market() -> dict:
         df = df.sort_values("date")
         last = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else last
-        pct = round((last["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0.0
+        if prev["close"]:
+            pct = round((last["close"] - prev["close"]) / prev["close"] * 100, 2)
+        else:
+            pct = 0.0
         out.append(
             {
                 "code": c,
                 "name": _INDEX_NAMES.get(c, c),
                 "close": float(last["close"]),
                 "pct": pct,
-                "date": last["date"].isoformat() if hasattr(last["date"], "isoformat") else str(last["date"]),
+                "date": _iso_date(last["date"]),
             }
         )
     return {"empty": len(out) == 0, "indices": out}
