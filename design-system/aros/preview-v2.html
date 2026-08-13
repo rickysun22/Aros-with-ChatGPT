@@ -1855,67 +1855,85 @@
       document.head.appendChild(sc);
     });
   }
-  // ---------- 市场概览(指数/涨跌/成交)实时刷新 · 东方财富 push2 ----------
+  // ---------- 市场概览(指数/涨跌/成交)实时刷新 · 东财 push2 主源 + 腾讯备用 ----------
   const INDEX_SECS = [
-    { n: '上证指数', secid: '1.000001' },
-    { n: '深证成指', secid: '0.399001' },
-    { n: '创业板指', secid: '0.399006' },
-    { n: '科创 50', secid: '1.000688' }
+    { n: '上证指数', secid: '1.000001', tx: 'sh000001' },
+    { n: '深证成指', secid: '0.399001', tx: 'sz399001' },
+    { n: '创业板指', secid: '0.399006', tx: 'sz399006' },
+    { n: '科创 50', secid: '1.000688', tx: 'sh000688' }
   ];
+  function txQuote(codes) {
+    return new Promise(function (resolve, reject) {
+      const sc = document.createElement('script');
+      const timer = setTimeout(function () { cleanup(); reject(new Error('timeout')); }, 10000);
+      function cleanup() { if (sc.parentNode) sc.parentNode.removeChild(sc); clearTimeout(timer); }
+      sc.onload = function () {
+        cleanup();
+        const out = [];
+        codes.forEach(function (c) {
+          const raw = window['v_' + c];
+          if (!raw) return;
+          const p = String(raw).split('~');
+          if (p.length < 38) return;
+          out.push({ code: c, price: parseFloat(p[3]), chg: parseFloat(p[31]), pct: parseFloat(p[32]), vol: parseFloat(p[37]) * 1e4 });
+        });
+        resolve(out);
+      };
+      sc.onerror = function () { cleanup(); reject(new Error('net')); };
+      sc.src = 'https://qt.gtimg.cn/q=' + codes.join(',');
+      document.head.appendChild(sc);
+    });
+  }
+  function txKline(code, n) {
+    const cb = '__emcb_txk' + code;
+    const url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=' + code + ',day,,,' + (n || 10) + ',qfq&_var=' + cb;
+    return jsonpEM(url, cb.replace('__emcb_', '')).then(function (d) {
+      const kd = d && d.data && d.data[code] && d.data[code].day;
+      if (!kd || !kd.length) return null;
+      return kd.map(function (r) { return parseFloat(r[2]); });
+    }).catch(function () { return null; });
+  }
   function refreshIndexBlocks() {
     const mkt = document.getElementById('mkt-indices');
     if (!mkt) return;
-    const secids = INDEX_SECS.map(function (s) { return s.secid; }).join(',');
-    const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
-      '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2&cb=';
-    jsonpEM(url, 'idx').then(function (d) {
-      const diff = d && d.data && d.data.diff;
-      if (!diff || !diff.length) return;
-      const byId = {};
-      diff.forEach(function (r) { byId[r.f12] = r; });
-      const now = new Date();
-      const today = (now.getMonth() + 1) + '/' + now.getDate();
-      const idxBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'index'; });
-      const cardsBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'cards'; });
-      let upSum = 0, dnSum = 0, volSum = 0, volOk = 0, upCnt = 0, dnCnt = 0;
-      idxBlock.d.items = idxBlock.d.items.map(function (it) {
-        const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
-        const r = sec && byId[sec.secid.split('.')[1]];
-        if (!r || r.f2 == null) return it;
-        const v = r.f2, chg = r.f4, pct = r.f3, vol = r.f6;
-        if (chg >= 0) upSum++; else dnSum++;
-        if (vol != null && vol > 0) { volSum += vol; volOk++; }
-        if (r.f104 != null && r.f105 != null) { upCnt += r.f104; dnCnt += r.f105; }
-        return {
-          n: it.n, v: v.toFixed(2),
-          chg: (chg >= 0 ? '+' : '') + chg.toFixed(2),
-          pct: (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%',
-          c: chg >= 0 ? '#FF4D4F' : '#52C41A',
-          extra: '成交 ' + (vol / 1e8).toFixed(0) + ' 亿',
-          px: it.px
-        };
-      });
-      idxBlock.d.title = '主要指数行情(实时 · ' + today + ')';
+    const now = new Date();
+    const today = (now.getMonth() + 1) + '/' + now.getDate();
+    const idxBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'index'; });
+    const cardsBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'cards'; });
+    function applyIndexData(items, extra, src) {
+      idxBlock.d.items = items;
+      idxBlock.d.title = '主要指数行情(实时 · ' + today + ' · ' + src + ')';
       if (cardsBlock) {
         const cards = cardsBlock.d;
-        if (cards.length >= 2) {
-          cards[1] = { title: '两市成交', val: (volSum / 1e8).toFixed(0) + ' 亿', note: '沪+深合计 · 实时', color: '#722ED1' };
+        if (extra && extra.volSum != null && extra.volOk >= 2) {
+          cards[1] = { title: '两市成交', val: (extra.volSum / 1e8).toFixed(0) + ' 亿', note: '沪+深合计 · 实时', color: '#722ED1' };
         }
-        if (upCnt + dnCnt > 0) {
-          cards[0] = { title: '涨跌家数', val: upCnt + ' 涨 / ' + dnCnt + ' 跌', note: '沪深两市 · 实时', color: upCnt >= dnCnt ? '#16a34a' : '#dc2626' };
+        if (extra && extra.upCnt + extra.dnCnt > 0) {
+          cards[0] = { title: '涨跌家数', val: extra.upCnt + ' 涨 / ' + extra.dnCnt + ' 跌', note: '沪深两市 · 实时', color: extra.upCnt >= extra.dnCnt ? '#16a34a' : '#dc2626' };
         }
       }
       mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
-      // 指数 sparkline: 各指数近10日真实K线(东方财富 push2his)
-      Promise.all(INDEX_SECS.map(function (sec) {
-        const cb = '__emcb_ix' + sec.secid.split('.')[1];
-        const ku = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + sec.secid +
-          '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=10&cb=' + cb;
-        return jsonpEM(ku, cb.replace('__emcb_', '')).then(function (kd) {
-          const k = kd && kd.data && kd.data.klines;
-          if (!k || !k.length) return null;
-          return { sec: sec, cs: k.map(function (l) { return parseFloat(l.split(',')[2]); }) };
-        }).catch(function () { return null; });
+    }
+    function buildItems(quoteFn, byIdKey) {
+      const items = idxBlock.d.items.map(function (it) {
+        const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
+        const r = sec && quoteFn(sec);
+        if (!r) return it;
+        const chg = r.chg, pct = r.pct, vol = r.vol;
+        return {
+          n: it.n, v: r.price.toFixed(2),
+          chg: (chg >= 0 ? '+' : '') + chg.toFixed(2),
+          pct: (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%',
+          c: chg >= 0 ? '#FF4D4F' : '#52C41A',
+          extra: '成交 ' + ((vol || 0) / 1e8).toFixed(0) + ' 亿',
+          px: it.px
+        };
+      });
+      return items;
+    }
+    function loadSparks(sparkFn) {
+      return Promise.all(INDEX_SECS.map(function (sec) {
+        return sparkFn(sec).then(function (cs) { return { sec: sec, cs: cs }; });
       })).then(function (res) {
         res.forEach(function (r) {
           if (!r || !r.cs || !r.cs.length) return;
@@ -1924,7 +1942,60 @@
         });
         mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
       });
-    }).catch(function () { /* 网络失败:保留原快照 */ });
+    }
+    // 主源:东方财富 push2
+    const secids = INDEX_SECS.map(function (s) { return s.secid; }).join(',');
+    const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
+      '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2&cb=';
+    jsonpEM(url, 'idx').then(function (d) {
+      const diff = d && d.data && d.data.diff;
+      if (!diff || !diff.length) throw new Error('empty');
+      const byId = {};
+      diff.forEach(function (r) { byId[r.f12] = r; });
+      let volSum = 0, volOk = 0, upCnt = 0, dnCnt = 0;
+      const items = idxBlock.d.items.map(function (it) {
+        const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
+        const r = sec && byId[sec.secid.split('.')[1]];
+        if (!r || r.f2 == null) return it;
+        if (r.f6 != null && r.f6 > 0) { volSum += r.f6; volOk++; }
+        if (r.f104 != null && r.f105 != null) { upCnt += r.f104; dnCnt += r.f105; }
+        return {
+          n: it.n, v: r.f2.toFixed(2),
+          chg: (r.f4 >= 0 ? '+' : '') + r.f4.toFixed(2),
+          pct: (r.f3 >= 0 ? '+' : '') + r.f3.toFixed(2) + '%',
+          c: r.f4 >= 0 ? '#FF4D4F' : '#52C41A',
+          extra: '成交 ' + (r.f6 / 1e8).toFixed(0) + ' 亿',
+          px: it.px
+        };
+      });
+      applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: upCnt, dnCnt: dnCnt }, '东方财富');
+      loadSparks(function (sec) {
+        const cb = '__emcb_ix' + sec.secid.split('.')[1];
+        const ku = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + sec.secid +
+          '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=10&cb=' + cb;
+        return jsonpEM(ku, cb.replace('__emcb_', '')).then(function (kd) {
+          const k = kd && kd.data && kd.data.klines;
+          if (!k || !k.length) return null;
+          return k.map(function (l) { return parseFloat(l.split(',')[2]); });
+        }).catch(function () { return null; });
+      });
+    }).catch(function () {
+      // 备用源:腾讯行情(本机网络被拦截东财时自动切换)
+      txQuote(INDEX_SECS.map(function (s) { return s.tx; })).then(function (qs) {
+        if (!qs || !qs.length) return;
+        const byTx = {};
+        qs.forEach(function (q) { byTx[q.code] = q; });
+        let volSum = 0, volOk = 0;
+        const items = buildItems(function (sec) { return byTx[sec.tx]; });
+        items.forEach(function (it) {
+          const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
+          const q = sec && byTx[sec.tx];
+          if (q && q.vol > 0) { volSum += q.vol; volOk++; }
+        });
+        applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: 0, dnCnt: 0 }, '腾讯');
+        loadSparks(function (sec) { return txKline(sec.tx, 10); });
+      }).catch(function () { /* 双源失败:保留原快照 */ });
+    });
   }
   // ---------- 全市场 K 线加载器(东方财富 push2his · 真实前复权日线) ----------
   const RK_FULL = {};
