@@ -6599,6 +6599,7 @@ const RISK_DATA = {
 
   function btDates(n, endStr) {
     const end = new Date(endStr + 'T00:00:00');
+    if (isNaN(end.getTime())) end.setTime(Date.now());
     const days = [];
     const d = new Date(end);
     while (days.length < n) {
@@ -6724,6 +6725,19 @@ const RISK_DATA = {
       }
       signal[i] = on;
     }
+    const rkD = (typeof REAL_KLINE !== 'undefined') ? REAL_KLINE[stock.c] : null;
+    const rkF = (typeof RK_FULL !== 'undefined') ? RK_FULL[stock.c] : null;
+    const srcD = (rkD && rkD.d && rkD.d.length >= n) ? rkD : ((rkF && rkF.d && rkF.d.length >= n) ? rkF : null);
+    const dates = srcD ? srcD.d.slice(srcD.d.length - n) : btDates(n, stock.sel || '2026-08-08');
+    const hsMap = {};
+    if (typeof HS300 !== 'undefined') HS300.d.forEach((dd, k) => { hsMap[dd] = HS300.c[k]; });
+    let hsStart = null;
+    const benchArr = dates.map(dd => {
+      const c = hsMap[dd];
+      if (c == null) return null;
+      if (hsStart == null) hsStart = c;
+      return cash * c / hsStart;
+    });
     let cashAvail = cash;
     let shares = 0, holding = false, buyPx = 0, buyI = 0;
     const equity = [{ i: 0, nav: cash, bench: cash }];
@@ -6753,7 +6767,7 @@ const RISK_DATA = {
         cashAvail = after - fee;
         shares = 0; holding = false;
       }
-      if (!holding && signal[i] === 1 && signal[i - 1] === 0) {
+      if (!holding && !closed && signal[i] === 1 && signal[i - 1] === 0) {
         shares = cashAvail / p;
         buyPx = p; buyI = i; holding = true;
       }
@@ -6792,25 +6806,15 @@ const RISK_DATA = {
     const grossProfit = trades.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
     const grossLoss = trades.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0);
     const profitFactor = grossLoss < 0 ? (grossProfit / (-grossLoss)) : (grossProfit > 0 ? Infinity : 0);
-    const rkD = (typeof REAL_KLINE !== 'undefined') ? REAL_KLINE[stock.c] : null;
-    const rkF = (typeof RK_FULL !== 'undefined') ? RK_FULL[stock.c] : null;
-    const srcD = (rkD && rkD.d && rkD.d.length >= n) ? rkD : ((rkF && rkF.d && rkF.d.length >= n) ? rkF : null);
-    const dates = srcD ? srcD.d.slice(srcD.d.length - n) : btDates(n, stock.sel || '2026-08-08');
-    const hsMap = {};
-    if (typeof HS300 !== 'undefined') HS300.d.forEach((dd, k) => { hsMap[dd] = HS300.c[k]; });
-    let hsStart = null;
-    const benchArr = dates.map(dd => {
-      const c = hsMap[dd];
-      if (c == null) return null;
-      if (hsStart == null) hsStart = c;
-      return cash * c / hsStart;
-    });
     const indNames = indIds.map(id => {
       const ind = BT_INDICATORS.find(x => x.id === id);
       return ind ? ind.name : id;
     });
     return {
-      strategy: indIds.map(id => BT_ICON[id] + ' ' + BT_NAME[id] || id).join(''),
+      strategy: indIds.map(id => {
+        const ind = BT_INDICATORS.find(x => x.id === id);
+        return (ind ? ind.icon + ' ' + ind.name : id);
+      }).join(''),
       combo, indNames, code: stock.c, name: stock.n,
       days: n, cash, tp, sl, cost,
       metrics: {
@@ -8168,7 +8172,7 @@ const RISK_DATA = {
         (inflowY != null
           ? '<div class="intel-news"><b>主力净流入(实时)</b><span>' + fmtYi(opts.inflowYuan) + (opts.turnover != null ? ' · 换手率 ' + opts.turnover.toFixed(2) + '%' : '') + '</span></div>' + fundTxt
           : (fundTxt || '<div class="intel-note">主力净流入需实时行情(腾讯/东财);公募重仓为基金季报真实数据,网络受限时回退占位。</div>'));
-      const newsScore = nws.length ? 50 + nws.reduce((a, n) => a + n.sent, 0) * 60 / nws.length : 50;
+      const newsScore = nws.length ? Math.min(100, Math.max(0, 50 + nws.reduce((a, n) => a + n.sent, 0) * 60 / nws.length)) : 50;
       const newsHtml =
         '<div class="intel-sec"><div class="intel-sec-t">📰 新闻情报<span class="intel-sec-sub">' + (nws.length ? nws.length + ' 条重点新闻(东财真实)' : '暂无该股当日新闻(东财)') + '</span></div>' +
         (nws.length
@@ -8193,10 +8197,11 @@ const RISK_DATA = {
         else if (downs > ups) { bull = '—'; bear = '机构评级偏谨慎(' + downs + '家卖出/减持),基本面承压'; }
         else { bull = '机构观点分歧,等待催化确认'; bear = '行业竞争与政策不确定性仍存'; }
       } else { bull = '暂无真实研报,无法推导机构观点'; bear = '—'; }
-      const mv = (s.cap != null) ? s.cap : (parseFloat(s.lb) * 100).toFixed(0);
+      const mv = (s.cap != null && !isNaN(parseFloat(s.cap))) ? s.cap : null;
+      const ovIntro = s.n + ' 是国内' + (s.sec ? s.sec + '领域' : '') + '核心上市公司,' + (s.con ? '主营' + s.con.replace(' · ', '/') + '等业务,' : '业务多元,') + (mv != null ? '市值约 ' + mv + ' 亿元。' : '实时市值暂缺(需实时行情)。');
       const ovHtml =
         '<div class="intel-sec"><div class="intel-sec-t">🏢 公司概览</div>' +
-        '<div class="intel-ov-intro">' + s.n + ' 是国内' + (s.sec ? s.sec + '领域' : '') + '核心上市公司,' + (s.con ? '主营' + s.con.replace(' · ', '/') + '等业务,' : '业务多元,') + '市值约 ' + mv + ' 亿元。</div>' +
+        '<div class="intel-ov-intro">' + ovIntro + '</div>' +
         '<div class="intel-ov-grid">' +
         '<div class="intel-ov-item"><span class="ov-k">🔑 核心看点</span><span class="ov-v">' + bull + '</span></div>' +
         '<div class="intel-ov-item"><span class="ov-k">⚠️ 风险提示</span><span class="ov-v down">' + bear + '</span></div>' +
