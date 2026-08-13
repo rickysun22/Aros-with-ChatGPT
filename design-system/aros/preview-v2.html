@@ -865,7 +865,7 @@
 <div class="topbar">
   <div class="logo">A<b>ROS</b></div>
   <div class="search-box">🔍 搜索股票 / 策略 / 因子...<kbd>⌘K</kbd></div>
-  <div class="status"><div class="dot"></div><span>数据已同步 2026-08-08</span></div>
+  <div class="status"><div class="dot"></div><span id="syncState">数据同步中…</span></div>
   <div class="actions">
     <div class="icon-btn">🔔</div>
     <div class="icon-btn">⚙️</div>
@@ -1900,6 +1900,10 @@
     const today = (now.getMonth() + 1) + '/' + now.getDate();
     const idxBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'index'; });
     const cardsBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'cards'; });
+    function setSync(label) {
+      const st = document.getElementById('syncState');
+      if (st) st.textContent = label;
+    }
     function applyIndexData(items, extra, src) {
       idxBlock.d.items = items;
       idxBlock.d.title = '主要指数行情(实时 · ' + today + ' · ' + src + ')';
@@ -1912,7 +1916,35 @@
           cards[0] = { title: '涨跌家数', val: extra.upCnt + ' 涨 / ' + extra.dnCnt + ' 跌', note: '沪深两市 · 实时', color: extra.upCnt >= extra.dnCnt ? '#16a34a' : '#dc2626' };
         }
       }
-      mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
+      // 就地更新,不整块重建(避免清空资金流向等已绘内容)
+      const titleEl = mkt.querySelector('.pg-panel-t');
+      if (titleEl) titleEl.textContent = '📊 ' + idxBlock.d.title;
+      const cards = mkt.querySelectorAll('.ich-card');
+      items.forEach(function (it, i) {
+        if (!cards[i]) return;
+        const cv = cards[i].querySelector('.ich-cv');
+        if (cv) cv.textContent = it.v;
+        const cd = cards[i].querySelector('.ich-cd');
+        if (cd) { cd.textContent = it.chg + '  ' + it.pct; cd.className = 'ich-cd ' + (it.chg.charAt(0) === '-' ? 'down' : 'up'); }
+        const ce = cards[i].querySelector('.ich-ex');
+        if (ce) ce.textContent = it.extra;
+        const cs = cards[i].querySelector('.ich-cs');
+        if (cs && it.px && it.px.length) cs.innerHTML = sparkline(it.px, 100, 26, it.c);
+      });
+      if (cardsBlock) {
+        const pc = mkt.querySelectorAll('.pg-card');
+        if (pc.length >= 2 && extra) {
+          if (extra.volSum != null && extra.volOk >= 2) {
+            const c1 = pc[1].querySelector('.pg-card-v'); if (c1) c1.textContent = cardsBlock.d[1].val;
+            const n1 = pc[1].querySelector('.pg-card-n'); if (n1) n1.textContent = cardsBlock.d[1].note;
+          }
+          if (extra.upCnt + extra.dnCnt > 0) {
+            const c0 = pc[0].querySelector('.pg-card-v'); if (c0) c0.textContent = cardsBlock.d[0].val;
+            const n0 = pc[0].querySelector('.pg-card-n'); if (n0) n0.textContent = cardsBlock.d[0].note;
+            pc[0].style.borderTop = '2px solid ' + cardsBlock.d[0].color;
+          }
+        }
+      }
     }
     function buildItems(quoteFn, byIdKey) {
       const items = idxBlock.d.items.map(function (it) {
@@ -1940,7 +1972,12 @@
           const it = idxBlock.d.items.find(function (x) { return x.n === r.sec.n; });
           if (it) it.px = r.cs;
         });
-        mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
+        const cards = mkt.querySelectorAll('.ich-card');
+        idxBlock.d.items.forEach(function (it, i) {
+          if (!cards[i] || !it.px || !it.px.length) return;
+          const cs = cards[i].querySelector('.ich-cs');
+          if (cs) cs.innerHTML = sparkline(it.px, 100, 26, it.c);
+        });
       });
     }
     // 主源:东方财富 push2
@@ -1969,6 +2006,7 @@
         };
       });
       applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: upCnt, dnCnt: dnCnt }, '东方财富');
+      setSync('数据已同步 · 东方财富 · ' + today + ' ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
       loadSparks(function (sec) {
         const cb = '__emcb_ix' + sec.secid.split('.')[1];
         const ku = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + sec.secid +
@@ -1993,8 +2031,9 @@
           if (q && q.vol > 0) { volSum += q.vol; volOk++; }
         });
         applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: 0, dnCnt: 0 }, '腾讯');
+        setSync('数据已同步 · 腾讯 · ' + today + ' ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
         loadSparks(function (sec) { return txKline(sec.tx, 10); });
-      }).catch(function () { /* 双源失败:保留原快照 */ });
+      }).catch(function () { setSync('行情源不可达 · 显示快照'); });
     });
   }
   // ---------- 全市场 K 线加载器(东方财富 push2his · 真实前复权日线) ----------
