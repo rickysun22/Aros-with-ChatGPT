@@ -1893,6 +1893,82 @@
       return kd.map(function (r) { return parseFloat(r[2]); });
     }).catch(function () { return null; });
   }
+  function flowTA(px) {
+    const cur = px[px.length - 1];
+    const H = Math.max.apply(null, px), L = Math.min.apply(null, px);
+    const ma5 = px.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    const ma10 = px.reduce((a, b) => a + b, 0) / 10;
+    const sup = Math.min(L, ma5), res = Math.max(H, ma5);
+    const tag = cur > ma5 && ma5 > ma10 ? '偏多' : (cur < ma5 && ma5 < ma10 ? '偏空' : '震荡');
+    return {
+      cur: cur.toFixed(2), sup: sup.toFixed(2), res: res.toFixed(2),
+      dSup: ((cur - sup) / cur * 100).toFixed(1), dRes: ((res - cur) / cur * 100).toFixed(1), tag
+    };
+  }
+  function buildFlow(bodyEl, block, mode) {
+    const gs = block.d.groups;
+    const valOf = g => mode === 'day' ? g.day :
+      (mode === 'd5' ? g.d5.reduce((a, b) => a + b, 0) : g.d10.reduce((a, b) => a + b, 0));
+    const maxAbs = Math.max.apply(null, gs.map(g => Math.abs(valOf(g))));
+    const note = mode === 'day' ? '' :
+      '<div class="ff-note">' + (mode === 'd5' ? '近 5 日' : '近 10 日') + '累计主力净流入(亿元)</div>';
+    bodyEl.innerHTML = note + '<div class="ff-day">' + gs.map(g => {
+      const v = valOf(g);
+      const w = Math.min(Math.max(Math.abs(v) / maxAbs * 22, 1.5), 22);
+      const up = v >= 0;
+      const ta = flowTA(g.px);
+      const tcls = ta.tag === '偏多' ? 'up' : (ta.tag === '偏空' ? 'down' : 'mid');
+      return '<div class="ff-group">' +
+        '<div class="ff-row"><span class="ff-name">' + g.n + '</span>' +
+        '<div class="ff-track"><div class="ff-zero"></div>' +
+        '<div class="ff-fill ' + (up ? 'up' : 'down') + '" style="left:' + (up ? '50%' : (50 - w).toFixed(2) + '%') + ';width:' + w.toFixed(2) + '%"></div></div>' +
+        '<span class="ff-val ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + v.toFixed(1) + ' 亿</span></div>' +
+        '<div class="ff-sub">' +
+        '<span class="fs-cur">现价 ' + ta.cur + '</span>' +
+        '<span>支撑 <b>' + ta.sup + '</b></span>' +
+        '<span>压力 <b>' + ta.res + '</b></span>' +
+        '<span class="fs-gap">距支撑 ' + ta.dSup + '% · 距压力 ' + ta.dRes + '%</span>' +
+        '<span class="fs-tag ' + tcls + '">' + ta.tag + '</span>' +
+        '</div></div>';
+    }).join('') + '</div>';
+  }
+  // ---------- 板块资金流向实时刷新(东财延迟行情 clist: f62 当日 / f66 5日 / f72 10日) ----------
+  function refreshFlowBlock() {
+    const fc = document.querySelector('#mkt-indices .pg-flow');
+    if (!fc) return;
+    const flowBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'flowchart'; });
+    if (!flowBlock) return;
+    const pages = 5, per = 100;
+    const jobs = [];
+    for (let pn = 1; pn <= pages; pn++) {
+      const u = 'https://push2delay.eastmoney.com/api/qt/clist/get?fid=f62&po=1&pz=' + per + '&pn=' + pn +
+        '&np=1&fltt=2&invt=2&fs=m:90+t:2&fields=f12,f14,f62,f66,f72';
+      jobs.push(jsonpEM(u, 'flow' + pn).then(function (d) {
+        return d && d.data && d.data.diff ? d.data.diff : [];
+      }).catch(function () { return []; }));
+    }
+    Promise.all(jobs).then(function (pagesArr) {
+      const byName = {};
+      pagesArr.forEach(function (diff) {
+        diff.forEach(function (r) { if (r.f14 && r.f62 != null) byName[r.f14] = r; });
+      });
+      let hit = 0;
+      flowBlock.d.groups.forEach(function (g) {
+        const r = byName[g.n];
+        if (!r) return;
+        g.day = Math.round(r.f62 / 1e8 * 10) / 10;
+        if (r.f66 != null) g.d5 = [Math.round(r.f66 / 1e8 * 10) / 10];
+        if (r.f72 != null) g.d10 = [Math.round(r.f72 / 1e8 * 10) / 10];
+        hit++;
+      });
+      if (!hit) return;
+      flowBlock.d.title = '板块资金流向 · 主力净流入(亿元,实时 · 东财延迟行情)';
+      const titleEl = fc.closest('.pg-panel').querySelector('.pg-panel-t');
+      if (titleEl) titleEl.textContent = '📊 ' + flowBlock.d.title;
+      const tab = fc.querySelector('.pg-flow-tab.active');
+      buildFlow(fc.querySelector('.pg-flow-body'), flowBlock, tab ? tab.dataset.mode : 'day');
+    });
+  }
   function refreshIndexBlocks() {
     const mkt = document.getElementById('mkt-indices');
     if (!mkt) return;
@@ -1914,6 +1990,9 @@
         }
         if (extra && extra.upCnt + extra.dnCnt > 0) {
           cards[0] = { title: '涨跌家数', val: extra.upCnt + ' 涨 / ' + extra.dnCnt + ' 跌', note: '沪深两市 · 实时', color: extra.upCnt >= extra.dnCnt ? '#16a34a' : '#dc2626' };
+          const tot = extra.upCnt + extra.dnCnt;
+          const t = Math.round(extra.upCnt / tot * 100);
+          cards[2] = { title: '市场温度', val: t + '° ' + (t >= 65 ? '过热' : t >= 50 ? '偏热' : t >= 35 ? '中性' : t >= 20 ? '偏冷' : '冰点'), note: '实时口径 · 上涨家数占比推导', color: t >= 65 ? '#F5222D' : t >= 50 ? '#FA8C16' : t >= 35 ? '#722ED1' : '#52C41A' };
         }
       }
       // 就地更新,不整块重建(避免清空资金流向等已绘内容)
@@ -1942,6 +2021,11 @@
             const c0 = pc[0].querySelector('.pg-card-v'); if (c0) c0.textContent = cardsBlock.d[0].val;
             const n0 = pc[0].querySelector('.pg-card-n'); if (n0) n0.textContent = cardsBlock.d[0].note;
             pc[0].style.borderTop = '2px solid ' + cardsBlock.d[0].color;
+            if (pc[2]) {
+              const c2 = pc[2].querySelector('.pg-card-v'); if (c2) c2.textContent = cardsBlock.d[2].val;
+              const n2 = pc[2].querySelector('.pg-card-n'); if (n2) n2.textContent = cardsBlock.d[2].note;
+              pc[2].style.borderTop = '2px solid ' + cardsBlock.d[2].color;
+            }
           }
         }
       }
@@ -1980,10 +2064,10 @@
         });
       });
     }
-    // 主源:东方财富 push2
+    // 主源:东方财富延迟行情 push2delay(涨跌家数 f104/f105 亦由该源提供)
     const secids = INDEX_SECS.map(function (s) { return s.secid; }).join(',');
-    const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
-      '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2&cb=';
+    const url = 'https://push2delay.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
+      '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2';
     jsonpEM(url, 'idx').then(function (d) {
       const diff = d && d.data && d.data.diff;
       if (!diff || !diff.length) throw new Error('empty');
@@ -8064,53 +8148,15 @@ const RISK_DATA = {
     const mkt = document.getElementById('mkt-indices');
     if (mkt) mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
     refreshIndexBlocks();
-    setInterval(function () { refreshIndexBlocks(); }, 5 * 60 * 1000);
+    refreshFlowBlock();
+    setInterval(function () { refreshIndexBlocks(); refreshFlowBlock(); }, 5 * 60 * 1000);
     const moved = document.getElementById('moved-radar');
     const radar = document.getElementById('page-radar');
     if (moved && radar) { radar.appendChild(moved); moved.style.display = ''; }
     refreshLivePrices();
     fillMarket();
 
-    // ---------- 板块资金流向图 ----------
-    function flowTA(px) {
-      const cur = px[px.length - 1];
-      const H = Math.max.apply(null, px), L = Math.min.apply(null, px);
-      const ma5 = px.slice(-5).reduce((a, b) => a + b, 0) / 5;
-      const ma10 = px.reduce((a, b) => a + b, 0) / 10;
-      const sup = Math.min(L, ma5), res = Math.max(H, ma5);
-      const tag = cur > ma5 && ma5 > ma10 ? '偏多' : (cur < ma5 && ma5 < ma10 ? '偏空' : '震荡');
-      return {
-        cur: cur.toFixed(2), sup: sup.toFixed(2), res: res.toFixed(2),
-        dSup: ((cur - sup) / cur * 100).toFixed(1), dRes: ((res - cur) / cur * 100).toFixed(1), tag
-      };
-    }
-    function buildFlow(bodyEl, block, mode) {
-      const gs = block.d.groups;
-      const valOf = g => mode === 'day' ? g.day :
-        (mode === 'd5' ? g.d5.reduce((a, b) => a + b, 0) : g.d10.reduce((a, b) => a + b, 0));
-      const maxAbs = Math.max.apply(null, gs.map(g => Math.abs(valOf(g))));
-      const note = mode === 'day' ? '' :
-        '<div class="ff-note">' + (mode === 'd5' ? '近 5 日' : '近 10 日') + '累计主力净流入(亿元)</div>';
-      bodyEl.innerHTML = note + '<div class="ff-day">' + gs.map(g => {
-        const v = valOf(g);
-        const w = Math.min(Math.max(Math.abs(v) / maxAbs * 22, 1.5), 22);
-        const up = v >= 0;
-        const ta = flowTA(g.px);
-        const tcls = ta.tag === '偏多' ? 'up' : (ta.tag === '偏空' ? 'down' : 'mid');
-        return '<div class="ff-group">' +
-          '<div class="ff-row"><span class="ff-name">' + g.n + '</span>' +
-          '<div class="ff-track"><div class="ff-zero"></div>' +
-          '<div class="ff-fill ' + (up ? 'up' : 'down') + '" style="left:' + (up ? '50%' : (50 - w).toFixed(2) + '%') + ';width:' + w.toFixed(2) + '%"></div></div>' +
-          '<span class="ff-val ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + v.toFixed(1) + ' 亿</span></div>' +
-          '<div class="ff-sub">' +
-          '<span class="fs-cur">现价 ' + ta.cur + '</span>' +
-          '<span>支撑 <b>' + ta.sup + '</b></span>' +
-          '<span>压力 <b>' + ta.res + '</b></span>' +
-          '<span class="fs-gap">距支撑 ' + ta.dSup + '% · 距压力 ' + ta.dRes + '%</span>' +
-          '<span class="fs-tag ' + tcls + '">' + ta.tag + '</span>' +
-          '</div></div>';
-      }).join('') + '</div>';
-    }
+    // ---------- 板块资金流向图(初始绘制;数据由 refreshFlowBlock 实时刷新) ----------
     document.querySelectorAll('.pg-flow').forEach(fc => {
       const pageId = fc.closest('.page').id.replace('page-', '');
       const page = PAGES[pageId];
