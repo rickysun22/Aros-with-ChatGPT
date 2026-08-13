@@ -12,6 +12,21 @@ from pathlib import Path
 LIVE = Path("C:/aros/reports/_data/live_sim")
 HTML = Path("C:/aros/design-system/aros/preview-v2.html")
 QFQ = Path("C:/aros/reports/_data/qfq_cache")
+META_CACHE = Path("C:/aros/reports/_data/live_sim/meta_cache.json")
+
+
+def load_meta_cache() -> dict:
+    """读取本机网络取回的真实行业/概念缓存(由 WeStock data_profile / data_industry_chain 产出)。
+
+    沙箱外网被限制,无法直连东财/akshare,因此真实 meta 需经由已连接的 westock-mcp
+    连接器(走用户本机网络)取回并落盘到 meta_cache.json,注入脚本只负责读取。
+    """
+    if META_CACHE.exists():
+        try:
+            return json.load(open(META_CACHE, encoding="utf-8")) or {}
+        except Exception:
+            return {}
+    return {}
 
 
 def em_secid(code: str) -> str:
@@ -92,15 +107,20 @@ all_codes = sorted({re.sub(r"^(sh|sz|bj)", "", c) for group in strategies.values
 
 print(f"[inject] 读取 {latest.name} 共 {len(all_codes)} 只 A/B/H 选股")
 
+meta_cache = load_meta_cache()
 meta = {}
 klines = {}
 for code in all_codes:
     bare = re.sub(r"^(sh|sz|bj)", "", code)
     klines[bare] = qfq_klines(bare)
-    m = em_stock_meta(bare)
-    # 若 f104 概念为空，用 f127 申万二级或 f100 行业兜底，避免前端显示空白
-    if not m["con"]:
-        m["con"] = m["sw2"] or m["sec"]
+    # 优先用本机网络取回的真实 meta 缓存;沙箱连不上东财时 em_stock_meta 只会回退空串
+    m = dict(meta_cache.get(bare) or {})
+    if not m.get("sec") and not m.get("con"):
+        m = em_stock_meta(bare)
+        if not m["con"]:
+            m["con"] = m["sw2"] or m["sec"]
+    m.setdefault("sec", "")
+    m.setdefault("con", "")
     meta[bare] = m
     print(f"[inject] {bare} sec={m['sec'][:16]:<16} con={m['con'][:30]:<30} k={len(klines[bare].get('c') or [])}")
 
