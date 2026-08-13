@@ -811,6 +811,7 @@
   .wiz-run-hint { font-size:12px; color:var(--sub); }
   /* 风险监控 */
   .risk-banner { display:flex; align-items:center; gap:24px; background:var(--panel); border:1px solid var(--border); border-left-width:5px; border-radius:12px; padding:20px 24px; margin-bottom:16px; }
+  .risk-snap { font-size:12px; color:#f59e0b; background:rgba(245,158,11,.08); border:1px dashed rgba(245,158,11,.4); border-radius:8px; padding:8px 12px; margin-bottom:14px; }
   .risk-banner-l { text-align:center; }
   .risk-banner-num { font-size:46px; font-weight:800; line-height:1; }
   .risk-banner-lab { font-size:12px; color:var(--sub); margin-top:4px; }
@@ -945,8 +946,8 @@
             </defs>
           </svg>
           <div class="sc-side">
-            <div class="sc-score" style="color:#FFB74D">68</div>
-            <div class="sc-note">营收 +61%<br><b>估值 24.3x</b> · 净利 +82%</div>
+            <div class="sc-score" style="color:#FFB74D">…</div>
+            <div class="sc-note">加载中…<br><b>实时行情接入后填充</b></div>
           </div>
         </div>
       </div>
@@ -971,8 +972,8 @@
             </defs>
           </svg>
           <div class="sc-side">
-            <div class="sc-score" style="color:#95DE64">75</div>
-            <div class="sc-note">均线多头排列<br><b>RSI 68</b> · MACD 金叉</div>
+            <div class="sc-score" style="color:#95DE64">…</div>
+            <div class="sc-note">加载中…<br><b>实时行情接入后填充</b></div>
           </div>
         </div>
       </div>
@@ -997,8 +998,8 @@
             </defs>
           </svg>
           <div class="sc-side">
-            <div class="sc-score" style="color:#FF7875">82</div>
-            <div class="sc-note">公募重仓(季报真实)<br><b>机构买入覆盖</b> · 估值代理</div>
+            <div class="sc-score" style="color:#FF7875">…</div>
+            <div class="sc-note">加载中…<br><b>实时行情接入后填充</b></div>
           </div>
         </div>
       </div>
@@ -1023,8 +1024,8 @@
             </defs>
           </svg>
           <div class="sc-side">
-            <div class="sc-score" style="color:#40A9FF">55</div>
-            <div class="sc-note">研报 18 篇<br><b>一致预期买入</b> · 目标 +18%</div>
+            <div class="sc-score" style="color:#40A9FF">…</div>
+            <div class="sc-note">加载中…<br><b>实时行情接入后填充</b></div>
           </div>
         </div>
       </div>
@@ -1049,8 +1050,8 @@
             </defs>
           </svg>
           <div class="sc-side">
-            <div class="sc-score" style="color:#B39DDB">79</div>
-            <div class="sc-note">市场热度 92<br><b>搜索热度↑</b> · 龙虎榜净买</div>
+            <div class="sc-score" style="color:#B39DDB">…</div>
+            <div class="sc-note">加载中…<br><b>实时行情接入后填充</b></div>
           </div>
         </div>
       </div>
@@ -1137,55 +1138,54 @@
       <div class="panel" style="overflow-y:auto;">
         <div class="panel-header">
           <h3>🤖 AI Insights</h3>
-          <div class="ai-title"><span class="stock" id="aiStock">中际旭创 300308.SZ</span></div>
+          <div class="ai-title"><span class="stock" id="aiStock">加载中…</span></div>
         </div>
         <div style="padding:4px 13px 10px;" id="aiBody">
           <div class="ai-block">
             <div class="ai-label">📈 技术指标分析</div>
-            <div class="ai-val">均线 <span class="up">多头排列</span> · RSI 68.5 偏强<br>MACD <span class="up">金叉</span> · BOLL 上轨突破 · KDJ 高位钝化</div>
-            <div class="ai-tags"><span class="hit">MA 多头</span><span class="hit">MACD 金叉</span><span class="miss">KDJ 超买</span></div>
+            <div class="ai-val">加载中… 点击下方股票行后按真实 K 线计算</div>
+            <div class="ai-tags"><span class="hit">MA</span><span class="hit">MACD</span><span class="miss">KDJ</span></div>
           </div>
           <div class="ai-block">
             <div class="ai-label">🎯 策略命中</div>
-            <div class="ai-val">7 / 10 套策略触发 · 动量 / 趋势 / 资金共振</div>
-            <div class="ai-tags"><span class="hit">动量 8/10</span><span class="hit">趋势 7/10</span><span class="hit">资金 6/10</span><span class="miss">回撤 3/10</span></div>
+            <div class="ai-val">加载中… 由真实 K 线逐条判定策略</div>
+            <div class="ai-tags"><span class="hit">动量</span><span class="hit">趋势</span><span class="hit">资金</span></div>
           </div>
           <div class="ai-block">
             <div class="ai-label">🔥 市场情绪 / 热度</div>
-            <div class="ai-val">情绪 <span class="up">偏乐观</span> · 热度 92/100<br>龙虎榜 <span class="up">净买入</span> · 股吧讨论 +45%</div>
+            <div class="ai-val">加载中… 实时新闻与行情接入后填充</div>
           </div>
           <div class="ai-block">
             <div class="ai-label">🏦 机构进场痕迹</div>
-            <div class="ai-val">主力净流入(实时东财) · 公募重仓(季报真实) · 研报覆盖(东财真实)</div>
+            <div class="ai-val">加载中… 主力净流入(实时东财)· 研报覆盖(东财真实)</div>
             <div class="ai-tags"><span class="miss">机构数据待接入</span></div>
           </div>
           <div class="ai-block">
             <div class="ai-label">⚠️ 风险预告</div>
-            <div class="warn-line"><span class="mark">⚠</span>大股东计划减持 1.2%(2026-09 实施)</div>
-            <div class="warn-line"><span class="mark">⚠</span>商誉减值 0.8 亿 · 限售解禁 4.2%</div>
+            <div class="warn-line"><span class="mark">⚠</span>风险项待真实公告数据接入后展示</div>
           </div>
           <div class="ai-block">
             <div class="ai-label">📊 五面评分</div>
             <div class="facet-list" id="aiFacets">
-              <div class="facet"><span class="f-name">基本面</span><div class="f-bar"><i style="width:68%;background:linear-gradient(90deg,#E09030,#FFB74D)"></i></div><span class="f-val" style="color:#FFB74D">68</span><span class="f-tag" style="background:rgba(255,152,0,0.15);color:#FFB74D">中性偏强</span></div>
-              <div class="facet"><span class="f-name">技术面</span><div class="f-bar"><i style="width:75%;background:linear-gradient(90deg,#389E0D,#95DE64)"></i></div><span class="f-val" style="color:#95DE64">75</span><span class="f-tag" style="background:rgba(82,196,26,0.15);color:#95DE64">偏强</span></div>
-              <div class="facet"><span class="f-name">资金面</span><div class="f-bar"><i style="width:82%;background:linear-gradient(90deg,#CF1322,#FF7875)"></i></div><span class="f-val" style="color:#FF7875">82</span><span class="f-tag" style="background:rgba(255,77,79,0.15);color:#FF7875">净流入</span></div>
-              <div class="facet"><span class="f-name">新闻面</span><div class="f-bar"><i style="width:55%;background:linear-gradient(90deg,#2962FF,#40A9FF)"></i></div><span class="f-val" style="color:#40A9FF">55</span><span class="f-tag" style="background:rgba(41,98,255,0.15);color:#40A9FF">偏多</span></div>
-              <div class="facet"><span class="f-name">情绪面</span><div class="f-bar"><i style="width:79%;background:linear-gradient(90deg,#6D28D9,#B39DDB)"></i></div><span class="f-val" style="color:#B39DDB">79</span><span class="f-tag" style="background:rgba(124,58,237,0.18);color:#B39DDB">偏乐观</span></div>
+              <div class="facet"><span class="f-name">基本面</span><div class="f-bar"><i style="width:0%;background:linear-gradient(90deg,#E09030,#FFB74D)"></i></div><span class="f-val" style="color:#FFB74D">…</span><span class="f-tag" style="background:rgba(255,152,0,0.15);color:#FFB74D">加载中</span></div>
+              <div class="facet"><span class="f-name">技术面</span><div class="f-bar"><i style="width:0%;background:linear-gradient(90deg,#389E0D,#95DE64)"></i></div><span class="f-val" style="color:#95DE64">…</span><span class="f-tag" style="background:rgba(82,196,26,0.15);color:#95DE64">加载中</span></div>
+              <div class="facet"><span class="f-name">资金面</span><div class="f-bar"><i style="width:0%;background:linear-gradient(90deg,#CF1322,#FF7875)"></i></div><span class="f-val" style="color:#FF7875">…</span><span class="f-tag" style="background:rgba(255,77,79,0.15);color:#FF7875">加载中</span></div>
+              <div class="facet"><span class="f-name">新闻面</span><div class="f-bar"><i style="width:0%;background:linear-gradient(90deg,#2962FF,#40A9FF)"></i></div><span class="f-val" style="color:#40A9FF">…</span><span class="f-tag" style="background:rgba(41,98,255,0.15);color:#40A9FF">加载中</span></div>
+              <div class="facet"><span class="f-name">情绪面</span><div class="f-bar"><i style="width:0%;background:linear-gradient(90deg,#6D28D9,#B39DDB)"></i></div><span class="f-val" style="color:#B39DDB">…</span><span class="f-tag" style="background:rgba(124,58,237,0.18);color:#B39DDB">加载中</span></div>
             </div>
-            <div class="ai-tags" style="margin-top:6px"><span class="hit">综合 72</span><span class="hit">建议: 逢低建仓</span></div>
+            <div class="ai-tags" style="margin-top:6px"><span class="hit">综合 …</span><span class="hit">建议: 待数据接入</span></div>
           </div>
           <div class="ai-block">
             <div class="ai-label">💡 交易参考 · 关键价位</div>
             <div class="price-box">
-              <div class="pb"><div class="l">压力位</div><div class="v" style="color:#FF7875">98.2 / 102.5</div></div>
-              <div class="pb"><div class="l">支撑位</div><div class="v" style="color:#95DE64">90.5 / 88.0</div></div>
-              <div class="pb"><div class="l">目标价位</div><div class="v" style="color:#40A9FF">108.0 (+15%)</div></div>
+              <div class="pb"><div class="l">压力位</div><div class="v" style="color:#FF7875">— / —</div></div>
+              <div class="pb"><div class="l">支撑位</div><div class="v" style="color:#95DE64">— / —</div></div>
+              <div class="pb"><div class="l">目标价位</div><div class="v" style="color:#40A9FF">—</div></div>
             </div>
             <div class="price-box" style="margin-top:6px">
-              <div class="pb"><div class="l">建议建仓</div><div class="v" style="color:#FF7875">92.5-95.0</div></div>
-              <div class="pb"><div class="l">参考止盈</div><div class="v" style="color:#FF7875">108.0</div></div>
-              <div class="pb"><div class="l">参考止损</div><div class="v" style="color:#95DE64">86.5 (-8%)</div></div>
+              <div class="pb"><div class="l">建议建仓</div><div class="v" style="color:#FF7875">—</div></div>
+              <div class="pb"><div class="l">参考止盈</div><div class="v" style="color:#FF7875">—</div></div>
+              <div class="pb"><div class="l">参考止损</div><div class="v" style="color:#95DE64">—</div></div>
             </div>
           </div>
         </div>
@@ -1196,7 +1196,7 @@
     <div class="bottom-row">
       <div class="panel">
         <div class="panel-header">
-          <h3>📈 K线 · <span style="color:var(--fg)" id="klineName">中际旭创</span> <span style="font-family:'Fira Code';font-size:10px;color:var(--faint)" id="klineCode">300308.SZ</span></h3>
+          <h3>📈 K线 · <span style="color:var(--fg)" id="klineName">—</span> <span style="font-family:'Fira Code';font-size:10px;color:var(--faint)" id="klineCode">—</span></h3>
           <div style="display:flex;align-items:center;gap:8px;">
             <div class="chart-subtabs">
               <div class="tab">分时</div><div class="tab active">1日</div>
@@ -1210,30 +1210,31 @@
           </div>
         </div>
         <div class="kpi-mini">
-          <div class="km"><div class="l">开盘</div><div class="v" style="color:#FF7875">94.20</div></div>
-          <div class="km"><div class="l">最高</div><div class="v" style="color:#FF7875">95.80</div></div>
-          <div class="km"><div class="l">最低</div><div class="v" style="color:#95DE64">92.10</div></div>
-          <div class="km"><div class="l">成交量</div><div class="v">24.6M</div></div>
+          <div class="km"><div class="l">开盘</div><div class="v" style="color:#FF7875">—</div></div>
+          <div class="km"><div class="l">最高</div><div class="v" style="color:#FF7875">—</div></div>
+          <div class="km"><div class="l">最低</div><div class="v" style="color:#95DE64">—</div></div>
+          <div class="km"><div class="l">成交量</div><div class="v">—</div></div>
         </div>
         <div class="chart-main">
         <div class="chart-header">
           <span class="chart-title"></span>
           <div class="ma-legend">
-            <span style="color:var(--blue)">━ MA5 92.84</span>
-            <span style="color:var(--orange)">━ MA10 90.12</span>
-            <span style="color:#7C3AED">━ MA20 86.45</span>
-            <span style="color:#FACC15">━ EMA20 87.20</span>
+            <span style="color:var(--blue)">━ MA5 —</span>
+            <span style="color:var(--orange)">━ MA10 —</span>
+            <span style="color:#7C3AED">━ MA20 —</span>
+            <span style="color:#FACC15">━ EMA20 —</span>
             <span style="color:var(--sub)">鳄鱼线 青/红/绿(虚线)</span>
           </div>
           <div class="ma-legend" style="margin-left:auto">
-            <span style="color:#FF7875">MACD 1.28 金叉</span>
-            <span style="color:#FFB74D">KDJ 82.4</span>
-            <span style="color:#40A9FF">RSI 68.5</span>
+            <span style="color:#FF7875">MACD —</span>
+            <span style="color:#FFB74D">KDJ —</span>
+            <span style="color:#40A9FF">RSI —</span>
           </div>
         </div>
 
         <!-- Candlestick: 蜡烛/网格/均线可拉伸,文字轴用 HTML 覆盖层防变形 -->
         <div class="chart-wrap">
+        <div class="chart-placeholder" id="chartPh" style="font-size:12px;color:#f59e0b;padding:6px 10px;border:1px dashed rgba(245,158,11,.4);border-radius:8px;margin-bottom:8px;background:rgba(245,158,11,.06)">⚠️ 以下为示意占位图,接入真实行情(点击左侧股票行)后自动重绘。</div>
         <svg class="candlestick-chart" id="klineSvg" viewBox="0 0 768 210" preserveAspectRatio="none">
           <!-- horizontal grid -->
           <g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">
@@ -1302,12 +1303,12 @@
           </g>
         </svg>
           <div class="ch-price" id="chPrice">
-            <span>95.8</span><span>94.2</span><span>92.6</span><span>91.0</span>
+            <span>—</span><span>—</span><span>—</span><span>—</span>
           </div>
           <div class="ch-time" id="chTime">
-            <span>07/28</span><span>07/31</span><span>08/03</span><span>08/06</span><span>08/08</span>
+            <span>等待</span><span>真实</span><span>行情</span>
           </div>
-          <div class="ch-last" id="chLast" style="top:87%">93.15</div>
+          <div class="ch-last" id="chLast" style="top:87%">—</div>
         </div>
 
         <!-- Volume: 涨日红 跌日绿 -->
@@ -1413,19 +1414,19 @@
       <div class="bottom-right">
         <div class="panel" style="overflow-y:auto;flex:1;">
           <div class="panel-header">
-            <h3>🏭 公司业绩 · <span id="fundName">中际旭创</span></h3>
+            <h3>🏭 公司业绩 · <span id="fundName">—</span></h3>
             <div class="panel-actions" style="display:flex;gap:6px;">
               <div class="mini-btn">2026 Q1</div>
             </div>
           </div>
           <div style="padding:4px 13px 10px;" id="fundRows">
-            <div class="fund-row"><span class="k">营业收入</span><span class="v up">48.2 亿 <span style="color:var(--faint)">(+61.3%)</span></span></div>
-            <div class="fund-row"><span class="k">净利润</span><span class="v up">12.6 亿 <span style="color:var(--faint)">(+82.4%)</span></span></div>
-            <div class="fund-row"><span class="k">毛利率</span><span class="v">33.5% <span style="color:var(--faint)">(+2.1pct)</span></span></div>
-            <div class="fund-row"><span class="k">ROE (年化)</span><span class="v">18.6%</span></div>
-            <div class="fund-row"><span class="k">每股收益</span><span class="v">0.86 元</span></div>
-            <div class="fund-row"><span class="k">一致预期净利</span><span class="v up">58.3 亿 <span style="color:var(--faint)">(FY26E)</span></span></div>
-            <div class="fund-note" id="fundNote">📄 研报观点:800G/1.6T 光模块需求旺盛,AI 算力资本开支高增;目标价一致预期 <b style="color:#FF7875">108 元(+15%)</b>,18 篇研报中 15 篇买入。</div>
+            <div class="fund-row"><span class="k">营业收入</span><span class="v">加载中…</span></div>
+            <div class="fund-row"><span class="k">净利润</span><span class="v">加载中…</span></div>
+            <div class="fund-row"><span class="k">毛利率</span><span class="v">加载中…</span></div>
+            <div class="fund-row"><span class="k">ROE (年化)</span><span class="v">加载中…</span></div>
+            <div class="fund-row"><span class="k">每股收益</span><span class="v">加载中…</span></div>
+            <div class="fund-row"><span class="k">一致预期净利</span><span class="v">加载中…</span></div>
+            <div class="fund-note" id="fundNote">📄 业绩数据与研报观点在接入真实数据源后填充(点击左侧股票行)。</div>
           </div>
         </div>
 
@@ -1519,7 +1520,7 @@
     { t: 'cards', d: [
       { title: '涨跌家数', val: '1,615 涨 / 3,777 跌', note: '涨停 54 · 跌停 0', color: '#16a34a' },
       { title: '两市成交', val: '23,210 亿', note: '较 5 日均 -8.6%', color: '#722ED1' },
-      { title: '市场温度', val: '22° 偏冷', note: '市场画像综合分 22/100(真实)', color: '#FF9800' }
+      { title: '市场温度', val: '22° 偏冷', note: '快照口径 22/100 · 截至 2026-08-11', color: '#FF9800' }
     ] },
     { t: 'flowchart', d: { title: '板块资金流向 · 主力净流入(亿元,真实 2026-08-11)', dates5: ['08/05','08/06','08/07','08/08','08/11'], dates10: ['07/28','07/29','07/30','07/31','08/03','08/04','08/05','08/06','08/07','08/11'], groups: [
 { n: '通信设备', c: '#FF4D4F', day: 16.5, d5: [67.1], d10: [-199.6], px: [8943.28, 8176.43, 8556.44, 8586.87, 9509.41, 9321.22, 9459.89, 9489.55, 9141.59, 9263.65] },
@@ -1557,7 +1558,7 @@
         { t: 'intel', d: { title: '个股综合研判' } },
         { t: 'chat', d: [
           { role: 'u', text: '帮我分析中际旭创中报前的交易窗口,以及风险点' },
-          { role: 'a', text: '基于一致预期与事件日历,给出以下观点:1) 8/18 中报为关键催化,预期净利 68 亿(+82%),毛利率能否维持 33%+ 是分歧点;2) 1.6T 光模块 Q4 放量节奏决定明年估值中枢;3) 风险:光模块板块短期涨幅过大、获利盘了结,若 CPI 超预期引发科技股回调,建议在 89 元以下分批建仓,止损 84 元。' }
+          { role: 'a', text: '(演示回复 · 非 AI 实时研判)中际旭创 8/18 前后中报披露为市场关注焦点,1.6T 光模块放量节奏是关键变量;具体业绩与交易建议请以公司公告及实时情报研判为准,此对话内容仅演示交互流程。' }
         ] }
       ]
     },
@@ -1629,8 +1630,8 @@
           events: {
             8: [{ t: '美国 7 月 CPI', s: '预期 3.0% yoy · 美联储 9 月议息前瞻', tag: '宏观', cls: 'warn' }],
             12: [{ t: '中国 7 月社融/信贷', s: '社融增量一致预期 1.1 万亿,关注企业中长贷', tag: '宏观', cls: 'warn' }, { t: 'FOMC 会议纪要', s: '关注降息路径与缩表表述', tag: '海外', cls: 'blue' }],
-            15: [{ t: '澜起科技科创板上市', s: '发行价 45.20 元 · 募资 62 亿,关注首日表现', tag: 'IPO', cls: 'blue' }],
-            18: [{ t: '中际旭创中报披露', s: '一致预期净利 68 亿(+82%),1.6T 进度为焦点', tag: '业绩', cls: 'up' }],
+            15: [{ t: '澜起科技(688008)动态', s: '澜起科技已于 2019 年上市,此处关注中报/回购等公司动态', tag: '个股', cls: 'blue' }],
+            18: [{ t: '中际旭创中报披露', s: '1.6T 光模块进度为市场焦点(具体业绩以公司公告为准)', tag: '业绩', cls: 'up' }],
             20: [{ t: '中国 8 月 LPR 报价', s: '市场预期维持不变,关注 MLF 续作', tag: '宏观', cls: 'warn' }],
             26: [{ t: '英伟达 Q2 财报', s: '数据中心指引影响光模块板块', tag: '海外', cls: 'up' }],
             31: [{ t: '8 月制造业 PMI', s: '7 月 49.4 · 关注重回荣枯线', tag: '宏观', cls: 'warn' }]
@@ -1799,6 +1800,7 @@
         '<div class="risk-banner-r"><div class="risk-badge" style="background:' + band + '">' + (R.verdictLevel === 'up' ? '🟢 ' : (R.verdictLevel === 'warn' ? '🟡 ' : '🔴 ')) + R.verdict + '</div>' +
         '<div class="risk-banner-sub">' + (R.summary || '') + '</div></div>' +
       '</div>' +
+      '<div class="risk-snap">⚠️ 本页为静态快照(截至 ' + (R.date || '—') + '),非实时更新;两融维度除外(运行时由内嵌真实序列推导)。</div>' +
       '<div class="risk-grid">' + cards + '</div>' +
       '<div class="pg-panel"><div class="pg-panel-t">🧭 信号解读</div><ul class="risk-reasons">' + reasons + '</ul></div>' +
       '<div class="risk-extra">' + valHtml + techHtml + srcHtml + '</div>';
@@ -1817,8 +1819,8 @@
     const chg20 = (last / prev20 - 1) * 100;
     const buy = rzmre[n - 1];
     const fundM = (RISK_DATA.dims.fund.metrics || []).find(function (m) { return m.t === '成交额'; });
-    const turnYi = fundM ? parseFloat(String(fundM.v).replace(/,/g, '')) * 1e4 : 23200;
-    const buyRatio = turnYi ? (buy / turnYi * 100) : null;
+    const turnYi = fundM ? parseFloat(String(fundM.v).replace(/,/g, '')) * 1e4 : null;
+    const buyRatio = (turnYi && turnYi > 0) ? (buy / turnYi * 100) : null;
     let score = 50 + chg20 * 6; score = Math.max(5, Math.min(95, score));
     const level = score >= 60 ? '偏多' : (score >= 45 ? '中性' : '偏空');
     const trend = chg20 >= 0 ? '杠杆资金升温' : '杠杆资金降温';
@@ -6144,8 +6146,8 @@ const RISK_DATA = {
     "margin": {
       "name": "两融余额",
       "score": null,
-      "level": "实时未加载",
-      "status": "实时两融序列(MG_EM)未加载,该维度留空;正常打开文件时由 AkShare 融资融券报告真实数据填充",
+      "level": "未参与评分",
+      "status": "两融维度:运行时可从内嵌两融序列(MG_EM)推导实时情绪分,未注入时该维度不参与评分",
       "metrics": [
         {
           "t": "融资余额",
@@ -6225,9 +6227,9 @@ const RISK_DATA = {
   function researchHtml() {
     const kpiCards = [
       { t: '因子总数', v: '7', d: '个价量因子', cls: '', icon: '🧬' },
-      { t: 'IC 均值', v: '-0.062', d: '日频 RankIC(全A)', cls: '', icon: '📈' },
-      { t: 'ICIR', v: '-0.40', d: '因子稳健度(真实)', cls: '', icon: '🛡️' },
-      { t: '覆盖', v: '4149', d: '只 A 股 · 2023–2026', cls: '', icon: '🔄' }
+      { t: 'IC 均值', v: '-0.062', d: '演示口径 · 非实时统计', cls: '', icon: '📈' },
+      { t: 'ICIR', v: '-0.40', d: '演示口径 · 非实时统计', cls: '', icon: '🛡️' },
+      { t: '覆盖', v: '4149', d: '演示口径 · 2023–2026', cls: '', icon: '🔄' }
     ];
     const kpisHtml = kpiCards.map(k =>
       '<div class="pg-kpi"><div class="pg-kpi-t">' + k.t + '</div><div class="pg-kpi-v">' + k.v + '</div><div class="pg-kpi-d">' + k.d + '</div></div>'
@@ -6247,9 +6249,9 @@ const RISK_DATA = {
       '<div class="pg-kpis">' + kpisHtml + '</div>' +
       '<div class="pg-panel" style="margin-top:12px"><div class="pg-panel-t">🧬 因子库 · 按类别筛选</div>' +
       '<div class="factor-cats">' + catChips + '</div>' +
-      '<div class="pg-table"><table><thead><tr><th>因子</th><th>类别</th><th>IC</th><th>ICIR</th><th>方向</th><th>状态</th><th>操作</th></tr></thead>' +
+      '<div class="pg-table"><table><thead><tr><th>因子</th><th>类别</th><th>IC*</th><th>ICIR*</th><th>方向</th><th>状态</th><th>操作</th></tr></thead>' +
       '<tbody>' + rowsHtml + '</tbody></table></div>' +
-      '<div class="bt-note">点击「＋加入信号」,将因子作为过滤条件注入右侧策略实验室;因子 IC/ICIR 为真实截面统计:全 A 股 4149 只、2023–2026 前复权日线逐日 RankIC(近期呈反转特征)。</div>' +
+      '<div class="bt-note">点击「＋加入信号」,将因子作为过滤条件注入右侧策略实验室;* 因子 IC/ICIR 为演示口径数值,非实时截面统计,仅用于演示因子筛选流程。</div>' +
       '</div></div>';
     const labPanel =
       '<div class="res-panel" id="res-lab">' +
@@ -6312,7 +6314,7 @@ const RISK_DATA = {
     return '<div class="room-pipe">' +
       '<div class="room-stage"><div class="room-stage-h"><span class="room-no">1</span>因子 · 选择有效因子(按 |IC| 加权)</div>' +
         '<div class="room-factors">' + facChips + '</div>' +
-        '<div class="room-note">选中因子按 |IC| 加权合成复合得分;点击切换启用 / 停用。因子 IC / ICIR 为真实截面统计(全 A 股 4149 只,2023–2026 日频 RankIC,全部为负向→反转主导)。</div>' +
+        '<div class="room-note">选中因子按 |IC| 加权合成复合得分;点击切换启用 / 停用。因子打分基于候选池快照 faces 叠加演示波动,IC/ICIR 为演示口径,非实时截面统计。</div>' +
       '</div>' +
       '<div class="room-stage"><div class="room-stage-h"><span class="room-no">2</span>信号 · 因子打分 → 排名 → 信号篮</div>' +
         '<div class="room-nrow"><span class="room-nlbl">信号篮规模 N</span>' +
@@ -7267,7 +7269,7 @@ const RISK_DATA = {
     const mean = cs.slice(-20).reduce(function (a, b) { return a + b; }, 0) / 20;
     const sd = Math.sqrt(cs.slice(-20).reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / 20);
     const boll = last > mean + 2 * sd ? '上轨突破' : (last < mean - 2 * sd ? '下轨' : '中轨上方');
-    const kdj = rsi >= 65 ? '高位钝化' : '金叉';
+    const kdj = rsi >= 65 ? '偏强(RSI近似)' : '中性(RSI近似)';
     const chg = n >= 2 ? (cs[n - 1] / cs[n - 2] - 1) * 100 : 0;
     return { tech: Math.round(tech), ma20: +ma20.toFixed(2), rsi: +rsi.toFixed(1), macd: +macd.toFixed(2), mom20: +mom20.toFixed(2), kdj: kdj, boll: boll, last: last, chg: +chg.toFixed(2) };
   }
@@ -7512,7 +7514,7 @@ const RISK_DATA = {
       ['情绪面', faces.sent, '#6D28D9,#B39DDB', '#B39DDB', faces.sent >= 75 ? '偏乐观' : faces.sent >= 60 ? '中性' : '谨慎', 'rgba(124,58,237,0.18)']
     ];
     const total = Math.round((faces.fund + faces.tech + faces.flow + faces.news + faces.sent) / 5);
-    const totalClamped = Math.max(60, Math.min(95, total));
+    const totalClamped = Math.max(5, Math.min(95, total));
     const verdict = totalClamped >= 88 ? '逢低建仓' : totalClamped >= 80 ? '逢低关注' : '观望为主';
     const rsiState = s.rsi >= 65 ? '偏强' : s.rsi >= 50 ? '中性' : '偏弱';
     const price = s.px;
@@ -7524,9 +7526,10 @@ const RISK_DATA = {
     const buy1 = (price * 0.99).toFixed(1), buy2 = (price * 1.02).toFixed(1);
     const sl = (price * 0.92).toFixed(1);
     const techTxt = '均线 <span class="' + (s.ma && s.chg >= 0 ? 'up' : 'down') + '">MA20 ' + s.ma.toFixed(2) + '</span> · RSI ' + s.rsi + ' ' + rsiState + '<br>MACD <span class="' + (s.macd >= 0 ? 'up' : 'down') + '">' + (s.macd >= 0 ? '金叉' : '死叉') + '</span> · BOLL ' + s.boll + ' · KDJ ' + s.kdj;
-    const techTags = (s.ma && s.chg >= 0 ? '<span class="hit">MA 多头</span>' : '<span class="miss">MA 偏弱</span>') + (s.macd >= 0 ? '<span class="hit">MACD 金叉</span>' : '<span class="miss">MACD 死叉</span>') + (s.kdj === '金叉' ? '<span class="hit">KDJ 金叉</span>' : '<span class="miss">KDJ 超买</span>');
+    const techTags = (s.ma && s.chg >= 0 ? '<span class="hit">MA 多头</span>' : '<span class="miss">MA 偏弱</span>') + (s.macd >= 0 ? '<span class="hit">MACD 金叉</span>' : '<span class="miss">MACD 死叉</span>') + (s.kdj.indexOf('偏强') >= 0 ? '<span class="hit">RSI 偏强</span>' : '<span class="miss">RSI 中性</span>');
     const stratN = Math.max(4, Math.min(9, Math.round(totalClamped / 10) - 1));
-    const stratTags = [['动量', 8], ['趋势', 7], ['资金', 6], ['回撤', 3]].map(function (t) { return '<span class="' + (t[1] >= 5 ? 'hit' : 'miss') + '">' + t[0] + ' ' + t[1] + '/10</span>'; }).join('');
+    const stratTxt = stratN + ' / 10 套策略触发 · 动量 / 趋势 / 资金共振(演示换算:按综合分推导,非逐套实算)';
+    const stratTags = '<span class="hit">命中数按综合分换算</span><span class="miss">非逐策略实算</span>';
     const fc = (typeof FUND_CACHE !== 'undefined') ? FUND_CACHE[s.code] : null;
     let instTxt;
     if (fc && fc.count > 0) {
@@ -7560,7 +7563,7 @@ const RISK_DATA = {
     return {
       ai: {
         tech: techTxt, techTags: techTags,
-        strat: stratN + ' / 10 套策略触发 · 动量 / 趋势 / 资金共振', stratTags: stratTags,
+        strat: stratTxt, stratTags: stratTags,
         senti: '情绪 <span class="' + (s.chg >= 0 ? 'up' : 'down') + '">现价 ' + s.px.toFixed(2) + '</span> · 当日 ' + (s.chg >= 0 ? '+' : '') + s.chg.toFixed(2) + '%<br>RSI ' + s.rsi + ' · 动量 ' + (s.mom20 >= 0 ? '+' : '') + s.mom20.toFixed(1) + '%',
         inst: instTxt, instTags: instTags,
         risk: riskTxt,
@@ -7779,17 +7782,20 @@ const RISK_DATA = {
     const f = poolFaces();
     document.querySelectorAll('.score-card[data-dim]').forEach(function (card) {
       const dim = card.dataset.dim;
-      const v = (f[dim] != null) ? f[dim] : 50;
+      const v = (f[dim] != null) ? f[dim] : null;
       const sc = card.querySelector('.sc-score');
-      if (sc) { sc.textContent = v; sc.style.color = scoreColor(v); }
+      if (sc) { sc.textContent = (v == null ? '—' : v); sc.style.color = (v == null ? 'var(--faint)' : scoreColor(v)); }
       card.querySelectorAll('.mini-gauge path').forEach(function (p) {
         const st = p.getAttribute('stroke') || '';
-        if (st.indexOf('url(') === 0) p.setAttribute('stroke-dasharray', v + ' 100');
+        if (st.indexOf('url(') === 0) p.setAttribute('stroke-dasharray', (v == null ? 0 : v) + ' 100');
       });
       const tag = card.querySelector('.sc-tag');
-      if (tag) { const ti = scoreTag(v); tag.textContent = ti.txt; tag.className = 'sc-tag ' + ti.cls; }
+      if (tag) {
+        if (v == null) { tag.textContent = '暂无数据'; tag.className = 'sc-tag'; }
+        else { const ti = scoreTag(v); tag.textContent = ti.txt; tag.className = 'sc-tag ' + ti.cls; }
+      }
       const note = card.querySelector('.sc-note');
-      if (note) note.innerHTML = scoreNote(dim, v, f);
+      if (note) note.innerHTML = (v == null ? '数据缺失,接入行情后填充' : scoreNote(dim, v, f));
     });
   }
   async function fillMarket() {
