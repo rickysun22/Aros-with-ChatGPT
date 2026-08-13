@@ -294,12 +294,107 @@ class DataManager:
     def get_sector_concept(self, code: str) -> tuple[str, str, list[str]]:
         """Return ``(industry, concept, concept_list)`` for ``code`` (Sprint 4.3).
 
-        Concept is best-effort; empty strings/lists on failure.
+        Industry now comes from Eastmoney push2 (proxy-reachable); akshare was
+        unreliable behind the proxy. Concept is best-effort; empty on failure.
         """
-        from data.providers.moneyflow import _ak_industry_of
+        from data.providers.moneyflow import _em_industry_of
 
         try:
-            industry = _ak_industry_of(code)
+            industry = _em_industry_of(code)
             return (industry or "", "", [])
         except Exception:
             return ("", "", [])
+
+    # ------------------------------------------------------------------ #
+    # Live / real-time analysis boundary (2026-07-21)
+    #   Backtests keep reading the local tables above. These methods call the
+    #   skill's live sources (Tencent / THS / Sina / Eastmoney-throttled) for
+    #   time-sensitive data only.
+    # ------------------------------------------------------------------ #
+    def _live(self) -> "LiveData":
+        from data.live import LiveData
+
+        return LiveData()
+
+    def get_realtime_quote(self, code: str) -> dict | None:
+        """Live fundamentals/limit prices via Tencent (PE/PB/市值/涨跌停价)."""
+        try:
+            return self._live().quote_single(code)
+        except Exception:
+            return None
+
+    def get_realtime_blocks(self, code: str) -> str | None:
+        """Authoritative industry name via Eastmoney push2; ``None`` if blocked."""
+        try:
+            return self._live().industry_of(code)
+        except Exception:
+            return None
+
+    def get_live_hot_reason(self, trade_date: str | None = None):
+        """当日强势股 + 题材归因 (DataFrame) via 同花顺."""
+        try:
+            return self._live().hot_reason(trade_date)
+        except Exception:
+            return None
+
+    def get_live_global_news(self, page_size: int = 50) -> list[dict]:
+        """东方财富 7x24 全球财经快讯."""
+        try:
+            return self._live().global_news(page_size)
+        except Exception:
+            return []
+
+    def refresh_latest_bars(self, code: str, n: int = 5) -> int:
+        """Fetch the latest ``n`` daily bars from Sina and upsert into the local
+        ``daily_bars`` table, **preserving** any existing non-zero ``amount``.
+
+        This is the *only* write path that touches live sources; it is meant for
+        forward-refreshing today's/in-recent sessions before live analysis. It
+        never alters historical bars used by backtests (those are untouched
+        because Sina only returns the most recent ``n`` rows).
+        """
+        df = self._live().latest_bars(code, n=n)
+        if df is None or df.empty:
+            return 0
+        with self._sessionmaker() as session:
+            self._upsert_daily_refresh(session, df)
+            session.commit()
+        return len(df)
+
+    @staticmethod
+    def _upsert_daily_refresh(session: Session, df: pd.DataFrame) -> None:
+        """Upsert that keeps the larger of (existing, new) ``amount`` so a live
+        refresh never clobbers a real historical turnover with Sina's 0."""
+        from sqlalchemy import func as _func
+
+        from .models import DailyBar
+
+        rows = [
+            {
+                "code": str(r.code),
+                "date": r.date,
+                "open": float(r.open),
+                "high": float(r.high),
+                "low": float(r.low),
+                "close": float(r.close),
+                "volume": float(r.volume),
+                "amount": float(r.amount),
+            }
+            for r in df.itertuples(index=False)
+        ]
+        if not rows:
+            return
+        stmt = sqlite_insert(DailyBar).values(rows)
+        excluded = stmt.excluded
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["code", "date"],
+            set_={
+                "open": excluded.open,
+                "high": excluded.high,
+                "low": excluded.low,
+                "close": excluded.close,
+                "volume": excluded.volume,
+                "amount": _func.max(excluded.amount, DailyBar.amount),
+            },
+        )
+        session.execute(stmt)

@@ -451,6 +451,7 @@ class ConsensusEngine:
                         "strategy_id": row.strategy_id,
                         "category": row.category,
                         "quality_star": row.quality_star,
+                        "validated": row.quality_star is not None,
                         "best_fit_regimes": _json_regimes(row.best_fit_regimes),
                     }
                 )
@@ -459,6 +460,43 @@ class ConsensusEngine:
         fold_by_strategy, max_dd_by_strategy = self._load_validations(
             session, {h["strategy_id"] for hs in hits_by_code.values() for h in hs}
         )
+
+        # Idempotent re-run: drop any prior screening + its candidates/hits for
+        # this date before persisting. No ON DELETE CASCADE is configured on the
+        # FKs, so children must be removed explicitly, in dependency order.
+        from research.models import (
+            DailyScreening as _DS,
+            DailyAlphaCandidate as _DAC,
+            ScreeningHit as _SH,
+            DecisionTracking as _DT,
+            CandidatePerformance as _CP,
+        )
+
+        _prev_ids = [r.id for r in session.query(_DS.id).filter(_DS.run_date == sdate).all()]
+        if _prev_ids:
+            _cand_ids = [
+                r.id
+                for r in session.query(_DAC.id)
+                .filter(_DAC.screening_id.in_(_prev_ids))
+                .all()
+            ]
+            if _cand_ids:
+                session.query(_DT).filter(_DT.candidate_id.in_(_cand_ids)).delete(
+                    synchronize_session=False
+                )
+                session.query(_CP).filter(_CP.candidate_id.in_(_cand_ids)).delete(
+                    synchronize_session=False
+                )
+                session.query(_DAC).filter(_DAC.screening_id.in_(_prev_ids)).delete(
+                    synchronize_session=False
+                )
+            session.query(_SH).filter(_SH.screening_id.in_(_prev_ids)).delete(
+                synchronize_session=False
+            )
+            session.query(_DS).filter(_DS.id.in_(_prev_ids)).delete(
+                synchronize_session=False
+            )
+            session.flush()
 
         # Persist the screening header.
         screening_id = f"scr_{uuid.uuid4().hex[:8]}"
@@ -476,6 +514,12 @@ class ConsensusEngine:
 
         # Build + score candidates.
         results: list[ConsensusResult] = []
+        from data.models import Stock as _Stock
+
+        name_map = {
+            code: name
+            for code, name in session.query(_Stock.code, _Stock.name).all()
+        }
         for code, hits in hits_by_code.items():
             res = self._score_candidate(
                 code, hits, fold_by_strategy, max_dd_by_strategy, regime_label, screening_id
@@ -496,8 +540,28 @@ class ConsensusEngine:
 
         # Rank by AROS and persist Top-N candidates.
         results.sort(key=lambda r: r.aros_score, reverse=True)
-        for rank, res in enumerate(results[: self._cc.top_n], start=1):
-            session.add(self._candidate_row(res, screening_id, rank))
+        top = results[: self._cc.top_n]
+        # Read industry / sector from the persistent cache (StockIndustry) so the
+        # scan stays fast and resilient to source flakiness / rate-limiting. Codes
+        # not yet cached simply stay blank until the backfill job fetches them.
+        from data.models import StockIndustry as _SI
+
+        _ind_cache = {
+            code: (ind, sec)
+            for code, ind, sec in session.query(_SI.code, _SI.industry, _SI.sector).all()
+        }
+        for rank, res in enumerate(top, start=1):
+            _ind, _sec = _ind_cache.get(res.code, (None, None))
+            session.add(
+                self._candidate_row(
+                    res,
+                    screening_id,
+                    rank,
+                    name=name_map.get(res.code),
+                    industry=_ind,
+                    sector=_sec,
+                )
+            )
 
         session.commit()
         return results
@@ -512,7 +576,13 @@ class ConsensusEngine:
             bench = self._bench(self._cfg.benchmark.default, "2010-01-01", str(sdate))
             from research.market_regime import MarketRegimeEngine
 
-            return MarketRegimeEngine(self._cfg.research.market_regime).current_regime(bench)
+            eng = MarketRegimeEngine(self._cfg.research.market_regime)
+            if isinstance(bench, pd.DataFrame):
+                if "close" in bench.columns:
+                    bench = bench.set_index("date")["close"].astype(float)
+                elif bench.shape[1] == 1:
+                    bench = bench.iloc[:, 0]
+            return eng.current_regime(bench)
         except Exception:
             return NEUTRAL
 
@@ -622,6 +692,12 @@ class ConsensusEngine:
         avg_star = sum(stars) / len(stars) if stars else None
         max_star = max(stars) if stars else None
 
+        # Infer explainable advantages / risks / thesis / system suggestion now
+        # that rating + avg_star are known (Chinese, money-flow-aware text).
+        advantages, risks, thesis, system_suggestion = _build_explanation(
+            hits, regime_label, rating, avg_star
+        )
+
         return ConsensusResult(
             code=code,
             hit_count=len(hits),
@@ -638,18 +714,28 @@ class ConsensusEngine:
             public_money_score=public_money_score,
             hidden_flow_score=hidden_flow_score,
             risk_filter=risk_filter,
-            system_suggestion=hflow.explanation,
+            advantages=advantages,
+            risks=risks,
+            thesis=thesis,
+            system_suggestion=system_suggestion,
         )
 
     @staticmethod
-    def _candidate_row(res: ConsensusResult, screening_id: str, rank: int) -> DailyAlphaCandidate:
+    def _candidate_row(
+        res: ConsensusResult,
+        screening_id: str,
+        rank: int,
+        name: str | None = None,
+        industry: str | None = None,
+        sector: str | None = None,
+    ) -> DailyAlphaCandidate:
         return DailyAlphaCandidate(
             id=f"dac_{uuid.uuid4().hex[:8]}",
             screening_id=screening_id,
             code=res.code,
-            name=None,
-            industry=None,
-            sector=None,
+            name=name,
+            industry=industry,
+            sector=sector or industry,  # 板块优先用缓存的行业划分,回退到行业名
             concepts_json=None,
             regime_label=res.regime_label,
             hit_count=res.hit_count,
@@ -669,6 +755,104 @@ class ConsensusEngine:
             thesis=res.thesis,
             system_suggestion=res.system_suggestion,
         )
+
+
+# --- Display helpers (Chinese names + explainability) ----------------- #
+REGIME_CN: dict[str, str] = {
+    "Bull": "牛市",
+    "Neutral": "中性",
+    "Bear": "熊市",
+    "EmotionHot": "情绪过热",
+    "EmotionCold": "情绪过冷",
+}
+
+try:
+    from research.strategy_library import list_strategies as _list_strategies
+
+    STRATEGY_CN: dict[str, str] = {s.spec.name: s.spec.display_name for s in _list_strategies()}
+except Exception:  # pragma: no cover - defensive
+    STRATEGY_CN = {}
+
+
+def _strategy_cn(sid: str) -> str:
+    """Chinese display name for a strategy id, falling back to the raw id."""
+    return STRATEGY_CN.get(sid, sid)
+
+
+def _stars(value: float | None) -> str:
+    """Render a 0-5 quality-star float as a ★/☆ string (e.g. 3.0 -> '★★★')."""
+    if value is None:
+        return "-"
+    n = int(round(value))
+    n = max(0, min(5, n))
+    return "★" * n + "☆" * (5 - n)
+
+
+def _build_explanation(
+    hits: list[dict[str, Any]],
+    regime_label: str,
+    rating: str,
+    avg_star: float | None,
+) -> tuple[str, str, str, str]:
+    """Infer human-readable advantages / risks / thesis / system suggestion from
+    the hitting strategies (Chinese). Replaces the old hidden-flow-only note so
+    the report carries a usable, explainable verdict even with no money-flow data.
+    """
+    names = [_strategy_cn(h["strategy_id"]) for h in hits]
+    cats = {h.get("category") for h in hits}
+    n = len(hits)
+    regime_cn = REGIME_CN.get(regime_label, regime_label)
+
+    adv_parts = [f"{n} 套策略共振（{'、'.join(names)}）"]
+    if "trend" in cats:
+        adv_parts.append("趋势多头结构确认")
+    if "strong" in cats:
+        adv_parts.append("强势股博弈形态")
+    if "emotion" in cats:
+        adv_parts.append("情绪/连板活跃度提升")
+    advantages = "；".join(adv_parts)
+
+    all_validated = all(h.get("validated") for h in hits)
+    any_validated = any(h.get("validated") for h in hits)
+    if all_validated:
+        star_txt = _stars(avg_star) if avg_star is not None else ""
+        risk_parts = [
+            f"策略均已通过样本外验证（实测星级 {star_txt}），回测证据支撑",
+            "资金流数据未接入（中性 50），暗盘风险不可见",
+            "日线粒度，分时与盘口不可见，警惕追高与回撤",
+        ]
+    elif any_validated:
+        risk_parts = [
+            "部分策略已验证、部分未验证，证据强度不一",
+            "资金流数据未接入（中性 50），暗盘风险不可见",
+            "日线粒度，分时与盘口不可见，警惕追高与回撤",
+        ]
+    else:
+        risk_parts = [
+            "策略均未经验证（质量星级默认 3★），缺回测证据支撑",
+            "资金流数据未接入（中性 50），暗盘风险不可见",
+            "日线粒度，分时与盘口不可见，警惕追高与回撤",
+        ]
+    if avg_star is not None and avg_star <= 3.0:
+        if all_validated or any_validated:
+            risk_parts.append("样本外实测星级中性偏低，胜率/夏普需结合回测综合判断")
+        else:
+            risk_parts.insert(1, "信号质量中性，胜率尚未证实")
+    risks = "；".join(risk_parts)
+
+    thesis = (
+        f"以{'、'.join(names)}为代表的多策略在截面日发出共振看多信号，"
+        f"当前市况「{regime_cn}」。系统据此列为 Alpha 候选，"
+        f"建议结合量价与板块强度二次确认后关注。"
+    )
+
+    if rating in ("S", "A"):
+        sug = f"共振强度 {rating} 级，优先纳入观察池，放量确认后逢低布局。"
+    elif rating == "B":
+        sug = f"共振强度 B 级（中等），建议加入自选观察，等待更明确量价确认再介入。"
+    else:
+        sug = f"共振强度 {rating} 级偏弱，仅作关注，不建议直接介入。"
+    return advantages, risks, thesis, sug
 
 
 def _signal_at(sig: pd.Series, sdate: date) -> bool:

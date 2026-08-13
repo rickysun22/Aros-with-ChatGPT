@@ -25,6 +25,26 @@ class Stock(Base):
     list_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
+class StockIndustry(Base):
+    """Cached industry / sector classification for a stock (Sprint 4.6).
+
+    Industry is a slow-changing stock attribute, so it is fetched opportunistically
+    (when a proxy-reachable source is available) and cached here. The daily-alpha
+    scan reads from this cache instead of doing a live fetch every run, which keeps
+    scans fast and resilient to source flakiness / rate-limiting.
+    """
+
+    __tablename__ = "stock_industry"
+
+    code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    industry: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now()
+    )
+
+
 class DailyBar(Base):
     """A single day of OHLCV data for one stock (adjusted per config)."""
 

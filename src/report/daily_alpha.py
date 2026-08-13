@@ -32,6 +32,23 @@ from sqlalchemy.orm import Session
 
 from research.models import DailyAlphaCandidate, DailyScreening, DecisionTracking
 
+# Display helpers: Chinese regime labels, strategy names, and star glyphs.
+# Imported from the consensus engine (single source of truth); fall back to
+# safe local no-ops if the import ever fails (defensive, offline-testable).
+try:
+    from research.consensus import REGIME_CN, _strategy_cn, _stars
+except Exception:  # pragma: no cover - defensive
+    REGIME_CN = {}
+
+    def _strategy_cn(sid: str) -> str:
+        return sid
+
+    def _stars(value):
+        if value is None:
+            return "-"
+        n = max(0, min(5, int(round(value))))
+        return "★" * n + "☆" * (5 - n)
+
 # A cell getter maps a candidate + the report date + its decision-tracking row (or
 # None when the human has not yet judged it) to a display value.
 CellFn = Callable[[DailyAlphaCandidate, date, "DecisionTracking | None"], Any]
@@ -75,11 +92,11 @@ SHEET1: list[tuple[str, CellFn]] = [
     ("行业", lambda c, rd, dt: c.industry),
     ("板块", lambda c, rd, dt: c.sector),
     ("概念", lambda c, rd, dt: " / ".join(_json_list(c.concepts_json))),
-    ("Regime", lambda c, rd, dt: c.regime_label),
+    ("市场环境", lambda c, rd, dt: REGIME_CN.get(c.regime_label, c.regime_label)),
     ("命中套数", lambda c, rd, dt: c.hit_count),
-    ("命中策略", lambda c, rd, dt: " / ".join(_json_list(c.hit_strategies_json))),
-    ("平均星级", lambda c, rd, dt: c.avg_quality_star),
-    ("最高星级", lambda c, rd, dt: c.max_quality_star),
+    ("命中策略", lambda c, rd, dt: " / ".join(_strategy_cn(s) for s in _json_list(c.hit_strategies_json))),
+    ("平均星级", lambda c, rd, dt: _stars(c.avg_quality_star)),
+    ("最高星级", lambda c, rd, dt: _stars(c.max_quality_star)),
     ("共振评分", lambda c, rd, dt: c.consensus_score),
     ("公开资金", lambda c, rd, dt: c.public_money_score),
     ("隐性行为", lambda c, rd, dt: c.hidden_flow_score),
@@ -88,7 +105,7 @@ SHEET1: list[tuple[str, CellFn]] = [
     ("评级", lambda c, rd, dt: c.rating),
     ("优势", lambda c, rd, dt: c.advantages),
     ("风险", lambda c, rd, dt: c.risks),
-    ("Thesis", lambda c, rd, dt: c.thesis),
+    ("投资逻辑", lambda c, rd, dt: c.thesis),
     ("系统建议", lambda c, rd, dt: c.system_suggestion),
     ("人工判断", lambda c, rd, dt: ""),
     ("跟踪状态", lambda c, rd, dt: ""),
@@ -282,7 +299,7 @@ class DailyAlphaReport:
         body.append("<h2>一、Top 候选</h2>")
         body.append(
             "<table><thead><tr>"
-            "<th>排名</th><th>代码</th><th>名称</th><th>Regime</th>"
+            "<th>排名</th><th>代码</th><th>名称</th><th>市场环境</th>"
             "<th>命中</th><th>共振</th><th>AROS</th><th>评级</th>"
             "</tr></thead><tbody>"
         )
@@ -292,7 +309,7 @@ class DailyAlphaReport:
                 f"<td>{i}</td>"
                 f"<td>{esc(c.code)}</td>"
                 f"<td>{esc(c.name or '-')}</td>"
-                f"<td>{esc(c.regime_label)}</td>"
+                f"<td>{esc(REGIME_CN.get(c.regime_label, c.regime_label))}</td>"
                 f"<td>{c.hit_count}</td>"
                 f"<td>{c.consensus_score:.1f}</td>"
                 f"<td>{c.aros_score:.1f}</td>"
@@ -345,16 +362,18 @@ class DailyAlphaReport:
             "<p class='tags'>"
             f"<span class='tag rating'>{esc(c.rating)}</span> "
             f"AROS <b>{c.aros_score:.1f}</b> · 共振 {c.consensus_score:.1f} · "
-            f"Regime {esc(c.regime_label)} · 命中 {c.hit_count} 套"
+            f"市场环境 {esc(REGIME_CN.get(c.regime_label, c.regime_label))} · 命中 {c.hit_count} 套"
             f"</p>"
         )
         if c.avg_quality_star is not None:
-            max_star = f"{c.max_quality_star:.1f}" if c.max_quality_star is not None else "-"
-            block.append(f"<p>平均星级 {c.avg_quality_star:.1f} · 最高星级 {max_star}</p>")
+            block.append(
+                f"<p>平均星级 {_stars(c.avg_quality_star)} · "
+                f"最高星级 {_stars(c.max_quality_star)}</p>"
+            )
         for label, value in (
             ("优势", c.advantages),
             ("风险", c.risks),
-            ("Thesis", c.thesis),
+            ("投资逻辑", c.thesis),
             ("系统建议", c.system_suggestion),
         ):
             if value:
@@ -425,12 +444,12 @@ class DailyAlphaReport:
 
         lines.append("## 一、Top 候选")
         lines.append("")
-        header = ["排名", "代码", "名称", "Regime", "命中", "共振", "AROS", "评级"]
+        header = ["排名", "代码", "名称", "市场环境", "命中", "共振", "AROS", "评级"]
         lines.append("| " + " | ".join(header) + " |")
         lines.append("|" + "|".join(["---"] * len(header)) + "|")
         for i, c in enumerate(candidates, 1):
             lines.append(
-                f"| {i} | {c.code} | {c.name or '-'} | {c.regime_label} | "
+                f"| {i} | {c.code} | {c.name or '-'} | {REGIME_CN.get(c.regime_label, c.regime_label)} | "
                 f"{c.hit_count} | {c.consensus_score:.1f} | {c.aros_score:.1f} | {c.rating} |"
             )
         lines.append("")
@@ -442,16 +461,15 @@ class DailyAlphaReport:
             lines.append("")
             lines.append(f"- 评级: {c.rating}")
             lines.append(f"- AROS: {c.aros_score:.1f} · 共振评分: {c.consensus_score:.1f}")
-            lines.append(f"- Regime: {c.regime_label} · 命中: {c.hit_count} 套")
+            lines.append(f"- 市场环境: {REGIME_CN.get(c.regime_label, c.regime_label)} · 命中: {c.hit_count} 套")
             if c.avg_quality_star is not None:
-                max_star = f"{c.max_quality_star:.1f}" if c.max_quality_star is not None else "-"
-                lines.append(f"- 平均星级: {c.avg_quality_star:.1f} · 最高星级: {max_star}")
+                lines.append(f"- 平均星级: {_stars(c.avg_quality_star)} · 最高星级: {_stars(c.max_quality_star)}")
             if c.advantages:
                 lines.append(f"- 优势: {c.advantages}")
             if c.risks:
                 lines.append(f"- 风险: {c.risks}")
             if c.thesis:
-                lines.append(f"- Thesis: {c.thesis}")
+                lines.append(f"- 投资逻辑: {c.thesis}")
             if c.system_suggestion:
                 lines.append(f"- 系统建议: {c.system_suggestion}")
             lines.append("")

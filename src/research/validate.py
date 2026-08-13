@@ -316,6 +316,28 @@ class ValidationEngine:
 
         runner = self._make_runner()
 
+        # Idempotent re-run: drop prior experiment runs + validation for this
+        # strategy so a repeat invocation does not trip the UNIQUE(name) / FK
+        # constraints (experiment_runs <- experiment_metrics / experiment_equity,
+        # and strategy_validations.strategy_id).
+        # NOTE: use string interpolation (not bound params) for the LIKE pattern;
+        # strategy_name is an internal constant, never user input.
+        from sqlalchemy import text
+
+        _like = f"validate_{strategy_name}%"
+        session.execute(text("PRAGMA foreign_keys=OFF"))
+        session.execute(text(
+            f"DELETE FROM experiment_metrics WHERE run_id IN "
+            f"(SELECT id FROM experiment_runs WHERE name LIKE '{_like}')"
+        ))
+        session.execute(text(
+            f"DELETE FROM experiment_equity WHERE run_id IN "
+            f"(SELECT id FROM experiment_runs WHERE name LIKE '{_like}')"
+        ))
+        session.execute(text(f"DELETE FROM experiment_runs WHERE name LIKE '{_like}'"))
+        session.execute(text(f"DELETE FROM strategy_validations WHERE strategy_id = '{strategy_name}'"))
+        session.commit()
+
         # 1. Baseline OOS run (walk-forward, regime analysis off for speed).
         base_cfg = ExperimentConfig(
             name=f"validate_{strategy_name}_base",
@@ -341,9 +363,9 @@ class ValidationEngine:
         decays: list[float] = []
         pert_run_ids: list[str] = []
         if num_params:
-            for key, _delta, value in _perturbations(num_params):
+            for i, (key, _delta, value) in enumerate(_perturbations(num_params)):
                 pcfg = base_cfg.model_copy(
-                    update={"name": f"validate_{strategy_name}_pert_{key}_{value}"}
+                    update={"name": f"validate_{strategy_name}_pert_{i}_{key}_{value}"}
                 )
                 pbatch = runner.run(
                     [strategy_name],

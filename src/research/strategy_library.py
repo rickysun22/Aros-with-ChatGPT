@@ -488,6 +488,100 @@ class SentimentReboundStrategy(ResearchStrategy):
 
 
 # --------------------------------------------------------------------------- #
+# Batch 4 -- short-term trading rules (ported from A股短线交易 skill)
+# --------------------------------------------------------------------------- #
+class BreakoutVolumeNewHighStrategy(ResearchStrategy):
+    """放量新高突破 (R00, 短线核心): 近 N 日巨量 + 连续站上 MA5 + 阶段新高。
+
+    移植自 A股短线交易 skill 的核心规则。仅用日线字段（volume / amount /
+    close / high）。原规则的「换手率≤50%」(C5) 因 daily_bars 无流通股本，改用
+    量能天花板近似；「3 日成交额>24 亿」(C4) 在含 ``amount`` 列时生效。
+    """
+
+    spec = ResearchStrategySpec(
+        name="breakout_volume_newhigh",
+        display_name="放量新高突破",
+        category="trend",
+        engine="event",
+        universe="csi800",
+        description="近N日均量放大、连续站上MA5、创阶段新高（短线核心突破信号）。",
+        data_fidelity="daily_full",
+        parameters={"vol_mult": 1.5, "lookback": 3, "high_n": 252, "amount_min": 2.4e9},
+    )
+
+    def entry_signals(self, prices: dict[str, pd.DataFrame]) -> dict[str, pd.Series]:
+        vol_mult = float(_param(self.spec, "vol_mult", 1.5))
+        lookback = int(_param(self.spec, "lookback", 3))
+        high_n = int(_param(self.spec, "high_n", 252))
+        amount_min = float(_param(self.spec, "amount_min", 2.4e9))
+
+        def fn(df: pd.DataFrame) -> pd.Series:
+            ma5 = sma(df["close"], 5)
+            above_ma5 = df["close"] > ma5
+            c3 = above_ma5.rolling(lookback, min_periods=lookback).sum() >= lookback
+            vol20 = df["volume"].rolling(20, min_periods=20).mean()
+            recent_vol = df["volume"].rolling(lookback, min_periods=lookback).mean()
+            c2 = recent_vol >= vol20 * vol_mult
+            stage_high = df["high"].rolling(high_n, min_periods=min(high_n, 120)).max()
+            c6 = df["high"] >= stage_high
+            sig = c2.fillna(False) & c3.fillna(False) & c6.fillna(False)
+            if "amount" in df.columns:
+                amt3 = df["amount"].rolling(lookback, min_periods=lookback).sum()
+                sig = sig & (amt3 >= amount_min)
+            return sig.fillna(False)
+
+        return _single_code(self.spec, fn, prices)
+
+
+class ShrinkConsolidationStrategy(ResearchStrategy):
+    """缩量整理蓄势 (R06): 横盘低振幅 + 量能萎缩 + 均线之上 + 相对低位。
+
+    移植自 A股短线交易 skill。等待低波动「蓄势」形态——通常是放量突破的前兆。
+    纯日线实现。
+    """
+
+    spec = ResearchStrategySpec(
+        name="shrink_consolidation",
+        display_name="缩量整理蓄势",
+        category="strong",
+        engine="event",
+        universe="csi800",
+        description="近N日振幅≤阈值且量缩至MA60六成以下，股价在MA20上方、处于相对低位。",
+        data_fidelity="daily_full",
+        parameters={"coil_n": 5, "amp_max": 0.05, "vol_floor": 0.6, "ma": 20, "low_n": 60},
+    )
+
+    def entry_signals(self, prices: dict[str, pd.DataFrame]) -> dict[str, pd.Series]:
+        coil_n = int(_param(self.spec, "coil_n", 5))
+        amp_max = float(_param(self.spec, "amp_max", 0.05))
+        vol_floor = float(_param(self.spec, "vol_floor", 0.6))
+        ma = int(_param(self.spec, "ma", 20))
+        low_n = int(_param(self.spec, "low_n", 60))
+
+        def fn(df: pd.DataFrame) -> pd.Series:
+            win_hi = df["high"].rolling(coil_n, min_periods=coil_n).max()
+            win_lo = df["low"].rolling(coil_n, min_periods=coil_n).min()
+            mid = df["close"].rolling(coil_n, min_periods=coil_n).mean()
+            amp = (win_hi - win_lo) / mid
+            c_coil = amp <= amp_max
+            vol60 = sma(df["volume"], 60)
+            recent_vol = df["volume"].rolling(coil_n, min_periods=coil_n).mean()
+            c_vol = recent_vol <= vol60 * vol_floor
+            sup = sma(df["close"], ma)
+            c_above = df["close"] > sup
+            low_base = sma(df["close"], low_n)
+            c_low = df["close"] <= low_base * 1.15  # 60 日均线附近 15% 内视为相对低位
+            return (
+                c_coil.fillna(False)
+                & c_vol.fillna(False)
+                & c_above.fillna(False)
+                & c_low.fillna(False)
+            )
+
+        return _single_code(self.spec, fn, prices)
+
+
+# --------------------------------------------------------------------------- #
 # Registry
 # --------------------------------------------------------------------------- #
 STRATEGIES: dict[str, ResearchStrategy] = {}
@@ -508,6 +602,8 @@ _register(FirstBoardStrategy())
 _register(SecondBoardRelayStrategy())
 _register(HighBoardStrategy())
 _register(SentimentReboundStrategy())
+_register(BreakoutVolumeNewHighStrategy())
+_register(ShrinkConsolidationStrategy())
 
 
 def get_strategy(name: str) -> ResearchStrategy:

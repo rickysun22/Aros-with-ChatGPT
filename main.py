@@ -2020,6 +2020,210 @@ research_app.add_typer(validate_app, name="validate")
 research_app.add_typer(alpha_app, name="alpha")
 
 
+# --------------------------------------------------------------------------- #
+# Sprint 4.10 -- Part 3 local market report suite
+# (fused from a-share-limitboard-report / a-share-daily-review / stock-analyzer,
+#  computed entirely from local daily_bars / index_bars — no network needed)
+# --------------------------------------------------------------------------- #
+market_app = typer.Typer(help="Sprint 4.10 本地市场报告（涨跌停 / 复盘 / 个股深读）")
+
+
+def _latest_bar_date(session: Any) -> Any:
+    """Return the most recent date present in daily_bars (or None)."""
+    from data.models import DailyBar
+    from sqlalchemy import func
+
+    return session.query(func.max(DailyBar.date)).scalar()
+
+
+@market_app.command("limit-board")
+def market_limit_board(
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default latest bar date"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+) -> None:
+    """生成涨跌停全景日报（本地 daily_bars，离线）。"""
+    setup_logging()
+    from datetime import date as _date
+
+    from report.limit_board import LimitBoardReport
+
+    session = _kb_session()
+    target = _date.fromisoformat(date) if date else _latest_bar_date(session)
+    if target is None:
+        typer.echo("No daily_bars available.", err=True)
+        raise typer.Exit(code=1)
+    paths = LimitBoardReport().generate(target, session, out_dir=report_dir)
+    typer.echo(f"涨跌停日报 -> xlsx: {paths['xlsx']}")
+    typer.echo(f"           html: {paths['html']}")
+    typer.echo(f"           md  : {paths['md']}")
+
+
+@market_app.command("daily-review")
+def market_daily_review(
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default latest bar date"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+    no_live: bool = typer.Option(False, "--no-live", help="不拉取同花顺实时题材热点（纯离线）"),
+) -> None:
+    """生成每日市场复盘（指数 / 情绪温度计 / 板块轮动 + 同花顺实时题材）。"""
+    setup_logging()
+    from datetime import date as _date
+
+    from report.daily_review import DailyReviewReport
+
+    session = _kb_session()
+    target = _date.fromisoformat(date) if date else _latest_bar_date(session)
+    if target is None:
+        typer.echo("No daily_bars available.", err=True)
+        raise typer.Exit(code=1)
+    paths = DailyReviewReport().generate(
+        target, session, out_dir=report_dir, live_themes=not no_live
+    )
+    typer.echo(f"每日复盘 -> xlsx: {paths['xlsx']}")
+    typer.echo(f"         html: {paths['html']}")
+    typer.echo(f"         md  : {paths['md']}")
+
+
+@market_app.command("stock")
+def market_stock(
+    code: str = typer.Option(..., "--code", help="股票代码"),
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default latest bar date"),
+    window: int = typer.Option(252, "--window", help="回看交易日天数"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+) -> None:
+    """生成单股技术深读（本地 daily_bars 技术面 + 腾讯实时基本面）。"""
+    setup_logging()
+    from datetime import date as _date
+
+    from report.stock_deepdive import StockDeepDive
+
+    session = _kb_session()
+    target = _date.fromisoformat(date) if date else _latest_bar_date(session)
+    if target is None:
+        typer.echo("No daily_bars available.", err=True)
+        raise typer.Exit(code=1)
+    paths = StockDeepDive().generate(
+        code, session, as_of=target, out_dir=report_dir, window=window
+    )
+    typer.echo(f"个股深读 -> html: {paths['html']}")
+    typer.echo(f"          md  : {paths['md']}")
+
+
+@market_app.command("quote")
+def market_quote(
+    code: str = typer.Option(..., "--code", help="股票代码"),
+    refresh: bool = typer.Option(False, "--refresh", help="先刷新本地最新K线（新浪）再取行情"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+) -> None:
+    """实时行情与基本面（腾讯财经 live）：PE/PB/市值/涨跌停价/换手/量比。"""
+    setup_logging()
+    from pathlib import Path
+
+    from data.manager import DataManager
+
+    dm = DataManager()
+    if refresh:
+        n = dm.refresh_latest_bars(code, n=5)
+        typer.echo(f"已刷新本地最近 {n} 根日线（新浪）")
+    q = dm.get_realtime_quote(code)
+    if not q:
+        typer.echo(f"无法获取 {code} 的实时行情（网络/代理受限）。", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"\n{q['name']} ({code})  实时价 {q['price']:.2f}  当日 {q['change_pct']:+.2f}%")
+    typer.echo(f"  PE(TTM) {q['pe_ttm']:.2f} | PE(静) {q['pe_static']:.2f} | PB {q['pb']:.2f}")
+    typer.echo(f"  总市值 {q['mcap_yi']:.0f}亿 | 流通 {q['float_mcap_yi']:.0f}亿")
+    typer.echo(f"  换手 {q['turnover_pct']:.2f}% | 量比 {q['vol_ratio']:.2f}")
+    typer.echo(f"  涨停 {q['limit_up']:.2f} | 跌停 {q['limit_down']:.2f}")
+    # write a small md for the record
+    base = Path(report_dir) / "stocks"
+    base.mkdir(parents=True, exist_ok=True)
+    md = base / f"live_{code}.md"
+    md.write_text(
+        f"# {q['name']} ({code}) 实时行情\n\n"
+        f"- 实时价: {q['price']:.2f}（当日 {q['change_pct']:+.2f}%）\n"
+        f"- PE(TTM)/PE(静): {q['pe_ttm']:.2f} / {q['pe_static']:.2f}\n"
+        f"- PB: {q['pb']:.2f}\n"
+        f"- 总市值/流通市值: {q['mcap_yi']:.0f}亿 / {q['float_mcap_yi']:.0f}亿\n"
+        f"- 换手率/量比: {q['turnover_pct']:.2f}% / {q['vol_ratio']:.2f}\n"
+        f"- 涨停价/跌停价: {q['limit_up']:.2f} / {q['limit_down']:.2f}\n\n"
+        f"> 数据源：腾讯财经 qt.gtimg.cn（不封IP，代理可达）。\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"  已记录 -> {md}")
+
+
+@market_app.command("monitor")
+def market_monitor(
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default latest bar date"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+    no_live: bool = typer.Option(False, "--no-live", help="不拉取同花顺实时题材（纯离线）"),
+    alert_only: bool = typer.Option(False, "--alert-only", help="只打印预警摘要，不写报告文件"),
+) -> None:
+    """市场环境监测：regime + 情绪温度计 + 涨跌停/炸板/连板/成交额，给出风险/机会预警。"""
+    setup_logging()
+    from datetime import date as _date
+
+    from research.market_monitor import MarketMonitor
+
+    session = _kb_session()
+    target = _date.fromisoformat(date) if date else _latest_bar_date(session)
+    if target is None:
+        typer.echo("No daily_bars available.", err=True)
+        raise typer.Exit(code=1)
+    env = MarketMonitor().snapshot(session, target, live_themes=not no_live)
+    # 打印预警摘要
+    typer.echo(f"\n[{env.date}] 市场状态: {env.regime_cn} ｜ 情绪温度计 {env.gauge}/100({env.gauge_label})")
+    typer.echo(f"综合判断: {env.summary()}")
+    if env.alerts:
+        for a in env.alerts:
+            tag = {"risk": "🔴风险", "opportunity": "🟢机会", "watch": "🟡关注"}[a.level]
+            typer.echo(f"  {tag} · {a.title}（{a.metric}）: {a.detail}")
+    else:
+        typer.echo("  无显著风险 / 机会信号。")
+    if alert_only:
+        return
+    paths = MarketMonitor().render(env, out_dir=report_dir)
+    typer.echo(f"\n市场环境监测 -> md : {paths['md']}")
+    typer.echo(f"            html: {paths['html']}")
+
+
+@market_app.command("verify")
+def market_verify(
+    code: str = typer.Option(..., "--code", help="股票代码"),
+    date: str | None = typer.Option(None, "--date", help="YYYY-MM-DD, default latest bar date"),
+    window: int = typer.Option(120, "--window", help="回看交易日天数"),
+    report_dir: str = typer.Option("reports", "--report-dir", help="Report output dir"),
+    no_live: bool = typer.Option(False, "--no-live", help="不拉取实时源（纯本地技术面验证）"),
+) -> None:
+    """个股二次验证：技术面(本地) + 基本面/资金面/新闻面(实时源) + 异动监控，输出三维评分与预警。"""
+    setup_logging()
+    from datetime import date as _date
+
+    from research.stock_verify import StockVerify
+
+    session = _kb_session()
+    target = _date.fromisoformat(date) if date else _latest_bar_date(session)
+    if target is None:
+        typer.echo("No daily_bars available.", err=True)
+        raise typer.Exit(code=1)
+    res = StockVerify().verify(session, code, target, window=window, live=not no_live)
+    typer.echo(f"\n{res.code} {res.name or ''} 二次验证 [{res.as_of}]")
+    typer.echo(f"综合评分: {res.composite} / 10 ｜ 建议: {res.rating}")
+    if res.scores:
+        typer.echo("  三维评分: " + "  ".join(f"{k} {v}" for k, v in res.scores.items()))
+    if res.alerts:
+        for a in res.alerts:
+            tag = {"risk": "🔴风险", "opportunity": "🟢机会", "watch": "🟡关注"}[a.level]
+            typer.echo(f"  {tag} · {a.title}: {a.detail}")
+    else:
+        typer.echo("  无显著风险 / 机会提示。")
+    paths = StockVerify().render(res, out_dir=report_dir)
+    typer.echo(f"\n个股验证 -> md : {paths['md']}")
+    typer.echo(f"         html: {paths['html']}")
+
+
+app.add_typer(market_app, name="market")
+
+
 def main() -> None:
     app()
 

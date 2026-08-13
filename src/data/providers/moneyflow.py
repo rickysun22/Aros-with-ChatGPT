@@ -206,6 +206,47 @@ def _ak_industry_of(code: str) -> str | None:
     return str(val).strip() or None
 
 
+def _em_industry_of(code: str) -> str | None:
+    """Industry (申万二级, f127) via Eastmoney push2 ``stock/get``.
+
+    Implemented with :mod:`urllib.request` (not ``requests``) on purpose: in this
+    environment ``requests`` HTTPS CONNECT is refused by the proxy while
+    ``urllib`` tunnels through it fine (and ``curl`` works too). ``urllib``
+    honours the ambient ``HTTP(S)_PROXY`` env, so Eastmoney stays reachable.
+    Best-effort: returns ``None`` on any failure so callers degrade gracefully.
+    """
+    import json
+    import time
+    import urllib.parse
+    import urllib.request
+
+    market = "1" if code[:1] in ("6", "9") else "0"
+    secid = f"{market}.{code}"
+    base = "https://push2.eastmoney.com/api/qt/stock/get"
+    params = urllib.parse.urlencode(
+        {"fltt": "2", "invt": "2", "fields": "f57,f58,f127", "secid": secid}
+    )
+    url = f"{base}?{params}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://quote.eastmoney.com/",
+        },
+    )
+    # The proxy intermittently refuses Eastmoney (RemoteDisconnected / rate
+    # limit), so retry with a short back-off before giving up.
+    for _ in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=12) as r:
+                d = json.loads(r.read().decode("utf-8")).get("data") or {}
+            ind = d.get("f127") or ""
+            return str(ind).strip() or None
+        except Exception:
+            time.sleep(1.5)
+    return None
+
+
 def _ak_industry_flow(industry: str) -> float | None:
     import akshare as ak
 
