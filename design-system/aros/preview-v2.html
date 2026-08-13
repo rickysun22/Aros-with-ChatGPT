@@ -1855,6 +1855,77 @@
       document.head.appendChild(sc);
     });
   }
+  // ---------- 市场概览(指数/涨跌/成交)实时刷新 · 东方财富 push2 ----------
+  const INDEX_SECS = [
+    { n: '上证指数', secid: '1.000001' },
+    { n: '深证成指', secid: '0.399001' },
+    { n: '创业板指', secid: '0.399006' },
+    { n: '科创 50', secid: '1.000688' }
+  ];
+  function refreshIndexBlocks() {
+    const mkt = document.getElementById('mkt-indices');
+    if (!mkt) return;
+    const secids = INDEX_SECS.map(function (s) { return s.secid; }).join(',');
+    const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
+      '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2&cb=';
+    jsonpEM(url, 'idx').then(function (d) {
+      const diff = d && d.data && d.data.diff;
+      if (!diff || !diff.length) return;
+      const byId = {};
+      diff.forEach(function (r) { byId[r.f12] = r; });
+      const now = new Date();
+      const today = (now.getMonth() + 1) + '/' + now.getDate();
+      const idxBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'index'; });
+      const cardsBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'cards'; });
+      let upSum = 0, dnSum = 0, volSum = 0, volOk = 0, upCnt = 0, dnCnt = 0;
+      idxBlock.d.items = idxBlock.d.items.map(function (it) {
+        const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
+        const r = sec && byId[sec.secid.split('.')[1]];
+        if (!r || r.f2 == null) return it;
+        const v = r.f2, chg = r.f4, pct = r.f3, vol = r.f6;
+        if (chg >= 0) upSum++; else dnSum++;
+        if (vol != null && vol > 0) { volSum += vol; volOk++; }
+        if (r.f104 != null && r.f105 != null) { upCnt += r.f104; dnCnt += r.f105; }
+        return {
+          n: it.n, v: v.toFixed(2),
+          chg: (chg >= 0 ? '+' : '') + chg.toFixed(2),
+          pct: (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%',
+          c: chg >= 0 ? '#FF4D4F' : '#52C41A',
+          extra: '成交 ' + (vol / 1e8).toFixed(0) + ' 亿',
+          px: it.px
+        };
+      });
+      idxBlock.d.title = '主要指数行情(实时 · ' + today + ')';
+      if (cardsBlock) {
+        const cards = cardsBlock.d;
+        if (cards.length >= 2) {
+          cards[1] = { title: '两市成交', val: (volSum / 1e8).toFixed(0) + ' 亿', note: '沪+深合计 · 实时', color: '#722ED1' };
+        }
+        if (upCnt + dnCnt > 0) {
+          cards[0] = { title: '涨跌家数', val: upCnt + ' 涨 / ' + dnCnt + ' 跌', note: '沪深两市 · 实时', color: upCnt >= dnCnt ? '#16a34a' : '#dc2626' };
+        }
+      }
+      mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
+      // 指数 sparkline: 各指数近10日真实K线(东方财富 push2his)
+      Promise.all(INDEX_SECS.map(function (sec) {
+        const cb = '__emcb_ix' + sec.secid.split('.')[1];
+        const ku = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + sec.secid +
+          '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&end=20500101&lmt=10&cb=' + cb;
+        return jsonpEM(ku, cb.replace('__emcb_', '')).then(function (kd) {
+          const k = kd && kd.data && kd.data.klines;
+          if (!k || !k.length) return null;
+          return { sec: sec, cs: k.map(function (l) { return parseFloat(l.split(',')[2]); }) };
+        }).catch(function () { return null; });
+      })).then(function (res) {
+        res.forEach(function (r) {
+          if (!r || !r.cs || !r.cs.length) return;
+          const it = idxBlock.d.items.find(function (x) { return x.n === r.sec.n; });
+          if (it) it.px = r.cs;
+        });
+        mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
+      });
+    }).catch(function () { /* 网络失败:保留原快照 */ });
+  }
   // ---------- 全市场 K 线加载器(东方财富 push2his · 真实前复权日线) ----------
   const RK_FULL = {};
   // 个股真实新闻情绪缓存 / 公募重仓(季报真实)缓存,运行时填充,零写死
@@ -7882,6 +7953,8 @@ const RISK_DATA = {
     if (document.getElementById('roomScore')) roomScoreTable();
     const mkt = document.getElementById('mkt-indices');
     if (mkt) mkt.innerHTML = INDEX_BLOCKS.map(renderBlock).join('');
+    refreshIndexBlocks();
+    setInterval(function () { refreshIndexBlocks(); }, 5 * 60 * 1000);
     const moved = document.getElementById('moved-radar');
     const radar = document.getElementById('page-radar');
     if (moved && radar) { radar.appendChild(moved); moved.style.display = ''; }
