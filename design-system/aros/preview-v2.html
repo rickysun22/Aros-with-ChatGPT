@@ -1856,11 +1856,18 @@
     });
   }
   // ---------- 市场概览(指数/涨跌/成交)实时刷新 · 东财 push2 主源 + 腾讯备用 ----------
+  // 概览展示用指数卡片(上证 / 深证 / 创业板 / 科创)
   const INDEX_SECS = [
-    { n: '上证指数', secid: '1.000001', tx: 'sh000001', mktVol: true },
-    { n: '深证成指', secid: '0.399001', tx: 'sz399001', mktVol: true },
+    { n: '上证指数', secid: '1.000001', tx: 'sh000001' },
+    { n: '深证成指', secid: '0.399001', tx: 'sz399001' },
     { n: '创业板指', secid: '0.399006', tx: 'sz399006' },
     { n: '科创 50', secid: '1.000688', tx: 'sh000688' }
+  ];
+  // 全市场级统计源(涨跌家数 / 成交额):上证指数 = 全沪市,深证综指(399106) = 全深市
+  // 深证成指(399001)仅 500 只样本、创业板/科创为沪深的子集,均不可用于全市场统计(会重复/少算)
+  const MKT_SECS = [
+    { n: '上证指数', secid: '1.000001', tx: 'sh000001' },
+    { n: '深证综指', secid: '0.399106', tx: 'sz399106' }
   ];
   function txQuote(codes) {
     return new Promise(function (resolve, reject) {
@@ -2065,7 +2072,7 @@
       });
     }
     // 主源:东方财富延迟行情 push2delay(涨跌家数 f104/f105 亦由该源提供)
-    const secids = INDEX_SECS.map(function (s) { return s.secid; }).join(',');
+    const secids = INDEX_SECS.concat(MKT_SECS).map(function (s) { return s.secid; }).join(',');
     const url = 'https://push2delay.eastmoney.com/api/qt/ulist.np/get?secids=' + secids +
       '&fields=f2,f3,f4,f6,f12,f14,f104,f105&fltt=2&invt=2';
     jsonpEM(url, 'idx').then(function (d) {
@@ -2074,12 +2081,17 @@
       const byId = {};
       diff.forEach(function (r) { byId[r.f12] = r; });
       let volSum = 0, volOk = 0, upCnt = 0, dnCnt = 0;
+      // 全市场统计只用 MKT_SECS(上证指数 = 全沪市 + 深证综指 = 全深市),避免创业板/科创子集重复计数、深证成指仅 500 样本少算
+      MKT_SECS.forEach(function (m) {
+        const r = byId[m.secid.split('.')[1]];
+        if (!r) return;
+        if (r.f6 != null && r.f6 > 0) { volSum += r.f6; volOk++; }
+        if (r.f104 != null && r.f105 != null) { upCnt += r.f104; dnCnt += r.f105; }
+      });
       const items = idxBlock.d.items.map(function (it) {
         const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
         const r = sec && byId[sec.secid.split('.')[1]];
         if (!r || r.f2 == null) return it;
-        if (sec.mktVol && r.f6 != null && r.f6 > 0) { volSum += r.f6; volOk++; }
-        if (r.f104 != null && r.f105 != null) { upCnt += r.f104; dnCnt += r.f105; }
         return {
           n: it.n, v: r.f2.toFixed(2),
           chg: (r.f4 >= 0 ? '+' : '') + r.f4.toFixed(2),
@@ -2107,13 +2119,13 @@
         if (!qs || !qs.length) return;
         const byTx = {};
         qs.forEach(function (q) { byTx[q.code] = q; });
+        // 成交额:腾讯备用源也只用全市场级指数(上证 + 深证综指)累加,避免子集重复
         let volSum = 0, volOk = 0;
-        const items = buildItems(function (sec) { return byTx[sec.tx]; });
-        items.forEach(function (it) {
-          const sec = INDEX_SECS.find(function (s) { return s.n === it.n; });
-          const q = sec && byTx[sec.tx];
-          if (sec.mktVol && q && q.vol > 0) { volSum += q.vol; volOk++; }
+        MKT_SECS.forEach(function (m) {
+          const q = byTx[m.tx];
+          if (q && q.vol > 0) { volSum += q.vol; volOk++; }
         });
+        const items = buildItems(function (sec) { return byTx[sec.tx]; });
         applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: 0, dnCnt: 0 }, '腾讯');
         setSync('数据已同步 · 腾讯 · ' + today + ' ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
         loadSparks(function (sec) { return txKline(sec.tx, 10); });
