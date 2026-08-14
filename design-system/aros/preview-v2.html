@@ -1841,7 +1841,7 @@
     };
   }
 
-  // ---------- 全市场扫描(实时 · 东方财富 push2) ----------
+  // ---------- 全市场扫描(东财延迟行情 push2delay · 与板块资金流同源) ----------
   function jsonpEM(url, cbName) {
     return new Promise((resolve, reject) => {
       const name = '__emcb_' + cbName;
@@ -2188,7 +2188,7 @@
   let MS_ALL = null, MS_LOADING = false;
   function msEMUrl(pn) {
     const PZ = 500;
-    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6';
+    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6';
   }
   // ---------- Alpha 雷达动态标的池(东方财富实时排名,零写死) ----------
   let MARKET_POOL = [];
@@ -2196,7 +2196,7 @@
   let POOL_FALLBACK = false;
   function poolEMUrl() {
     // 全市场 A 股 · 主力净流入榜 top 30(含行业/现价/涨跌幅/主力净流入/换手)
-    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6,f100';
+    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6,f100';
   }
   function fetchPool() {
     if (POOL_READY) return Promise.resolve(MARKET_POOL);
