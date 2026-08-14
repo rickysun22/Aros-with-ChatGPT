@@ -1611,7 +1611,7 @@
       ]
     },
     marketscan: {
-      icon: '🌐', title: '全市场扫描', sub: '实时全市场 5548 只 · 涨跌幅/换手/成交额/主力净流入 排行',
+      icon: '🌐', title: '全市场扫描', sub: '实时全市场 A 股(含北交所) · 涨跌幅/换手/成交额/主力净流入 排行',
       blocks: [
         { t: 'marketscan', d: {} }
       ]
@@ -1979,6 +1979,8 @@
   function refreshIndexBlocks() {
     const mkt = document.getElementById('mkt-indices');
     if (!mkt) return;
+    // 触发全市场扫描(含北交所)预拉取,供概览"全A"涨跌家数/成交额/温度使用(只触发一次)
+    if (!MS_ALL && !MS_LOADING) { loadMarketScan('f3', 'desc', false); }
     const now = new Date();
     const today = (now.getMonth() + 1) + '/' + now.getDate();
     const idxBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'index'; });
@@ -2102,6 +2104,7 @@
         };
       });
       applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: upCnt, dnCnt: dnCnt }, '东方财富');
+      applyAAllAggregate(); // 若全市场扫描(含北交所)已就绪,用全A口径覆盖沪深口径
       setSync('数据已同步 · 东方财富 · ' + today + ' ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
       loadSparks(function (sec) {
         const cb = '__emcb_ix' + sec.secid.split('.')[1];
@@ -2127,6 +2130,7 @@
         });
         const items = buildItems(function (sec) { return byTx[sec.tx]; });
         applyIndexData(items, { volSum: volSum, volOk: volOk, upCnt: 0, dnCnt: 0 }, '腾讯');
+        applyAAllAggregate(); // 若全市场扫描(含北交所)已就绪,用全A口径覆盖沪深口径
         setSync('数据已同步 · 腾讯 · ' + today + ' ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
         loadSparks(function (sec) { return txKline(sec.tx, 10); });
       }).catch(function () { setSync('行情源不可达 · 显示快照'); });
@@ -2184,7 +2188,7 @@
   let MS_ALL = null, MS_LOADING = false;
   function msEMUrl(pn) {
     const PZ = 500;
-    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f62,f184,f6';
+    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6';
   }
   // ---------- Alpha 雷达动态标的池(东方财富实时排名,零写死) ----------
   let MARKET_POOL = [];
@@ -2192,7 +2196,7 @@
   let POOL_FALLBACK = false;
   function poolEMUrl() {
     // 全市场 A 股 · 主力净流入榜 top 30(含行业/现价/涨跌幅/主力净流入/换手)
-    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23&fields=f12,f14,f2,f3,f62,f184,f6,f100';
+    return 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6,f100';
   }
   function fetchPool() {
     if (POOL_READY) return Promise.resolve(MARKET_POOL);
@@ -2234,6 +2238,38 @@
     return '涨跌家数 <b class="up">' + up + '</b> / <b class="down">' + down + '</b> / ' + flat +
       ' &nbsp;|&nbsp; 涨停 <b class="up">' + lu + '</b> / 跌停 <b class="down">' + ld + '</b> &nbsp;|&nbsp; 全市场 ' + all.length + ' 只';
   }
+  // 概览"全A(沪深京)"涨跌家数/成交额/温度:复用全市场扫描 MS_ALL(含北交所)实时计数,与扫描模块自洽
+  function applyAAllAggregate() {
+    const mkt = document.getElementById('mkt-indices');
+    const cardsBlock = INDEX_BLOCKS.find(function (b) { return b.t === 'cards'; });
+    if (!cardsBlock) return false;
+    if (!MS_ALL || !MS_ALL.length) return false; // 扫描未就绪:概览暂用沪深口径(MKT_SECS 已填),待扫描完成再覆盖
+    let up = 0, down = 0, flat = 0, volSum = 0;
+    MS_ALL.forEach(function (x) {
+      const p = x.f3 == null ? 0 : x.f3;
+      if (p > 0) up++; else if (p < 0) down++; else flat++;
+      if (x.f6 != null && x.f6 > 0) volSum += x.f6;
+    });
+    const cards = cardsBlock.d;
+    cards[0] = { title: '涨跌家数', val: up + ' 涨 / ' + down + ' 跌', note: '全A·沪深京 · 实时', color: up >= down ? '#16a34a' : '#dc2626' };
+    cards[1] = { title: '全A成交', val: (volSum / 1e8).toFixed(0) + ' 亿', note: '沪深京合计 · 实时', color: '#722ED1' };
+    const tot = up + down;
+    if (tot > 0) {
+      const t = Math.round(up / tot * 100);
+      cards[2] = { title: '市场温度', val: t + '° ' + (t >= 65 ? '过热' : t >= 50 ? '偏热' : t >= 35 ? '中性' : t >= 20 ? '偏冷' : '冰点'), note: '全A口径 · 上涨占比推导', color: t >= 65 ? '#F5222D' : t >= 50 ? '#FA8C16' : t >= 35 ? '#722ED1' : '#52C41A' };
+    }
+    if (mkt) {
+      const pc = mkt.querySelectorAll('.pg-card');
+      const setCard = function (i, c) {
+        if (!c || !pc[i]) return;
+        const v = pc[i].querySelector('.pg-card-v'); if (v) v.textContent = c.val;
+        const n = pc[i].querySelector('.pg-card-n'); if (n) n.textContent = c.note;
+        pc[i].style.borderTop = '2px solid ' + c.color;
+      };
+      setCard(0, cards[0]); setCard(1, cards[1]); setCard(2, cards[2]);
+    }
+    return true;
+  }
   function loadMarketScan(sortKey, dir, force) {
     const statusEl = document.getElementById('msStatus');
     const tbody = document.getElementById('msTbody');
@@ -2254,6 +2290,7 @@
         MS_ALL = all;
         renderMarketScan(sortKey, dir);
         if (breadth) breadth.innerHTML = msBreadth(all);
+        applyAAllAggregate(); // 扫描完成→概览"全A"涨跌家数/成交额/温度立即覆盖
       });
     }).then(() => { MS_LOADING = false; }, () => { MS_LOADING = false; })
       .catch(e => {
@@ -2301,7 +2338,7 @@
       '<div class="ms-tabs">' + tabHtml + '</div>' +
       '<div class="ms-status" id="msStatus">点击榜单或刷新,拉取全市场实时行情(东方财富公开接口)…</div>' +
       '<div class="pg-table ms-table"><table><thead><tr><th>#</th><th>代码</th><th>名称</th><th>现价</th><th>涨跌幅</th><th>换手率</th><th>成交额(亿)</th><th>主力净流入(亿)</th></tr></thead><tbody id="msTbody"><tr><td colspan="8" class="ms-empty">尚未加载</td></tr></tbody></table></div>' +
-      '<div class="bt-note">数据来源:东方财富 push2 实时行情,浏览器端免密钥拉取,覆盖全市场 5548 只 A 股;按所选维度客户端排序取前 100;涨跌家数 / 涨跌停以全市场实时计数。预览面板若拦截外部请求,请用本机浏览器直接打开本文件(file://)。</div></div>';
+      '<div class="bt-note">数据来源:东方财富 push2 实时行情,浏览器端免密钥拉取,覆盖全市场 A 股(含北交所);按所选维度客户端排序取前 100;涨跌家数 / 涨跌停以全市场实时计数。预览面板若拦截外部请求,请用本机浏览器直接打开本文件(file://)。</div></div>';
   }
 
   // ---------- 回测系统:真实回测引擎接线 ----------
