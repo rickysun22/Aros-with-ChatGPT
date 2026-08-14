@@ -2009,7 +2009,7 @@
       items.forEach(function (it, i) {
         if (!cards[i]) return;
         const cv = cards[i].querySelector('.ich-cv');
-        if (cv) cv.textContent = it.v;
+        if (cv) { cv.textContent = it.v; cv.className = 'ich-cv ' + (it.chg.charAt(0) === '-' ? 'down' : 'up'); }
         const cd = cards[i].querySelector('.ich-cd');
         if (cd) { cd.textContent = it.chg + '  ' + it.pct; cd.className = 'ich-cd ' + (it.chg.charAt(0) === '-' ? 'down' : 'up'); }
         const ce = cards[i].querySelector('.ich-ex');
