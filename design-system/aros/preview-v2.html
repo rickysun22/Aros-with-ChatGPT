@@ -1518,9 +1518,9 @@
       { n: '科创 50', v: '1,709.50', chg: '-28.27', pct: '-1.63%', c: '#13C2C2', extra: '成交 1,104 亿', px: [1678.74, 1588.41, 1635.96, 1552.89, 1616.36, 1693.67, 1701.29, 1744.02, 1737.77, 1709.50] }
     ] } },
     { t: 'cards', d: [
-      { title: '涨跌家数', val: '1,615 涨 / 3,777 跌', note: '涨停 54 · 跌停 0', color: '#16a34a' },
-      { title: '两市成交', val: '23,210 亿', note: '较 5 日均 -8.6%', color: '#722ED1' },
-      { title: '市场温度', val: '22° 偏冷', note: '快照口径 22/100 · 截至 2026-08-11', color: '#FF9800' }
+      { title: '涨跌家数', val: '1,615 涨 / 3,777 跌', note: '涨停 54 · 跌停 0 (演示)', color: '#16a34a' },
+      { title: '两市成交', val: '23,210 亿', note: '较 5 日均 -8.6% (演示)', color: '#722ED1' },
+      { title: '市场温度', val: '22° 偏冷', note: '演示快照 · 联网后实时覆盖', color: '#FF9800' }
     ] },
     { t: 'flowchart', d: { title: '板块资金流向 · 主力净流入(亿元,真实 2026-08-11)', dates5: ['08/05','08/06','08/07','08/08','08/11'], dates10: ['07/28','07/29','07/30','07/31','08/03','08/04','08/05','08/06','08/07','08/11'], groups: [
 { n: '通信设备', c: '#FF4D4F', day: 16.5, d5: [67.1], d10: [-199.6], px: [8943.28, 8176.43, 8556.44, 8586.87, 9509.41, 9321.22, 9459.89, 9489.55, 9141.59, 9263.65] },
@@ -1764,20 +1764,81 @@
   }
 
   // ---------- 风险监控(真实数据驱动) ----------
+  // 实时维度:从全市场扫描 MS_ALL 推导 大盘情绪(涨股比/涨跌比/涨停跌停/上涨家数)与 资金量能(全A成交额)
+  function riskLiveDims() {
+    if (!MS_ALL || !MS_ALL.length) return null;
+    let up = 0, down = 0, flat = 0, lu = 0, ld = 0, volSum = 0;
+    MS_ALL.forEach(function (x) {
+      const p = (x.f3 == null) ? 0 : x.f3;
+      if (p > 0) up++; else if (p < 0) down++; else flat++;
+      if (p >= 9.9) lu++; if (p <= -9.9) ld++;
+      if (x.f6 != null && x.f6 > 0) volSum += x.f6;
+    });
+    const tot = up + down + flat;
+    const upRatio = tot > 0 ? up / tot * 100 : 0;
+    const ratio = down > 0 ? up / down : (up > 0 ? 999 : 0);
+    const volYi = volSum / 1e8, volTr = volYi / 1e4;
+    const sScore = Math.max(2, Math.min(98, Math.round(upRatio)));
+    const sLevel = sScore >= 60 ? '偏多' : (sScore >= 45 ? '中性' : '偏空');
+    const fScore = Math.max(5, Math.min(95, Math.round(50 + (volTr - 2) * 30)));
+    const fLevel = fScore >= 60 ? '偏多' : (fScore >= 45 ? '中性' : '偏弱');
+    return {
+      ready: true,
+      sentiment: {
+        name: '大盘情绪', score: sScore, level: sLevel,
+        status: '涨股比 ' + upRatio.toFixed(1) + '%,涨跌比 ' + ratio.toFixed(2) + ',涨停 ' + lu + '/跌停 ' + ld + ',上涨 ' + up + ' 只(实时 · 全A沪深京)',
+        metrics: [
+          { t: '涨股比', v: upRatio.toFixed(1) + '%' },
+          { t: '涨跌比', v: ratio.toFixed(2) },
+          { t: '涨停/跌停', v: lu + ' / ' + ld },
+          { t: '上涨家数', v: up + ' / ' + MS_ALL.length }
+        ]
+      },
+      fund: {
+        name: '资金量能', score: fScore, level: fLevel,
+        status: '全A成交 ' + volTr.toFixed(2) + ' 万亿(实时 · 东财 push2delay)',
+        metrics: [
+          { t: '成交额', v: volTr.toFixed(2) + ' 万亿' },
+          { t: '全A样本', v: MS_ALL.length + ' 只' },
+          { t: '上涨占比', v: upRatio.toFixed(1) + '%' }
+        ]
+      }
+    };
+  }
   function riskHtml() {
     const R = (typeof RISK_DATA !== 'undefined') ? RISK_DATA : { composite: 0, verdict: '数据未接入', verdictLevel: 'warn', dims: {}, reasons: [], extra: {}, source: '', date: '' };
-    const band = R.verdictLevel === 'up' ? '#16a34a' : (R.verdictLevel === 'warn' ? '#f59e0b' : '#dc2626');
+    const mdLive = marginLiveDim();
+    const liveDims = riskLiveDims();
+    // 维度视图:实时优先(情绪/资金→MS_ALL,两融→MG_EM),缺失回退静态
+    const dimsView = {
+      sentiment: (liveDims && liveDims.sentiment) ? liveDims.sentiment : R.dims.sentiment,
+      fund: (liveDims && liveDims.fund) ? liveDims.fund : R.dims.fund,
+      margin: (mdLive) ? mdLive : R.dims.margin,
+      external: R.dims.external
+    };
+    // 混合评分(实时覆盖写死维度)→ 重算机会指数与结论
+    const dimScores = {};
+    ['sentiment', 'fund', 'margin', 'external'].forEach(function (k) {
+      const d = dimsView[k];
+      if (d && d.score != null) dimScores[k] = d.score;
+    });
+    const scArr = Object.keys(dimScores).map(function (k) { return dimScores[k]; });
+    const composite = scArr.length ? Math.round(scArr.reduce(function (a, b) { return a + b; }, 0) / scArr.length) : R.composite;
+    const vLevel = composite >= 60 ? 'up' : (composite >= 45 ? 'warn' : 'down');
+    const verdictMap = { up: '机会偏多', warn: '中性观望', down: '风险偏多' };
+    const band = vLevel === 'up' ? '#16a34a' : (vLevel === 'warn' ? '#f59e0b' : '#dc2626');
+    const verdict = verdictMap[vLevel];
     const dimOrder = ['sentiment', 'fund', 'margin', 'external'];
     const dimIcon = { sentiment: '😰', fund: '💧', margin: '🔗', external: '🌐' };
-    const mdLive = marginLiveDim();
-    const cards = dimOrder.map(k => {
-      const d = (k === 'margin' && mdLive) ? mdLive : R.dims[k]; if (!d) return '';
+    const isLive = function (k) { return (k === 'margin' && mdLive) || ((k === 'sentiment' || k === 'fund') && liveDims); };
+    const cards = dimOrder.map(function (k) {
+      const d = dimsView[k]; if (!d) return '';
       const has = (d.score != null);
       const sc = has ? d.score : 50;
       const col = !has ? '#94a3b8' : (sc >= 60 ? '#16a34a' : (sc >= 45 ? '#f59e0b' : '#dc2626'));
-      const metrics = (d.metrics || []).map(m => '<div class="risk-m"><span>' + m.t + '</span><b>' + m.v + '</b></div>').join('');
+      const metrics = (d.metrics || []).map(function (m) { return '<div class="risk-m"><span>' + m.t + '</span><b>' + m.v + '</b></div>'; }).join('');
       const spark = (k === 'margin' && mdLive && mdLive.spark) ? '<div class="risk-spark">' + sparkline(mdLive.spark, 300, 64, '#f59e0b') + '</div>' : '';
-      const liveTag = (k === 'margin' && mdLive) ? ' <span class="risk-live">实时</span>' : '';
+      const liveTag = isLive(k) ? ' <span class="risk-live">实时</span>' : '';
       return '<div class="risk-card"' + (k === 'margin' ? ' id="riskCardMargin"' : '') + '>' +
         '<div class="risk-card-t"><span class="risk-ic">' + dimIcon[k] + '</span>' + d.name + liveTag + '</div>' +
         (has
@@ -1789,18 +1850,24 @@
         spark +
         '</div>';
     }).join('');
-    const reasons = (R.reasons || []).map(r => '<li>' + r + '</li>').join('');
+    const reasons = (liveDims ? [
+      '大盘情绪(实时):涨股比 ' + liveDims.sentiment.metrics[0].v + ',上涨 ' + liveDims.sentiment.metrics[3].v + ' 只,广度' + (liveDims.sentiment.score >= 45 ? '尚可' : '偏弱'),
+      '资金量能(实时):全A成交 ' + liveDims.fund.metrics[0].v + ',' + (liveDims.fund.score >= 45 ? '量能有支撑' : '量能偏弱')
+    ] : (R.reasons || [])).map(function (r) { return '<li>' + r + '</li>'; }).join('');
     const ex = R.extra || {};
-    const valHtml = ex.valuation ? ('<div class="risk-extra-card"><div class="rec-t">估值水位</div><div class="rec-b">中证全指 PE(TTM) <b>' + ex.valuation.pe + '</b> · 10年分位 <b>' + ex.valuation.pePct10y + '%</b> · ' + ex.valuation.level + '</div></div>') : '';
-    const techHtml = ex.technical ? ('<div class="risk-extra-card"><div class="rec-t">技术面</div><div class="rec-b">RSI6 <b>' + ex.technical.rsi6 + '</b> · MACD(DIF) <b>' + ex.technical.macd + '</b> · 中长期趋势 <b>' + ex.technical.trendLong + '</b> · ' + ex.technical.ma + '</div></div>') : '';
-    const srcHtml = '<div class="risk-extra-card"><div class="rec-t">数据来源</div><div class="rec-b">' + (R.source || '') + ' · 快照 ' + (R.date || '') + '</div></div>';
+    const valHtml = ex.valuation ? ('<div class="risk-extra-card"><div class="rec-t">估值水位(演示)</div><div class="rec-b">中证全指 PE(TTM) <b>' + ex.valuation.pe + '</b> · 10年分位 <b>' + ex.valuation.pePct10y + '%</b> · ' + ex.valuation.level + '</div></div>') : '';
+    const techHtml = ex.technical ? ('<div class="risk-extra-card"><div class="rec-t">技术面(演示)</div><div class="rec-b">RSI6 <b>' + ex.technical.rsi6 + '</b> · MACD(DIF) <b>' + ex.technical.macd + '</b> · 中长期趋势 <b>' + ex.technical.trendLong + '</b> · ' + ex.technical.ma + '</div></div>') : '';
+    const srcHtml = '<div class="risk-extra-card"><div class="rec-t">数据来源</div><div class="rec-b">情绪/资金/两融:实时(全A扫描 + 内嵌两融序列);外围/估值/技术:演示快照 ' + (R.date || '') + '</div></div>';
+    const snap = liveDims
+      ? '✅ 大盘情绪 / 资金量能 / 两融余额 已接实时(全A沪深京扫描 + 内嵌两融序列);外围影响 / 估值 / 技术面仍为演示快照,非实时。'
+      : '⚠️ 全A扫描未就绪,情绪/资金维度暂用演示快照;两融维度由内嵌真实序列推导。联网打开本文件将自动加载实时行情。';
     return '' +
       '<div class="risk-banner" style="border-color:' + band + '">' +
-        '<div class="risk-banner-l"><div class="risk-banner-num" style="color:' + band + '">' + R.composite + '</div><div class="risk-banner-lab">机会指数 / 100</div></div>' +
-        '<div class="risk-banner-r"><div class="risk-badge" style="background:' + band + '">' + (R.verdictLevel === 'up' ? '🟢 ' : (R.verdictLevel === 'warn' ? '🟡 ' : '🔴 ')) + R.verdict + '</div>' +
-        '<div class="risk-banner-sub">' + (R.summary || '') + '</div></div>' +
+        '<div class="risk-banner-l"><div class="risk-banner-num" style="color:' + band + '">' + composite + '</div><div class="risk-banner-lab">机会指数 / 100</div></div>' +
+        '<div class="risk-banner-r"><div class="risk-badge" style="background:' + band + '">' + (vLevel === 'up' ? '🟢 ' : (vLevel === 'warn' ? '🟡 ' : '🔴 ')) + verdict + '</div>' +
+        '<div class="risk-banner-sub">机会指数由 情绪/资金/两融/外围 四维混合评分(实时优先)推导</div></div>' +
       '</div>' +
-      '<div class="risk-snap">⚠️ 本页为静态快照(截至 ' + (R.date || '—') + '),非实时更新;两融维度除外(运行时由内嵌真实序列推导)。</div>' +
+      '<div class="risk-snap">' + snap + '</div>' +
       '<div class="risk-grid">' + cards + '</div>' +
       '<div class="pg-panel"><div class="pg-panel-t">🧭 信号解读</div><ul class="risk-reasons">' + reasons + '</ul></div>' +
       '<div class="risk-extra">' + valHtml + techHtml + srcHtml + '</div>';
@@ -1818,8 +1885,14 @@
     const last = bal[n - 1], prev5 = bal[Math.max(0, n - 6)], prev20 = bal[Math.max(0, n - 21)];
     const chg20 = (last / prev20 - 1) * 100;
     const buy = rzmre[n - 1];
-    const fundM = (RISK_DATA.dims.fund.metrics || []).find(function (m) { return m.t === '成交额'; });
-    const turnYi = fundM ? parseFloat(String(fundM.v).replace(/,/g, '')) * 1e4 : null;
+    let turnYi = null;
+    if (MS_ALL && MS_ALL.length) {
+      let v = 0; MS_ALL.forEach(function (x) { if (x.f6 != null && x.f6 > 0) v += x.f6; });
+      turnYi = v / 1e8; // 亿元(实时 · 全A沪深京扫描)
+    } else {
+      const fundM = (RISK_DATA.dims.fund.metrics || []).find(function (m) { return m.t === '成交额'; });
+      turnYi = fundM ? parseFloat(String(fundM.v).replace(/,/g, '')) * 1e4 : null;
+    }
     const buyRatio = (turnYi && turnYi > 0) ? (buy / turnYi * 100) : null;
     let score = 50 + chg20 * 6; score = Math.max(5, Math.min(95, score));
     const level = score >= 60 ? '偏多' : (score >= 45 ? '中性' : '偏空');
@@ -2186,22 +2259,34 @@
     return arr.slice(0, K || 100);
   }
   let MS_ALL = null, MS_LOADING = false;
+  // 纯 A 股判定(沪 60/688 · 深 00/30 · 北交所 8/92),排除 B 股(900/200)、老三板(4xxxx)、ETF/可转债等
+  function isAShare(code) {
+    if (!code) return false;
+    if (/^60\d{4}$/.test(code)) return true;        // 沪市主板 600/601/603/605
+    if (/^68[89]\d{3}$/.test(code)) return true;    // 科创板 688/689
+    if (/^00\d{4}$/.test(code)) return true;        // 深市主板 000/001/002/003
+    if (/^30\d{4}$/.test(code)) return true;        // 创业板 300/301/302...
+    if (/^8\d{5}$/.test(code)) return true;         // 北交所 8xxxxx
+    if (/^92\d{4}$/.test(code)) return true;        // 北交所 92xxxx
+    return false;
+  }
   function msEMUrl(pn) {
     const PZ = 500;
-    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6';
+    // 纯 A 股口径(沪深京):沪A(m:0+t:1)+深A(m:1+t:1)+北交所(m:0+t:81),不含 ETF/基金/可转债/B股
+    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=' + pn + '&pz=' + PZ + '&po=1&np=1&fltt=2&invt=2&fid=f3&fs=m:0+t:1,m:1+t:1,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6';
   }
   // ---------- Alpha 雷达动态标的池(东方财富实时排名,零写死) ----------
   let MARKET_POOL = [];
   let POOL_READY = false;
   let POOL_FALLBACK = false;
   function poolEMUrl() {
-    // 全市场 A 股 · 主力净流入榜 top 30(含行业/现价/涨跌幅/主力净流入/换手)
-    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6,f100';
+    // 纯 A 股 · 主力净流入榜 top 30(含行业/现价/涨跌幅/主力净流入/换手)
+    return 'https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=m:0+t:1,m:1+t:1,m:0+t:81&fields=f12,f14,f2,f3,f62,f184,f6,f100';
   }
   function fetchPool() {
     if (POOL_READY) return Promise.resolve(MARKET_POOL);
     return jsonpEM(poolEMUrl(), 'pool').then(function (d) {
-      const diff = (d && d.data && d.data.diff) || [];
+      const diff = ((d && d.data && d.data.diff) || []).filter(function (x) { return isAShare(x.f12); });
       if (!diff.length) throw new Error('empty');
       MARKET_POOL = diff.map(function (x) {
         const inflowYi = (x.f62 != null) ? x.f62 / 1e8 : 0;
@@ -2277,7 +2362,7 @@
     if (MS_ALL && !force) { renderMarketScan(sortKey, dir); return; }
     if (MS_LOADING) return;
     MS_LOADING = true;
-    if (statusEl) statusEl.textContent = '正在拉取全市场实时行情(' + (MS_ALL ? MS_ALL.length : '5548') + ' 只)…';
+    if (statusEl) statusEl.textContent = '正在拉取全A(沪深京)实时行情(' + (MS_ALL ? MS_ALL.length : '5700') + ' 只)…';
     if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="ms-empty">加载中…</td></tr>';
     jsonpEM(msEMUrl(1), 'ms1').then(d => {
       const total = (d && d.data && d.data.total) || 0;
@@ -2286,11 +2371,12 @@
       for (let pn = 1; pn <= pages; pn++) reqs.push(jsonpEM(msEMUrl(pn), 'ms' + pn));
       return Promise.all(reqs).then(arrs => {
         const all = [];
-        arrs.forEach(a => { if (a && a.data && a.data.diff) a.data.diff.forEach(x => all.push(x)); });
+        arrs.forEach(a => { if (a && a.data && a.data.diff) a.data.diff.forEach(x => { if (isAShare(x.f12)) all.push(x); }); });
         MS_ALL = all;
         renderMarketScan(sortKey, dir);
         if (breadth) breadth.innerHTML = msBreadth(all);
         applyAAllAggregate(); // 扫描完成→概览"全A"涨跌家数/成交额/温度立即覆盖
+        if (CUR_PAGE === 'risk') renderPage('risk'); // 风险看板实时情绪/资金维度随扫描就绪刷新
       });
     }).then(() => { MS_LOADING = false; }, () => { MS_LOADING = false; })
       .catch(e => {
@@ -8179,6 +8265,7 @@ const RISK_DATA = {
     const target = document.getElementById('page-' + id);
     if (target) target.style.display = 'flex';
     if (id === 'marketscan') { const at = document.querySelector('.ms-tab.active'); loadMarketScan(at ? at.dataset.k : 'f3', at ? at.dataset.dir : 'desc', false); }
+    if (id === 'risk') { renderPage('risk'); } // 打开风险看板时按最新全A扫描重算实时维度
     if (id === 'backtest') renderBacktestLab();
     if (id === 'sim') renderSimReal();
     if (id === 'watchlist') refreshLivePrices();
