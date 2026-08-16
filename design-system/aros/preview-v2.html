@@ -262,18 +262,6 @@
   .radar-foot { display: flex; gap: 16px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(51,65,85,0.45); font-size: 10.5px; color: var(--dim); }
   .radar-foot b { color: #7EA6FF; font-family: 'Fira Code'; font-size: 12px; }
   .radar-foot span:last-child { margin-left: auto; color: var(--faint); font-family: 'Fira Code'; }
-  .signal-flow { margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(51,65,85,0.45); flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .sf-head { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: var(--sub); font-weight: 600; margin-bottom: 8px; }
-  .sf-live { font-family: 'Fira Code'; font-size: 9px; color: #FFB74D; background: rgba(255,152,0,0.12); padding: 2px 8px; border-radius: 8px; }
-  .sf-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(51,65,85,0.3); font-size: 11px; }
-  .sf-item:last-child { border-bottom: none; }
-  .sf-ic { font-size: 12px; flex-shrink: 0; }
-  .sf-t { color: var(--fg); font-weight: 500; white-space: nowrap; }
-  .sf-x { color: var(--dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sf-s { font-family: 'Fira Code'; font-size: 10px; padding: 1px 7px; border-radius: 8px; flex-shrink: 0; }
-  .sf-s.hot { color: #FF7875; background: rgba(255,77,79,0.15); }
-  .sf-s.blue { color: #40A9FF; background: rgba(41,98,255,0.15); }
-  .sf-s.warn { color: #FFB74D; background: rgba(255,152,0,0.15); }
 
   /* ===== AI INSIGHTS ===== */
   .ai-title { display: flex; align-items: center; gap: 8px; }
@@ -1122,10 +1110,6 @@
                               <tbody id="mktTbody"><tr><td colspan="9" class="ms-empty">实时拉取动态标的池与真实行情中…</td></tr></tbody>
         </table>
         <div class="intel-note" id="mktPoolNote" style="margin:8px 0 0;">实时数据加载中…</div>
-        </div>
-        <div class="signal-flow">
-          <div class="sf-head"><span>⚡ 今日信号流</span><span class="sf-live">LIVE · 08:30</span></div>
-          <div id="sfList"></div>
         </div>
         <div class="radar-foot">
           <span>⚡ 今日组合平均 Alpha <b id="mktAvgAlpha">—</b></span>
@@ -7740,21 +7724,6 @@ const RISK_DATA = {
         '</tr>';
     }).join('');
 
-    const sigList = document.getElementById('sfList');
-    if (sigList) {
-      sigList.innerHTML = list.map(function (s) {
-        const sigs = [];
-        if (s.rep) sigs.push({ ic: '📄', x: '机构研报 ' + s.rep.count + ' 篇 · ' + s.rep.buys + ' 家买入', s: '机构', c: 'blue' });
-        sigs.push({ ic: '📈', x: '技术评分 ' + s.tech + ' · ' + (s.chg >= 0 ? '均线多头' : '均线偏弱'), s: '技术', c: 'hot' });
-        sigs.push({ ic: '⚡', x: '20 日动量 ' + (s.mom20 >= 0 ? '+' : '') + s.mom20.toFixed(1) + '% · RSI ' + s.rsi, s: '动量', c: 'blue' });
-        sigs.push({ ic: '🎯', x: '概念: ' + s.con, s: '主题', c: 'warn' });
-        return sigs.map(function (g) {
-          return '<div class="sf-item"><span class="sf-ic">' + g.ic + '</span>' +
-            '<span class="sf-t">' + s.name + '</span><span class="sf-x">' + g.x + '</span>' +
-            '<span class="sf-s ' + g.c + '">' + g.s + '</span></div>';
-        }).join('');
-      }).join('');
-    }
     const btn = document.getElementById('todayBtn');
     if (btn) btn.textContent = '今日 (' + list.length + ')';
 
