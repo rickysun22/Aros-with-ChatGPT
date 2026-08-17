@@ -322,6 +322,25 @@
   .th-div { margin-top: 8px; font-size: 10px; color: #7fb0e8; background: rgba(41,98,255,0.10); border-radius: 6px; padding: 5px 8px; line-height: 1.45; }
   .th-div b { color: #FFB74D; }
   .th-note { font-size: 9px; color: var(--faint); margin-top: 6px; font-style: italic; }
+  .pat-card { background: linear-gradient(180deg, rgba(124,58,237,0.09), rgba(15,23,42,0.6)); border: 1px solid rgba(179,157,219,0.32); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+  .pat-head { display: flex; align-items: center; gap: 10px; }
+  .pat-ic { font-size: 18px; }
+  .pat-head-l { flex: 1; min-width: 0; }
+  .pat-label { font-size: 9.5px; letter-spacing: 1px; color: #b39ddb; font-weight: 700; font-family: 'Fira Code'; }
+  .pat-prop { font-size: 12.5px; font-weight: 600; color: var(--fg); margin-top: 2px; line-height: 1.35; }
+  .pat-count { font-size: 10px; font-weight: 700; font-family: 'Fira Code'; color: #b39ddb; background: rgba(124,58,237,0.16); border: 1px solid rgba(124,58,237,0.4); border-radius: 10px; padding: 3px 9px; flex-shrink: 0; }
+  .pat-list { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .pat-empty { font-size: 11px; color: var(--faint); padding: 6px 2px; }
+  .pat-item { background: rgba(15,23,42,0.5); border: 1px solid rgba(51,65,85,0.4); border-radius: 8px; padding: 7px 9px; }
+  .pat-item-h { display: flex; align-items: center; justify-content: space-between; }
+  .pat-chip { font-size: 10.5px; font-weight: 700; border: 1px solid; border-radius: 6px; padding: 1px 7px; font-family: 'Fira Code'; }
+  .pat-conf { font-size: 11px; font-weight: 700; font-family: 'Fira Code'; }
+  .pat-title { font-size: 11.5px; font-weight: 600; color: var(--fg); margin-top: 4px; }
+  .pat-desc { font-size: 10px; line-height: 1.45; color: var(--sub); margin-top: 3px; }
+  .pat-levels { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 5px; }
+  .pat-lv { font-size: 9.5px; color: var(--dim); font-family: 'Fira Code'; }
+  .pat-lv b { color: var(--sub); font-weight: 600; margin-right: 3px; }
+  .pat-note { font-size: 9px; color: var(--faint); margin-top: 6px; font-style: italic; }
 
   /* ===== BOTTOM ROW ===== */
   .bottom-row { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; padding: 10px 12px 12px; min-height: 0; }
@@ -1181,6 +1200,18 @@
             </div>
             <div class="th-div" id="thDiv" style="display:none"></div>
             <div class="th-note">证据/反证/失效条件由真实五维评分 · 研报 · 资金流自动归类；反证为规则推导（非 AI 生成），失效条件为可观测触发线。</div>
+          </div>
+          <div class="pat-card" id="patternCard">
+            <div class="pat-head">
+              <span class="pat-ic">📐</span>
+              <div class="pat-head-l">
+                <div class="pat-label">形态识别 · PATTERN</div>
+                <div class="pat-prop" id="patProp">基于收盘价峰谷的规则识别（非 AI）</div>
+              </div>
+              <div class="pat-count" id="patCount">—</div>
+            </div>
+            <div class="pat-list" id="patList"><div class="pat-empty">点击左侧股票行，自动识别近期形态</div></div>
+            <div class="pat-note">形态识别基于真实前复权日线收盘价峰谷（规则引擎，非 AI 生成；数据仅含收盘价，颈线/目标位为技术测算，仅供参考，不构成投资建议）。</div>
           </div>
           <div class="ai-block">
             <div class="ai-label">📈 技术指标分析</div>
@@ -7977,9 +8008,110 @@ const RISK_DATA = {
     return { prop: prop, conf: conf, verdict: verdict, vcolor: vcolor, vbg: vbg, pro: pro, con: con, cond: cond, div: divTxt };
   }
 
+  // ---- 形态识别：收盘价峰谷规则引擎（非 AI，数据仅含收盘价） ----
+  function detectPatterns(csIn) {
+    var cs = (csIn || []).filter(function (v) { return isFinite(v); });
+    var n = cs.length, list = [], marks = [];
+    if (n < 14) return { list: list, marks: marks };
+    var W = 3, highs = [], lows = [];
+    for (var i = W; i < n - W; i++) {
+      var isH = true, isL = true;
+      for (var j = i - W; j <= i + W; j++) {
+        if (cs[j] > cs[i]) isH = false;
+        if (cs[j] < cs[i]) isL = false;
+      }
+      if (isH) highs.push({ i: i, p: cs[i] });
+      if (isL) lows.push({ i: i, p: cs[i] });
+    }
+    function rec(idx) { return idx >= n - 14 ? 1 : (idx >= n - 26 ? 0.6 : 0.25); }
+    function minIn(a, b) { var m = Infinity, mi = a; for (var k = a; k <= b; k++) { if (cs[k] < m) { m = cs[k]; mi = k; } } return { p: m, i: mi }; }
+    function maxIn(a, b) { var m = -Infinity, mi = a; for (var k = a; k <= b; k++) { if (cs[k] > m) { m = cs[k]; mi = k; } } return { p: m, i: mi }; }
+    // 振幅过滤：区间震荡不误判为反转形态
+    var lo = Math.min.apply(null, cs), hi = Math.max.apply(null, cs), amp = (hi - lo) / lo;
+    if (amp < 0.12) {
+      list.push({ type: '震荡', dir: 'neutral', conf: Math.round(55 + (0.12 - amp) / 0.12 * 25), title: '箱体震荡（方向待突破）',
+        desc: '近 ' + n + ' 个交易日波动幅度仅 ' + (amp * 100).toFixed(1) + '%，呈区间整理（' + lo.toFixed(2) + '–' + hi.toFixed(2) + '），等待方向选择。',
+        levels: [{ label: '上沿', price: hi.toFixed(2) }, { label: '下沿', price: lo.toFixed(2) }] });
+      marks.push({ i: n - 1, p: hi, kind: 'neck', dir: 'bull' }, { i: n - 1, p: lo, kind: 'neck', dir: 'bear' });
+      return { list: list.slice(0, 3), marks: marks };
+    }
+    // 双顶
+    (function () {
+      for (var a = 0; a < highs.length - 1; a++) for (var b = a + 1; b < highs.length; b++) {
+        var h1 = highs[a], h2 = highs[b];
+        if (h2.i - h1.i < 4 || h2.i - h1.i > 30) continue;
+        var sp = Math.abs(h1.p - h2.p) / h1.p;
+        if (sp > 0.04 || h2.p > h1.p * 1.04) continue;
+        var v = minIn(h1.i, h2.i), neck = v.p, lastP = cs[n - 1], broken = lastP < neck;
+        var conf = Math.max(40, Math.min(92, 52 + Math.round((0.04 - sp) / 0.04 * 18) + Math.round(rec(h2.i) * 16) + (broken ? 10 : 0)));
+        list.push({ type: '双顶', dir: 'bearish', conf: conf, title: '双顶（看空反转）',
+          desc: '近 ' + (h2.i - h1.i) + ' 个交易日出现两个相近高点（' + h1.p.toFixed(2) + ' / ' + h2.p.toFixed(2) + '），' + (broken ? '已跌破颈线 ' + neck.toFixed(2) + '，形态成立。' : '颈线 ' + neck.toFixed(2) + ' 未破，仍待确认。'),
+          levels: [{ label: '颈线', price: neck.toFixed(2) }, { label: '测距目标', price: (neck - (Math.max(h1.p, h2.p) - neck)).toFixed(2) }] });
+        marks.push({ i: h1.i, p: h1.p, dir: 'bearish' }, { i: h2.i, p: h2.p, dir: 'bearish' }, { i: v.i, p: neck, kind: 'neck', dir: 'bear' });
+        return;
+      }
+    })();
+    // 双底
+    (function () {
+      for (var a = 0; a < lows.length - 1; a++) for (var b = a + 1; b < lows.length; b++) {
+        var l1 = lows[a], l2 = lows[b];
+        if (l2.i - l1.i < 4 || l2.i - l1.i > 30) continue;
+        var sp = Math.abs(l1.p - l2.p) / l1.p;
+        if (sp > 0.05 || l2.p < l1.p * 0.95) continue;
+        var v = maxIn(l1.i, l2.i), neck = v.p, lastP = cs[n - 1], broken = lastP > neck;
+        var conf = Math.max(40, Math.min(92, 52 + Math.round((0.05 - sp) / 0.05 * 18) + Math.round(rec(l2.i) * 16) + (broken ? 10 : 0)));
+        list.push({ type: '双底', dir: 'bullish', conf: conf, title: '双底（看多反转）',
+          desc: '近 ' + (l2.i - l1.i) + ' 个交易日出现两个相近低点（' + l1.p.toFixed(2) + ' / ' + l2.p.toFixed(2) + '），' + (broken ? '已突破颈线 ' + neck.toFixed(2) + '，形态成立。' : '颈线 ' + neck.toFixed(2) + ' 未破，仍待确认。'),
+          levels: [{ label: '颈线', price: neck.toFixed(2) }, { label: '测距目标', price: (neck + (neck - Math.min(l1.p, l2.p))).toFixed(2) }] });
+        marks.push({ i: l1.i, p: l1.p, dir: 'bullish' }, { i: l2.i, p: l2.p, dir: 'bullish' }, { i: v.i, p: neck, kind: 'neck', dir: 'bull' });
+        return;
+      }
+    })();
+    // 头肩顶
+    (function () {
+      if (highs.length < 3) return;
+      for (var a = 0; a < highs.length - 2; a++) for (var b = a + 1; b < highs.length - 1; b++) for (var c2 = b + 1; c2 < highs.length; c2++) {
+        var LS = highs[a], Hh = highs[b], RS = highs[c2];
+        if (!(Hh.i > LS.i && Hh.i < RS.i)) continue;
+        if (Hh.p <= LS.p || Hh.p <= RS.p) continue;
+        var sh = Math.abs(LS.p - RS.p) / LS.p;
+        if (sh > 0.10 || RS.i - LS.i > 40) continue;
+        var v1 = minIn(LS.i, Hh.i), v2 = minIn(Hh.i, RS.i), neck = (v1.p + v2.p) / 2, lastP = cs[n - 1], broken = lastP < neck;
+        var conf = Math.max(42, Math.min(93, 50 + Math.round((0.10 - sh) / 0.10 * 16) + Math.round(rec(RS.i) * 14) + (broken ? 12 : 0)));
+        list.push({ type: '头肩顶', dir: 'bearish', conf: conf, title: '头肩顶（看空反转）',
+          desc: '左肩 ' + LS.p.toFixed(2) + ' / 头部 ' + Hh.p.toFixed(2) + '（最高） / 右肩 ' + RS.p.toFixed(2) + '，两肩相近；' + (broken ? '已跌破颈线 ' + neck.toFixed(2) + '，形态成立。' : '颈线 ' + neck.toFixed(2) + ' 未破，待确认。'),
+          levels: [{ label: '颈线', price: neck.toFixed(2) }, { label: '测距目标', price: (neck - (Hh.p - neck)).toFixed(2) }] });
+        marks.push({ i: LS.i, p: LS.p, dir: 'bearish' }, { i: Hh.i, p: Hh.p, dir: 'bearish' }, { i: RS.i, p: RS.p, dir: 'bearish' }, { i: Hh.i, p: neck, kind: 'neck', dir: 'bear' });
+        return;
+      }
+    })();
+    // 头肩底
+    (function () {
+      if (lows.length < 3) return;
+      for (var a = 0; a < lows.length - 2; a++) for (var b = a + 1; b < lows.length - 1; b++) for (var c2 = b + 1; c2 < lows.length; c2++) {
+        var LS = lows[a], Hh = lows[b], RS = lows[c2];
+        if (!(Hh.i > LS.i && Hh.i < RS.i)) continue;
+        if (Hh.p >= LS.p || Hh.p >= RS.p) continue;
+        var sh = Math.abs(LS.p - RS.p) / LS.p;
+        if (sh > 0.10 || RS.i - LS.i > 40) continue;
+        var v1 = maxIn(LS.i, Hh.i), v2 = maxIn(Hh.i, RS.i), neck = (v1.p + v2.p) / 2, lastP = cs[n - 1], broken = lastP > neck;
+        var conf = Math.max(42, Math.min(93, 50 + Math.round((0.10 - sh) / 0.10 * 16) + Math.round(rec(RS.i) * 14) + (broken ? 12 : 0)));
+        list.push({ type: '头肩底', dir: 'bullish', conf: conf, title: '头肩底（看多反转）',
+          desc: '左肩 ' + LS.p.toFixed(2) + ' / 头部 ' + Hh.p.toFixed(2) + '（最低） / 右肩 ' + RS.p.toFixed(2) + '，两肩相近；' + (broken ? '已突破颈线 ' + neck.toFixed(2) + '，形态成立。' : '颈线 ' + neck.toFixed(2) + ' 未破，待确认。'),
+          levels: [{ label: '颈线', price: neck.toFixed(2) }, { label: '测距目标', price: (neck + (neck - Hh.p)).toFixed(2) }] });
+        marks.push({ i: LS.i, p: LS.p, dir: 'bullish' }, { i: Hh.i, p: Hh.p, dir: 'bullish' }, { i: RS.i, p: RS.p, dir: 'bullish' }, { i: Hh.i, p: neck, kind: 'neck', dir: 'bull' });
+        return;
+      }
+    })();
+    list.sort(function (x, y) { return y.conf - x.conf; });
+    return { list: list.slice(0, 3), marks: marks };
+  }
+
   function mktBuildDetail(s) {
     const rk = s.rk;
     const cs = (rk && rk.c) ? rk.c : null;
+    const patCs = (cs && cs.length >= 14) ? cs.slice(-36) : (Array.isArray(s.px10) && s.px10.length >= 14 ? s.px10.map(Number).filter(function (x) { return !isNaN(x); }) : []);
+    const pat = detectPatterns(patCs);
     const rep = s.rep;
     const q = { pe: (rep && rep.reports && rep.reports[0] && rep.reports[0].pe != null) ? rep.reports[0].pe : null,
                 pb: null, pct: s.chg, turnover: null };
@@ -8062,7 +8194,8 @@ const RISK_DATA = {
         ]
       },
       fund: { rows: fundRows, note: fundNote },
-      thesis: buildThesis(s, faces, totalClamped, rep)
+      thesis: buildThesis(s, faces, totalClamped, rep),
+      patterns: pat
     };
   }
   function mktRenderDetail(tr) {
@@ -8108,6 +8241,22 @@ const RISK_DATA = {
     setH('thCond', th.cond.map(function (x) { return '<li>' + x + '</li>'; }).join(''));
     const divEl = document.getElementById('thDiv');
     if (divEl) { divEl.style.display = 'block'; divEl.textContent = th.div; }
+    // ---- 形态识别卡渲染 ----
+    const pat = d.patterns;
+    const patListEl = document.getElementById('patList');
+    if (patListEl) {
+      if (pat.list && pat.list.length) {
+        patListEl.innerHTML = pat.list.map(function (p) {
+          const col = p.dir === 'bearish' ? '#FF4D4F' : (p.dir === 'bullish' ? '#52C41A' : '#2962FF');
+          const lv = p.levels.map(function (l) { return '<span class="pat-lv"><b>' + l.label + '</b>' + l.price + '</span>'; }).join('');
+          return '<div class="pat-item"><div class="pat-item-h"><span class="pat-chip" style="color:' + col + ';border-color:' + col + '">' + p.type + '</span><span class="pat-conf" style="color:' + col + '">' + p.conf + '%</span></div><div class="pat-title">' + p.title + '</div><div class="pat-desc">' + p.desc + '</div><div class="pat-levels">' + lv + '</div></div>';
+        }).join('');
+      } else {
+        patListEl.innerHTML = '<div class="pat-empty">近期（最近 36 根日线）未识别到明确反转形态</div>';
+      }
+    }
+    const patCountEl = document.getElementById('patCount');
+    if (patCountEl) patCountEl.textContent = (pat.list && pat.list.length) ? (pat.list.length + ' 个形态') : '无';
     mktRenderChart(s);
   }
   function mktRenderChart(s) {
@@ -8136,12 +8285,25 @@ const RISK_DATA = {
     const closePts = cs.map(function (c, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + yPos(c).toFixed(1); }).join(' ');
     const lastUp = cs[n - 1] >= cs[n - 2];
     const lastColor = lastUp ? '#FF4D4F' : '#52C41A';
+    const patOv = detectPatterns(cs);
+    let overlayStr = '';
+    patOv.marks.forEach(function (m) {
+      const x = (x0 + m.i * step + 3.5).toFixed(1);
+      const y = yPos(m.p).toFixed(1);
+      if (m.kind === 'neck') {
+        const c = m.dir === 'bull' ? '#52C41A' : '#FF4D4F';
+        overlayStr += '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '" stroke="' + c + '" stroke-width="0.9" stroke-dasharray="5,3" opacity="0.55"/>';
+      } else {
+        const c = m.dir === 'bullish' ? '#52C41A' : '#FF4D4F';
+        overlayStr += '<circle cx="' + x + '" cy="' + y + '" r="3.6" fill="none" stroke="' + c + '" stroke-width="1.6" opacity="0.95"/>';
+      }
+    });
     klineSvg.innerHTML =
       '<g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">' +
       [42, 84, 126, 168].map(function (y) { return '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '"/>'; }).join('') + '</g>' +
       '<polyline fill="none" stroke="#2962FF" stroke-width="1.8" points="' + closePts + '"/>' +
       maLine(5, '#FFD24D', 0.9) + maLine(10, '#FF9800', 0.85) + maLine(20, '#7C3AED', 0.8) +
-      '<g><line x1="0" y1="' + yPos(cs[n - 1]).toFixed(1) + '" x2="768" y2="' + yPos(cs[n - 1]).toFixed(1) + '" stroke="' + lastColor + '" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.7"/></g>';
+      '<g><line x1="0" y1="' + yPos(cs[n - 1]).toFixed(1) + '" x2="768" y2="' + yPos(cs[n - 1]).toFixed(1) + '" stroke="' + lastColor + '" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.7"/></g>' + overlayStr;
     const chPrice = document.getElementById('chPrice');
     if (chPrice) {
       const sp = chPrice.querySelectorAll('span');
