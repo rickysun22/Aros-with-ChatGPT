@@ -2301,9 +2301,9 @@
     return jsonpEM(url, cb.replace('__emcb_', '')).then(function (d) {
       const k = d && d.data && d.data.klines;
       if (!k || !k.length) { RK_FULL[c] = null; return null; }
-      const dts = [], cs = [];
-      k.forEach(function (line) { const a = line.split(','); dts.push(a[0]); cs.push(parseFloat(a[2])); });
-      RK_FULL[c] = { d: dts, c: cs };
+      const dts = [], os = [], cs = [], hs = [], ls = [], vs = [];
+      k.forEach(function (line) { const a = line.split(','); dts.push(a[0]); os.push(parseFloat(a[1])); cs.push(parseFloat(a[2])); hs.push(parseFloat(a[3])); ls.push(parseFloat(a[4])); vs.push(parseFloat(a[5])); });
+      RK_FULL[c] = { d: dts, o: os, c: cs, h: hs, l: ls, v: vs };
       return RK_FULL[c];
     }).catch(function () { RK_FULL[c] = null; return null; });
   }
@@ -8267,13 +8267,19 @@ const RISK_DATA = {
     const rk = s.rk;
     const full = (rk && rk.c) ? rk.c : [];
     if (!full.length) return;
+    const hasOHLC = !!(rk.o && rk.h && rk.l && rk.o.length === full.length && rk.h.length === full.length && rk.l.length === full.length);
     const N = Math.min(36, full.length);
     const cs = full.slice(-N);
     const n = cs.length;
+    const osW = hasOHLC ? rk.o.slice(-N) : null;
+    const hsW = hasOHLC ? rk.h.slice(-N) : null;
+    const lsW = hasOHLC ? rk.l.slice(-N) : null;
     const kn = document.getElementById('klineName'); if (kn) kn.textContent = s.name;
     const kc = document.getElementById('klineCode'); if (kc) kc.textContent = s.code;
     const x0 = 17, step = 20, yTop = 12, yBot = 190;
-    let minP = Math.min.apply(null, cs), maxP = Math.max.apply(null, cs);
+    let minP, maxP;
+    if (hasOHLC) { minP = Math.min.apply(null, lsW); maxP = Math.max.apply(null, hsW); }
+    else { minP = Math.min.apply(null, cs); maxP = Math.max.apply(null, cs); }
     const pad = (maxP - minP) * 0.08 || 1; minP -= pad; maxP += pad;
     const yPos = function (p) { return yTop + (maxP - p) / (maxP - minP) * (yBot - yTop); };
     const fmt = function (v) { return v >= 100 ? v.toFixed(1) : v.toFixed(2); };
@@ -8282,7 +8288,6 @@ const RISK_DATA = {
       for (let i = w - 1; i < n; i++) { let sm = 0; for (let j = 0; j < w; j++) sm += cs[i - j]; pts.push((x0 + i * step + 3.5).toFixed(1) + ',' + yPos(sm / w).toFixed(1)); }
       return '<polyline fill="none" stroke="' + color + '" stroke-width="1.5" opacity="' + alpha + '" points="' + pts.join(' ') + '"/>';
     };
-    const closePts = cs.map(function (c, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + yPos(c).toFixed(1); }).join(' ');
     const lastUp = cs[n - 1] >= cs[n - 2];
     const lastColor = lastUp ? '#FF4D4F' : '#52C41A';
     const patOv = detectPatterns(cs);
@@ -8298,10 +8303,25 @@ const RISK_DATA = {
         overlayStr += '<circle cx="' + x + '" cy="' + y + '" r="3.6" fill="none" stroke="' + c + '" stroke-width="1.6" opacity="0.95"/>';
       }
     });
+    let candleStr = '';
+    if (hasOHLC) {
+      for (let i = 0; i < n; i++) {
+        const o = osW[i], c = cs[i], hi = hsW[i], lo = lsW[i];
+        const up = c >= o;
+        const col = up ? '#FF4D4F' : '#52C41A';   // A股: 涨=红 跌=绿
+        const cx = x0 + i * step + 3.5;
+        const yO = yPos(o), yC = yPos(c), yH = yPos(hi), yL = yPos(lo);
+        const top = Math.min(yO, yC), bot = Math.max(yO, yC);
+        const bodyH = Math.max(1, bot - top);
+        candleStr += '<line x1="' + cx.toFixed(1) + '" y1="' + yL.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y2="' + yH.toFixed(1) + '" stroke="' + col + '" stroke-width="1"/>';
+        candleStr += '<rect x="' + (cx - 6).toFixed(1) + '" y="' + top.toFixed(1) + '" width="12" height="' + bodyH.toFixed(1) + '" fill="' + col + '" opacity="0.92"/>';
+      }
+    }
+    const gridStr = '<g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">' +
+      [42, 84, 126, 168].map(function (y) { return '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '"/>'; }).join('') + '</g>';
+    const closeLine = hasOHLC ? '' : '<polyline fill="none" stroke="#2962FF" stroke-width="1.8" points="' + cs.map(function (c, i) { return (x0 + i * step + 3.5).toFixed(1) + ',' + yPos(c).toFixed(1); }).join(' ') + '"/>';
     klineSvg.innerHTML =
-      '<g stroke="rgba(51,65,85,0.28)" stroke-width="0.75">' +
-      [42, 84, 126, 168].map(function (y) { return '<line x1="0" y1="' + y + '" x2="768" y2="' + y + '"/>'; }).join('') + '</g>' +
-      '<polyline fill="none" stroke="#2962FF" stroke-width="1.8" points="' + closePts + '"/>' +
+      gridStr + closeLine + candleStr +
       maLine(5, '#FFD24D', 0.9) + maLine(10, '#FF9800', 0.85) + maLine(20, '#7C3AED', 0.8) +
       '<g><line x1="0" y1="' + yPos(cs[n - 1]).toFixed(1) + '" x2="768" y2="' + yPos(cs[n - 1]).toFixed(1) + '" stroke="' + lastColor + '" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.7"/></g>' + overlayStr;
     const chPrice = document.getElementById('chPrice');
@@ -8315,9 +8335,10 @@ const RISK_DATA = {
     if (volSvg) {
       let vUp = '', vDn = '';
       cs.forEach(function (c, i) {
+        const upDay = hasOHLC ? (c >= osW[i]) : (i > 0 ? (c >= cs[i - 1]) : true);
         const d = i > 0 ? (c / cs[i - 1] - 1) : 0;
         const h = 5 + Math.min(20, Math.abs(d) * 400);
-        if (d >= 0) vUp += '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#FF4D4F" opacity="0.5"/>';
+        if (upDay) vUp += '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#FF4D4F" opacity="0.5"/>';
         else vDn += '<rect x="' + (x0 + i * step) + '" y="' + (51 - h).toFixed(1) + '" width="7" height="' + h.toFixed(1) + '" fill="#52C41A" opacity="0.5"/>';
       });
       volSvg.innerHTML = vUp + vDn;
