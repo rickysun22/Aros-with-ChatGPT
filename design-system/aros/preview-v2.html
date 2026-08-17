@@ -296,6 +296,33 @@
   .warn-line { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; color: #FFB74D; line-height: 1.5; }
   .warn-line .mark { flex-shrink: 0; }
 
+  /* ===== RESEARCH THESIS CARD (借鉴 TideView: THESIS NOT CHAT HISTORY) ===== */
+  .thesis-card { background: linear-gradient(180deg, rgba(41,98,255,0.10), rgba(15,23,42,0.6)); border: 1px solid rgba(64,169,255,0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+  .th-head { display: flex; align-items: center; gap: 10px; }
+  .th-ic { font-size: 18px; }
+  .th-head-l { flex: 1; min-width: 0; }
+  .th-label { font-size: 9.5px; letter-spacing: 1px; color: #7fb0e8; font-weight: 700; font-family: 'Fira Code'; }
+  .th-prop { font-size: 12.5px; font-weight: 600; color: var(--fg); margin-top: 2px; line-height: 1.35; }
+  .th-conf { text-align: center; flex-shrink: 0; min-width: 54px; background: rgba(15,23,42,0.7); border: 1px solid rgba(51,65,85,0.5); border-radius: 8px; padding: 4px 6px; }
+  .th-conf-num { font-size: 17px; font-weight: 700; font-family: 'Fira Code'; color: #40A9FF; line-height: 1; }
+  .th-conf-lab { font-size: 8.5px; color: var(--faint); margin-top: 2px; }
+  .th-conc { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+  .th-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .th-col-h { font-size: 10px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+  .th-pro .th-col-h { color: #95DE64; }
+  .th-con .th-col-h { color: #FFB74D; }
+  .th-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+  .th-list li { font-size: 10.5px; line-height: 1.4; color: var(--sub); padding-left: 10px; position: relative; }
+  .th-pro .th-list li::before { content: '▲'; position: absolute; left: 0; color: #95DE64; font-size: 8px; top: 3px; }
+  .th-con .th-list li::before { content: '▼'; position: absolute; left: 0; color: #FFB74D; font-size: 8px; top: 3px; }
+  .th-cond { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(51,65,85,0.45); }
+  .th-cond .th-col-h { color: #B39DDB; }
+  .th-cond-list li { padding-left: 12px; }
+  .th-cond-list li::before { content: '⟳'; position: absolute; left: 0; color: #B39DDB; font-size: 10px; top: 2px; }
+  .th-div { margin-top: 8px; font-size: 10px; color: #7fb0e8; background: rgba(41,98,255,0.10); border-radius: 6px; padding: 5px 8px; line-height: 1.45; }
+  .th-div b { color: #FFB74D; }
+  .th-note { font-size: 9px; color: var(--faint); margin-top: 6px; font-style: italic; }
+
   /* ===== BOTTOM ROW ===== */
   .bottom-row { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; padding: 10px 12px 12px; min-height: 0; }
   .bottom-right { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
@@ -1125,6 +1152,36 @@
           <div class="ai-title"><span class="stock" id="aiStock">加载中…</span></div>
         </div>
         <div style="padding:4px 13px 10px;" id="aiBody">
+          <div class="thesis-card" id="thesisCard">
+            <div class="th-head">
+              <span class="th-ic">🧭</span>
+              <div class="th-head-l">
+                <div class="th-label">研究命题 · THESIS</div>
+                <div class="th-prop" id="thProp">点击左侧股票行，自动生成可证伪的研究命题</div>
+              </div>
+              <div class="th-conf">
+                <div class="th-conf-num" id="thConf">—</div>
+                <div class="th-conf-lab">置信度</div>
+              </div>
+            </div>
+            <div class="th-conc" id="thConc" style="background:rgba(51,65,85,.4);color:var(--sub)">待数据接入</div>
+            <div class="th-cols">
+              <div class="th-col th-pro">
+                <div class="th-col-h">✅ 支持证据</div>
+                <ul class="th-list" id="thPro"><li>—</li></ul>
+              </div>
+              <div class="th-col th-con">
+                <div class="th-col-h">⚠️ 潜在反证</div>
+                <ul class="th-list" id="thCon"><li>—</li></ul>
+              </div>
+            </div>
+            <div class="th-cond">
+              <div class="th-col-h">🔄 失效条件（何时需重估）</div>
+              <ul class="th-list th-cond-list" id="thCond"><li>—</li></ul>
+            </div>
+            <div class="th-div" id="thDiv" style="display:none"></div>
+            <div class="th-note">证据/反证/失效条件由真实五维评分 · 研报 · 资金流自动归类；反证为规则推导（非 AI 生成），失效条件为可观测触发线。</div>
+          </div>
           <div class="ai-block">
             <div class="ai-label">📈 技术指标分析</div>
             <div class="ai-val">加载中… 点击下方股票行后按真实 K 线计算</div>
@@ -7865,6 +7922,61 @@ const RISK_DATA = {
       }
     }
 
+  // ---- 研究命题卡(借鉴 TideView: THESIS NOT CHAT HISTORY) ----
+  // 把真实五维评分/研报/资金流/技术状态自动归类为 支持证据/潜在反证/失效条件,并算显式置信度与分歧点
+  function buildThesis(s, faces, total, rep) {
+    const NAMES = ['基本面', '技术面', '资金面', '新闻面', '情绪面'];
+    const pro = [], con = [], cond = [];
+    if (faces.tech >= 60) pro.push('技术面 ' + faces.tech + '/100 ' + (faces.tech >= 75 ? '偏强' : '中性偏强') + '，均线/动量共振');
+    if (faces.flow >= 60) pro.push('资金面 ' + faces.flow + '/100 净流入，主力偏积极');
+    if (faces.news >= 60) pro.push('新闻面 ' + faces.news + '/100 偏多');
+    if (faces.fund >= 60) pro.push('基本面(机构覆盖) ' + faces.fund + '/100');
+    if (faces.sent >= 60) pro.push('情绪面 ' + faces.sent + '/100 偏乐观');
+    if (rep && rep.buys > 0) pro.push('东财研报 ' + rep.buys + ' 家买入（共 ' + rep.count + ' 篇）');
+    if (s.macd >= 0) pro.push('MACD 金叉，短期动能向上');
+    if (s.rsi >= 55) pro.push('RSI ' + s.rsi + ' 中性偏强');
+    if (faces.tech < 50) con.push('技术面 ' + faces.tech + '/100 偏弱');
+    if (faces.flow < 50) con.push('资金面 ' + faces.flow + '/100 流出/中性');
+    if (faces.news < 50) con.push('新闻面 ' + faces.news + '/100 偏空');
+    if (faces.fund < 50) con.push('基本面(机构覆盖) ' + faces.fund + '/100 偏淡');
+    if (faces.sent < 50) con.push('情绪面 ' + faces.sent + '/100 谨慎');
+    if (s.macd < 0) con.push('MACD 死叉，短期动能转弱');
+    if (s.rsi < 45) con.push('RSI ' + s.rsi + ' 偏弱，超买回吐压力');
+    if (s.mom20 < 0) con.push('20 日动量 ' + s.mom20.toFixed(1) + '% 为负，中期趋势承压');
+    if (s.px < s.ma) con.push('现价 ' + s.px.toFixed(2) + ' 已跌破 MA20(' + s.ma.toFixed(2) + ')');
+    cond.push('收盘价有效跌破 MA20（' + s.ma.toFixed(2) + '）则趋势假设失效');
+    cond.push('资金面评分回落至 < 45，或主力净流出连续转负');
+    cond.push('情绪面评分 < 45，或突发利空公告 / 解禁');
+    cond.push(s.mom20 >= 0 ? ('20 日动量由正转负（当前 ' + s.mom20.toFixed(1) + '%）') : '20 日动量延续为负且扩大');
+    const vals = [faces.fund, faces.tech, faces.flow, faces.news, faces.sent];
+    const maxv = Math.max.apply(null, vals), minv = Math.min.apply(null, vals);
+    const spread = maxv - minv;
+    const adj = Math.round((40 - spread) / 8);
+    const conf = Math.max(5, Math.min(96, total + adj));
+    let verdict, vcolor, vbg;
+    if (total >= 80) { verdict = '看多'; vcolor = '#95DE64'; vbg = 'rgba(82,196,26,0.18)'; }
+    else if (total >= 65) { verdict = '偏多'; vcolor = '#95DE64'; vbg = 'rgba(82,196,26,0.18)'; }
+    else if (total >= 50) { verdict = '中性'; vcolor = '#FFB74D'; vbg = 'rgba(255,152,0,0.18)'; }
+    else if (total >= 35) { verdict = '偏空'; vcolor = '#FF7875'; vbg = 'rgba(255,77,79,0.18)'; }
+    else { verdict = '看空'; vcolor = '#FF7875'; vbg = 'rgba(255,77,79,0.18)'; }
+    let prop;
+    if (total >= 75) prop = '「' + s.name + '（' + s.code + '）当前多头结构能否延续并打开空间？」';
+    else if (total >= 50) prop = '「' + s.name + '（' + s.code + '）多空拉锯，哪一侧先被证伪？」';
+    else prop = '「' + s.name + '（' + s.code + '）弱势结构何时迎来转折？」';
+    const divs = vals.map(function (v, i) { return { k: NAMES[i], v: v, d: v - total }; })
+      .filter(function (x) { return Math.abs(x.d) >= 15; })
+      .sort(function (a, b) { return Math.abs(b.d) - Math.abs(a.d); });
+    let divTxt;
+    if (divs.length) {
+      divTxt = '分歧点：' + divs.map(function (x) { return x.k + (x.d > 0 ? '偏强' : '偏弱') + '（' + x.v + '）'; }).join('、') + ' — 各维度未形成一致，结论须以失效条件为证伪边界动态重估。';
+    } else {
+      divTxt = '五维评分高度一致（极差 ' + spread + ' 分），结论置信度较高；仍须以失效条件作为证伪边界。';
+    }
+    if (!pro.length) pro.push('暂无明确正面信号，当前以观望为主');
+    if (!con.length) con.push('暂未发现明显反面信号');
+    return { prop: prop, conf: conf, verdict: verdict, vcolor: vcolor, vbg: vbg, pro: pro, con: con, cond: cond, div: divTxt };
+  }
+
   function mktBuildDetail(s) {
     const rk = s.rk;
     const cs = (rk && rk.c) ? rk.c : null;
@@ -7949,7 +8061,8 @@ const RISK_DATA = {
           ['参考止损', sl + ' (-8%)', '#95DE64']
         ]
       },
-      fund: { rows: fundRows, note: fundNote }
+      fund: { rows: fundRows, note: fundNote },
+      thesis: buildThesis(s, faces, totalClamped, rep)
     };
   }
   function mktRenderDetail(tr) {
@@ -7982,6 +8095,19 @@ const RISK_DATA = {
     fundRows.innerHTML = d.fund.rows.map(function (r) {
       return '<div class="fund-row"><span class="k">' + r[0] + '</span><span class="v ' + r[2] + '">' + r[1] + (r[3] ? ' <span style="color:var(--faint)">' + r[3] + '</span>' : '') + '</span></div>';
     }).join('') + '<div class="fund-note">' + d.fund.note + '</div>';
+    // ---- 研究命题卡渲染 ----
+    const th = d.thesis;
+    const setT = function (id, txt) { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    const setH = function (id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+    setT('thProp', th.prop);
+    setT('thConf', th.conf + '%');
+    const conc = document.getElementById('thConc');
+    if (conc) { conc.textContent = th.verdict + ' ▲ 置信度 ' + th.conf + '%'; conc.style.background = th.vbg; conc.style.color = th.vcolor; }
+    setH('thPro', th.pro.map(function (x) { return '<li>' + x + '</li>'; }).join(''));
+    setH('thCon', th.con.map(function (x) { return '<li>' + x + '</li>'; }).join(''));
+    setH('thCond', th.cond.map(function (x) { return '<li>' + x + '</li>'; }).join(''));
+    const divEl = document.getElementById('thDiv');
+    if (divEl) { divEl.style.display = 'block'; divEl.textContent = th.div; }
     mktRenderChart(s);
   }
   function mktRenderChart(s) {
